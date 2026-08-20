@@ -329,7 +329,7 @@ function cmdInit(tokens) {
   try {
     syncManaged(root, { language: options.language, recordApproval: options.record_hooks_approved });
   } catch (error) { fail(error.message); }
-  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nFramework: .riff -> ${PLUGIN_ROOT}\nSkills: symlinked into .agents/skills; the native plugin supplies the $riff:* namespace.\nState: project-local in .riff-state/.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\nRequired: open /hooks in Codex, review the local hooks, then run riff doctor --record-hooks-approved.\nNo Claude files were created.\n`);
+  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nFramework: .riff -> ${PLUGIN_ROOT}\nSkills: symlinked into .agents/skills; the native plugin supplies the $riff:* namespace.\nState: project-local in .riff-state/.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\nRequired: open /hooks in Codex, review the local hooks, then run riff-codex doctor --record-hooks-approved.\nNo Claude files were created.\n`);
 }
 
 function cmdResync(tokens) {
@@ -479,7 +479,7 @@ function cmdWave(tokens) {
   const action = tokens[0] ?? 'select';
   const options = parseOptions(tokens.slice(1));
   let state;
-  try { state = readState(root); } catch (error) { fail(`${error.message}; run riff init`); }
+  try { state = readState(root); } catch (error) { fail(`${error.message}; run riff-codex init`); }
   try {
     if (action === 'sync') {
       state = syncRoadmap(root);
@@ -498,7 +498,7 @@ function cmdWave(tokens) {
       return;
     }
     const id = options._[0];
-    if (!id) throw new Error(`riff wave ${action} requires a phase id`);
+    if (!id) throw new Error(`riff-codex wave ${action} requires a phase id`);
     const phase = phaseById(state, id);
     if (action === 'activate') {
       const selected = selectPhase(state, id);
@@ -585,7 +585,7 @@ function doctor(root, recordApproval = false) {
     const currentHash = hooksHash(hooks);
     if (recordApproval) { config.hooks ??= {}; config.hooks.approvedHash = currentHash; writeJson(files.config, config); }
     if (config.hooks?.approvedHash === currentHash) add('ok', 'hook approval', 'recorded for the current hook hash');
-    else add('warn', 'hook approval', 'pending or changed; review with /hooks, then run riff doctor --record-hooks-approved');
+    else add('warn', 'hook approval', 'pending or changed; review with /hooks, then run riff-codex doctor --record-hooks-approved');
   }
   try {
     const framework = lstatSync(files.framework);
@@ -914,7 +914,7 @@ function cmdStatus() {
 }
 
 function help() {
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--language CODE]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 7337|--snapshot|--check]\n  riff status\n  riff wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync\n  riff wave activate phase-1\n  riff wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff wave complete phase-1 --commit HEAD\n\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--language CODE]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 7337|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff-codex wave complete phase-1 --commit HEAD\n\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -927,5 +927,5 @@ else if (command === 'dashboard') cmdDashboard(tokens);
 else if (command === 'status') cmdStatus();
 else if (command === 'wave') cmdWave(tokens);
 else if (command === 'hook') cmdHook(tokens);
-else if (command === 'next') fail('riff next is intentionally deferred; use $riff:wave or riff wave select');
-else fail(`unknown command ${command}; run riff --help`);
+else if (command === 'next') fail('riff-codex next is intentionally deferred; use $riff:wave or riff-codex wave select');
+else fail(`unknown command ${command}; run riff-codex --help`);
