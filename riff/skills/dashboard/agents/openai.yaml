@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Dashboard"
+  short_description: "Show the read-only RIFF project dashboard"
+  default_prompt: "Use $dashboard through $riff:dashboard to show progress."

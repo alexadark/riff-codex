@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Map"
+  short_description: "Map product behavior to system boundaries"
+  default_prompt: "Use $map through $riff:map to map this codebase."

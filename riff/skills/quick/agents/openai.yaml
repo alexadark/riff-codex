@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Quick"
+  short_description: "Ship one small bounded change safely"
+  default_prompt: "Use $quick through $riff:quick for this small change."

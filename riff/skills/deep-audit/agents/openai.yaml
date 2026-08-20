@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Deep Audit"
+  short_description: "Route an exhaustive audit to Codex Security"
+  default_prompt: "Use $deep-audit through $riff:deep-audit for this audit."

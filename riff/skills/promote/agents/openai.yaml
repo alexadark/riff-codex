@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Promote"
+  short_description: "Promote an authorized reviewed candidate"
+  default_prompt: "Use $promote through $riff:promote for this candidate."

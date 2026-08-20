@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Incident"
+  short_description: "Contain and investigate an active incident"
+  default_prompt: "Use $incident through $riff:incident for this incident."

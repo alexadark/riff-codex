@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Onboard"
+  short_description: "Bring an existing application into RIFF"
+  default_prompt: "Use $onboard through $riff:onboard for this project."

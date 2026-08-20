@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Status"
+  short_description: "Summarize current roadmap and wave status"
+  default_prompt: "Use $status through $riff:status to report progress."

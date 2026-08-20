@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Add Phase"
+  short_description: "Add one vertical outcome to the roadmap"
+  default_prompt: "Use $add-phase through $riff:add-phase to extend the roadmap."

@@ -1,0 +1,22 @@
+{
+  "name": "riff",
+  "version": "0.1.0",
+  "description": "Product discovery, vertical roadmaps, autonomous waves, safety hooks, and a local dashboard for Codex.",
+  "author": {
+    "name": "RIFF"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "RIFF",
+    "shortDescription": "Ship real applications with Codex waves.",
+    "longDescription": "RIFF gives Codex a product contract, a vertical roadmap, deterministic wave state, focused safety checks, and a readable local dashboard.",
+    "developerName": "RIFF",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Use $riff:start to shape this product.",
+      "Use $riff:wave to build the next ready phase.",
+      "Use $riff:dashboard to show project progress."
+    ]
+  }
+}

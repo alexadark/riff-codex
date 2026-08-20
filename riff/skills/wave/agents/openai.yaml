@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Wave"
+  short_description: "Build the next vertical roadmap outcome"
+  default_prompt: "Use $wave through $riff:wave to continue the roadmap."

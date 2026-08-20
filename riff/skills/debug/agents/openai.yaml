@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Debug"
+  short_description: "Diagnose and fix one concrete failure"
+  default_prompt: "Use $debug through $riff:debug for this failure."
