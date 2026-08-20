@@ -13,6 +13,8 @@ cd /path/to/application
 riff-codex init
 ```
 
+On first interactive initialization, RIFF asks five concise questions about project scope, conversation and artifact languages, explanation level, and autonomy. Press Enter to accept the recommended choice. Use `riff-codex init --configure` to revisit these preferences or `--non-interactive` in scripts.
+
 `riff-codex init` creates these project-local links and files:
 
 - `.riff` is a symlink to the permanent `riff/` framework folder.

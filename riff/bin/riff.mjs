@@ -19,6 +19,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 const VERSION = '0.1.0';
@@ -281,9 +282,12 @@ function syncManaged(root, options = {}) {
     config = {
       version: 1,
       language: options.language ?? 'en',
-      preferences: { explanation: 'plain', autonomy: 'loop' },
+      artifactLanguage: options.artifactLanguage ?? 'en',
+      project: { scope: options.scope ?? 'production' },
+      preferences: { explanation: options.explanation ?? 'simple', autonomy: options.autonomy ?? 'loop' },
       notifications: { channel: 'codex' },
       hooks: { approvedHash: null },
+      onboarding: { completedAt: options.configured ? now() : null },
       managed: {},
     };
   }
@@ -299,6 +303,11 @@ function syncManaged(root, options = {}) {
   if (config.hooks.approvedHash !== currentHash) config.hooks.approvedHash = null;
   if (options.recordApproval) config.hooks.approvedHash = currentHash;
   if (options.language) config.language = options.language;
+  if (options.artifactLanguage) config.artifactLanguage = options.artifactLanguage;
+  if (options.scope) config.project = { ...(config.project ?? {}), scope: options.scope };
+  if (options.explanation) config.preferences = { ...(config.preferences ?? {}), explanation: options.explanation };
+  if (options.autonomy) config.preferences = { ...(config.preferences ?? {}), autonomy: options.autonomy };
+  if (options.configured) config.onboarding = { completedAt: now() };
   writeJson(files.config, config);
   if (!existsSync(files.state)) writeJson(files.state, baseState());
   if (!existsSync(files.events)) writeFileSync(files.events, '');
@@ -321,15 +330,71 @@ function parseOptions(tokens) {
   return options;
 }
 
-function cmdInit(tokens) {
+async function choose(terminal, prompt, choices, defaultValue) {
+  const effectiveDefault = choices.some((choice) => choice.value === defaultValue) ? defaultValue : choices[0].value;
+  process.stdout.write(`\n${prompt}\n`);
+  choices.forEach((choice, index) => process.stdout.write(`  ${index + 1}. ${choice.label}${choice.value === effectiveDefault ? ' (recommended)' : ''}\n`));
+  while (true) {
+    const defaultIndex = choices.findIndex((choice) => choice.value === effectiveDefault) + 1;
+    const answer = (await terminal.question(`Choice [${defaultIndex}]: `)).trim();
+    if (!answer) return effectiveDefault;
+    const numeric = Number(answer);
+    if (Number.isInteger(numeric) && choices[numeric - 1]) return choices[numeric - 1].value;
+    const named = choices.find((choice) => choice.value === answer.toLowerCase());
+    if (named) return named.value;
+    process.stdout.write('Please enter a listed number or value.\n');
+  }
+}
+
+async function configureInteractively(existing = {}) {
+  const terminal = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const language = await choose(terminal, 'Conversation language / Langue de conversation', [
+      { value: 'fr', label: 'fr, français' },
+      { value: 'en', label: 'en, English' },
+      { value: 'mix', label: 'mix, follow the user language' },
+    ], existing.language ?? 'fr');
+    const french = language === 'fr';
+    const scope = await choose(terminal, french ? 'Portée du projet' : 'Project scope', [
+      { value: 'production', label: french ? 'production, application réelle avec les protections complètes' : 'production, real application with full protections' },
+      { value: 'scratch', label: french ? 'scratch, expérimentation locale sans données sensibles' : 'scratch, local experiment without sensitive data' },
+    ], existing.project?.scope ?? 'production');
+    const artifactLanguage = await choose(terminal, french ? 'Langue du code, des commits et des documents partagés' : 'Language for code, commits, and shared documents', [
+      { value: 'en', label: 'en, English' },
+      { value: 'fr', label: 'fr, français' },
+    ], existing.artifactLanguage ?? 'en');
+    const explanation = await choose(terminal, french ? "Niveau d'explication" : 'Explanation level', [
+      { value: 'simple', label: french ? 'simple, langage courant' : 'simple, plain language' },
+      { value: 'technical', label: french ? 'technical, détails de code et jargon' : 'technical, code details and jargon' },
+      { value: 'eli5', label: french ? 'eli5, très accessible et très court' : 'eli5, very accessible and brief' },
+    ], existing.preferences?.explanation ?? 'simple');
+    const autonomy = await choose(terminal, french ? "Mode d'autonomie" : 'Autonomy mode', [
+      { value: 'loop', label: french ? "loop, RIFF continue jusqu'à un vrai blocage" : 'loop, RIFF continues until a real blocker' },
+      { value: 'guided', label: french ? 'guided, RIFF demande confirmation entre les phases' : 'guided, RIFF asks between phases' },
+    ], existing.preferences?.autonomy ?? 'loop');
+    return { language, scope, artifactLanguage, explanation, autonomy, configured: true };
+  } finally {
+    terminal.close();
+  }
+}
+
+async function cmdInit(tokens) {
   const options = parseOptions(tokens);
   const candidate = path.resolve(options.project_root ?? process.cwd());
   const root = gitRoot(candidate);
   if (root !== candidate) fail(`--project-root must be the Git root (${root})`);
+  const existing = readJson(pathsFor(root).config, false) ?? {};
+  const needsConfiguration = !existing.onboarding?.completedAt;
+  let configuration = { language: options.language };
+  if (!options.non_interactive && process.stdin.isTTY && process.stdout.isTTY && (options.configure || needsConfiguration)) {
+    process.stdout.write('RIFF project configuration\nPress Enter to accept each recommended choice.\n');
+    configuration = await configureInteractively({ ...existing, language: options.language ?? existing.language });
+  }
   try {
-    syncManaged(root, { language: options.language, recordApproval: options.record_hooks_approved });
+    syncManaged(root, { ...configuration, recordApproval: options.record_hooks_approved });
   } catch (error) { fail(error.message); }
-  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nFramework: .riff -> ${PLUGIN_ROOT}\nSkills: symlinked into .agents/skills; the native plugin supplies the $riff:* namespace.\nState: project-local in .riff-state/.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\nRequired: open /hooks in Codex, review the local hooks, then run riff-codex doctor --record-hooks-approved.\nNo Claude files were created.\n`);
+  const config = readJson(pathsFor(root).config);
+  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: .riff -> ${PLUGIN_ROOT}\nSkills: symlinked into .agents/skills; the native plugin supplies the $riff:* namespace.\nState: project-local in .riff-state/.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\nRequired: open /hooks in Codex, review the local hooks, then run riff-codex doctor --record-hooks-approved.\nNo Claude files were created.\n`);
 }
 
 function cmdResync(tokens) {
@@ -889,7 +954,7 @@ function cmdHook(tokens) {
       const state = readJson(pathsFor(root).state, false);
       event(root, 'hook_session_start', { source: payload.source, model: payload.model });
       const active = state?.phases?.find((phase) => phase.status === 'active');
-      const context = [`RIFF language: ${config?.language ?? 'en'}.`, `Preferences: explanation=${config?.preferences?.explanation ?? 'plain'}, autonomy=${config?.preferences?.autonomy ?? 'loop'}.`, 'Use PROJECT.md and ROADMAP.yaml as product sources; use .riff-state/state.json through the riff CLI only.'];
+      const context = [`RIFF conversation language: ${config?.language ?? 'en'}; artifact language: ${config?.artifactLanguage ?? 'en'}.`, `Project scope: ${config?.project?.scope ?? 'production'}. Preferences: explanation=${config?.preferences?.explanation ?? 'simple'}, autonomy=${config?.preferences?.autonomy ?? 'loop'}.`, 'Use PROJECT.md and ROADMAP.yaml as product sources; use .riff-state/state.json through the RIFF CLI only.'];
       if (active) context.push(`Resume interrupted phase ${active.id}. Load .riff/references/operating-contract.md before continuing.`);
       output = { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context.join(' ') } };
     } else if (name === 'pre-compact') {
@@ -914,13 +979,13 @@ function cmdStatus() {
 }
 
 function help() {
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--language CODE]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 7337|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff-codex wave complete phase-1 --commit HEAD\n\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 7337|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff-codex wave complete phase-1 --commit HEAD\n\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
 if (!command || command === '--help' || command === '-h' || command === 'help') help();
 else if (command === '--version' || command === '-v') process.stdout.write(`${VERSION}\n`);
-else if (command === 'init') cmdInit(tokens);
+else if (command === 'init') await cmdInit(tokens);
 else if (command === 'resync') cmdResync(tokens);
 else if (command === 'doctor') cmdDoctor(tokens);
 else if (command === 'dashboard') cmdDashboard(tokens);
