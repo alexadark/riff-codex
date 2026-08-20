@@ -14,6 +14,7 @@ Use Sol Medium for product judgment. Follow `.riff/references/model-routing.md` 
 5. Propose product outcomes and the simplest fitting architecture. Define only real blocking edges. Build a roadmap of demonstrable vertical tracer bullets, dependencies, risks, sensitive boundaries, and explicit exclusions.
 6. Present the discovery summary and ask the user to confirm or correct it before freezing artifacts.
 7. After confirmation, write `PROJECT.md` and `ROADMAP.yaml`. Make `ROADMAP.yaml` JSON-formatted YAML using the schema in `.riff/references/operating-contract.md`. Do not predict exact files, exhaustive tests, or detailed phase plans.
-8. Run `node .riff/bin/riff.mjs wave sync`, check that both artifacts parse, and stop. Do not start implementation unless the user separately invokes `$riff:wave`.
+8. Run `node .riff/bin/riff.mjs wave sync`, check that both artifacts parse, then write each phase's `EXPLAIN.simple.md` projection using `.riff/references/dashboard.md`.
+9. Stop. Do not start implementation unless the user separately invokes `$riff:wave`.
 
 If a truly multi-system architecture decision cannot be resolved normally, use at most one bounded Sol XHigh review and record why.
