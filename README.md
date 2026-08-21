@@ -38,7 +38,7 @@ RIFF deliberately does not claim that unapproved hooks are active.
 - `$riff:start` inspects facts, interviews only at the current decision boundary, asks for confirmation, and writes `PROJECT.md` plus JSON-formatted `ROADMAP.yaml`.
 - `$riff:onboard` performs the same concise shaping for an existing application.
 - `$riff:wave` resumes or selects the next ready vertical phase, validates affected behavior, obtains candidate-bound reviews, commits atomically, persists the result, and loops across independent ready phases.
-- `riff-codex dashboard` serves a dependency-free local dashboard at `http://127.0.0.1:7337`.
+- `riff-codex dashboard` opens the full shared local dashboard at `http://127.0.0.1:4000`. It combines legacy RIFF and RIFF Codex projects through a shared registry while leaving the legacy framework untouched.
 
 Use `riff-codex --help`, `riff-codex doctor`, and `riff-codex dashboard --snapshot` for the mechanical interfaces. There is intentionally no `riff-codex next`.
 
@@ -46,4 +46,6 @@ Use `riff-codex --help`, `riff-codex doctor`, and `riff-codex dashboard --snapsh
 
 `PROJECT.md` and `ROADMAP.yaml` belong to the application repository. `ROADMAP.yaml` is JSON-formatted YAML so RIFF can parse it without a YAML dependency. Runtime state is in `.riff-state/state.json`; structured events are in `.riff-state/events.ndjson`; review receipts are in `.riff-state/receipts/`.
 
-Rules live once: wave behavior in `.riff/references/operating-contract.md`, focused security in `.riff/references/security.md`, and model selection in `.riff/references/model-routing.md`.
+Rules live once: wave behavior in `.riff/references/operating-contract.md`, focused security in `.riff/references/security.md`, model selection in `.riff/references/model-routing.md`, and the read-only dashboard projection contract in `.riff/references/dashboard.md`.
+
+The dashboard is an independent Bun application. It doesn't call Codex, Claude, an AI SDK, or a provider API. `$riff:start` writes simple pre-phase explanations and `$riff:wave` writes verified post-phase explanations for the dashboard to display.

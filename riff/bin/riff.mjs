@@ -15,8 +15,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { createServer } from 'node:http';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
@@ -270,6 +269,19 @@ function excludeLocalState(root) {
   if (!/^\.riff-state\/$/m.test(current)) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF worktree-local state\n.riff-state/\n`);
 }
 
+function dashboardRegistryFile() {
+  return path.join(homedir(), '.config', 'riff-dashboard', 'registry.json');
+}
+
+function registerDashboardProject(root) {
+  const file = dashboardRegistryFile();
+  const current = readJson(file, false) ?? { version: 1, projects: [], hidden: [] };
+  const projects = Array.isArray(current.projects) ? current.projects.filter((item) => typeof item === 'string') : [];
+  const hidden = Array.isArray(current.hidden) ? current.hidden.filter((item) => typeof item === 'string' && item !== root) : [];
+  if (!projects.includes(root)) projects.push(root);
+  writeJson(file, { version: 1, projects, hidden });
+}
+
 function syncManaged(root, options = {}) {
   const files = pathsFor(root);
   ensureFrameworkLink(root);
@@ -313,6 +325,7 @@ function syncManaged(root, options = {}) {
   if (!existsSync(files.events)) writeFileSync(files.events, '');
   installGitHook(root, 'pre-commit');
   installGitHook(root, 'commit-msg');
+  registerDashboardProject(root);
   event(root, options.resync ? 'resync' : 'init', { version: VERSION, hooks_hash: currentHash });
   return { config, hooks: merged };
 }
@@ -680,7 +693,7 @@ function doctor(root, recordApproval = false) {
     try { valid = lstatSync(target).isSymbolicLink() && path.resolve(path.dirname(target), readlinkSync(target)) === path.join(root, '.riff', 'skills', name); } catch { /* missing */ }
     if (!valid) add('warn', `skill ${name}`, 'project symlink missing or preserved because a foreign entry owns the path');
   }
-  for (const name of ['git', 'node']) add(executable(name) ? 'ok' : 'error', `executable ${name}`, executable(name) ? 'available' : 'missing');
+  for (const name of ['git', 'node', 'bun']) add(executable(name) ? 'ok' : 'error', `executable ${name}`, executable(name) ? 'available' : 'missing');
   for (const name of ['pre-commit', 'commit-msg']) {
     const target = path.join(gitHooksDir(root), name);
     const valid = existsSync(target) && readFileSync(target, 'utf8').includes('# RIFF managed wrapper');
@@ -752,18 +765,6 @@ function dashboardData(root) {
   };
 }
 
-function dashboardHtml() {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>RIFF dashboard</title><style>
-:root{color-scheme:dark;--bg:#0a1012;--panel:#121b1e;--line:#26363b;--ink:#eef7f5;--muted:#91a7a5;--teal:#54d4c4;--amber:#f0c86a;--red:#ff7a7a}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#153034 0,#0a1012 44%);color:var(--ink);font:15px/1.5 ui-sans-serif,system-ui;padding:32px}main{max-width:1180px;margin:auto}h1{font-size:32px;margin:0}.eyebrow{color:var(--teal);letter-spacing:.16em;text-transform:uppercase;font-size:12px}.goal{color:var(--muted);font-size:18px;margin:6px 0 24px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.card{background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:14px;padding:18px}.wide{grid-column:1/-1}.metric{font-size:28px;font-weight:700}.bar{height:9px;background:#233034;border-radius:9px;overflow:hidden}.bar span{display:block;height:100%;background:var(--teal)}h2{font-size:14px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px}ul{padding-left:18px;margin:0}.pill{display:inline-block;padding:3px 9px;border:1px solid var(--line);border-radius:99px;margin:2px;color:var(--muted)}.warn{color:var(--amber)}.danger{color:var(--red)}pre{white-space:pre-wrap;color:var(--muted)}@media(max-width:600px){body{padding:18px}}
-</style></head><body><main id="app">Loading RIFF…</main><script>
-const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-const list=a=>a?.length?'<ul>'+a.map(x=>'<li>'+esc(x.title??x.summary??x.type??x)+'</li>').join('')+'</ul>':'<span class="pill">None</span>';
-const card=(title,body,wide=false)=>'<section class="card '+(wide?'wide':'')+'"><h2>'+title+'</h2>'+body+'</section>';
-async function render(){const d=await fetch('/api/state',{cache:'no-store'}).then(r=>r.json());const pct=d.progress.total?Math.round(100*d.progress.completed/d.progress.total):0;const h=[];h.push('<div class="eyebrow">RIFF '+esc(d.version)+'</div><h1>'+esc(d.project.name||'Unshaped project')+'</h1><div class="goal">'+esc(d.project.objective||'Run $riff:start to define the product.')+'</div><div class="grid">');h.push(card('Roadmap','<div class="metric">'+d.progress.completed+'/'+d.progress.total+'</div><div class="bar"><span style="width:'+pct+'%"></span></div><p>'+pct+'% complete</p>'));h.push(card('Active wave','<div class="metric">'+esc(d.activeWave?.phase||'None')+'</div><p>Next ready: '+esc(d.nextReady?.id||'None')+'</p>'));h.push(card('Last evidence','<p>Commit: '+esc(d.lastCommit||'None')+'</p><p>Validation: '+esc(d.lastValidation?.status||'None')+' '+esc(d.lastValidation?.summary||'')+'</p><p>Functional review: '+esc(d.reviews.functional?.status||'None')+(d.reviews.functional&&!d.reviews.functional.valid?' <span class="danger">stale</span>':'')+'</p>'));h.push(card('Model routing','<p>'+esc(d.model?.name||'Not recorded')+'</p><p>'+esc(d.model?.reasoning||'')+(d.model?' · Fast '+(d.model.fast_available?'available':'unavailable'):'')+'</p>'));h.push(card('Completed',list(d.phases.completed)));h.push(card('Ready',list(d.phases.ready)));h.push(card('Parked and blocked',list([...(d.phases.parked||[]),...(d.phases.blocked||[])])));h.push(card('Human action','<p class="'+(d.humanAction?'warn':'')+'">'+esc(d.humanAction?.reason||'None')+'</p>'));const findings=d.securityFindings.length?d.securityFindings.map(f=>'<p class="'+(['HIGH','CRITICAL'].includes(f.severity)?'danger':'warn')+'"><strong>'+esc(f.severity)+'</strong> '+esc(f.summary)+'<br>Could happen: '+esc(f.what_could_happen)+'<br>Affected: '+esc(f.affected)+'<br>Fix: '+esc(f.recommended_fix)+'<br>Decision: '+esc(f.decision_reason)+'</p>').join(''):'<p>None</p>';h.push(card('Security findings',findings,true));h.push(card('Recent wave and hook events','<pre>'+esc(d.events.map(e=>(e.at||'')+' '+e.type+' '+(e.phase||e.tool||'')).join('\\n')||'None')+'</pre>',true));h.push('</div>');document.querySelector('#app').innerHTML=h.join('')}
-render();setInterval(render,2500);
-</script></body></html>`;
-}
-
 function cmdDashboard(tokens) {
   const options = parseOptions(tokens);
   const root = gitRoot();
@@ -775,22 +776,37 @@ function cmdDashboard(tokens) {
     } catch (error) { fail(error.message); }
     return;
   }
-  const port = Number(options.port ?? 7337);
-  const server = createServer((request, response) => {
-    try {
-      if (request.url === '/api/state') {
-        response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-        response.end(JSON.stringify(dashboardData(root)));
-      } else {
-        response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-        response.end(dashboardHtml());
-      }
-    } catch (error) {
-      response.writeHead(500, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ error: error.message }));
-    }
-  });
-  server.listen(port, '127.0.0.1', () => process.stdout.write(`RIFF dashboard: http://127.0.0.1:${port}\nRead-only; press Ctrl-C to stop.\n`));
+  registerDashboardProject(root);
+  if (!executable('bun')) fail('Bun is required to run the shared dashboard');
+
+  const dashboardRoot = path.join(PLUGIN_ROOT, 'dashboard');
+  if (!existsSync(path.join(dashboardRoot, 'node_modules'))) {
+    process.stdout.write('Installing dashboard dependencies once...\n');
+    const installed = spawnSync('bun', ['install', '--production'], { cwd: dashboardRoot, stdio: 'inherit' });
+    if (installed.status !== 0) fail('dashboard dependency installation failed');
+  }
+
+  const processFile = path.join(homedir(), '.config', 'riff-dashboard', 'server.json');
+  const prior = readJson(processFile, false);
+  let alive = false;
+  if (Number.isInteger(prior?.pid)) {
+    try { process.kill(prior.pid, 0); alive = true; } catch { /* stale process record */ }
+  }
+
+  const port = Number(options.port ?? prior?.port ?? 4000);
+  const url = alive ? prior.url : `http://127.0.0.1:${port}`;
+  if (!alive) {
+    const child = spawn('bun', ['run', 'server.ts'], {
+      cwd: dashboardRoot,
+      detached: true,
+      stdio: 'ignore',
+      env: { ...process.env, PORT: String(port) },
+    });
+    child.unref();
+    writeJson(processFile, { version: 1, pid: child.pid, port, url, startedAt: now() });
+  }
+  if (!options.no_open && process.platform === 'darwin') spawnSync('open', [url], { stdio: 'ignore' });
+  process.stdout.write(`RIFF dashboard: ${url}\nShared, read-only, and independent from Codex or Claude.\n`);
 }
 
 function changedFiles(root, payload, staged = false) {
@@ -995,7 +1011,7 @@ function cmdStatus() {
 }
 
 function help() {
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 7337|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff-codex wave complete phase-1 --commit HEAD\n\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff-codex wave complete phase-1 --commit HEAD\n\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);

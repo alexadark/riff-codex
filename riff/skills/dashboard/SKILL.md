@@ -5,6 +5,6 @@ description: Open or summarize the read-only RIFF project dashboard. Use when th
 
 # Show the RIFF dashboard
 
-Run `node .riff/bin/riff.mjs dashboard` to serve the local read-only dashboard. Use `--snapshot` when a terminal summary is enough.
+Run `node .riff/bin/riff.mjs dashboard` to register the current project and open the shared local dashboard containing legacy RIFF and RIFF Codex projects. Use `--snapshot` when a terminal summary of only the current project is enough.
 
-Explain stale receipts, parked phases, security findings, and required human action in plain language. Do not mutate roadmap or wave state from the dashboard.
+The dashboard reads producer artifacts and never calls a model or agent CLI. Explain stale receipts, parked phases, security findings, and required human action in plain language. Do not mutate roadmap or wave state from the dashboard.

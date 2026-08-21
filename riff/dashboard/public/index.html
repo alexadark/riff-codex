@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RIFF Dashboard</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script>
+      // Apply theme before paint to avoid flash
+      (function () {
+        try {
+          var t = localStorage.getItem("theme") || "dark";
+          document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <!-- Inline icon definitions reused via <use> -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="icon-sun" viewBox="0 0 16 16">
+          <circle cx="8" cy="8" r="3.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+          <g stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <line x1="8" y1="1.25" x2="8" y2="2.75" />
+            <line x1="8" y1="13.25" x2="8" y2="14.75" />
+            <line x1="1.25" y1="8" x2="2.75" y2="8" />
+            <line x1="13.25" y1="8" x2="14.75" y2="8" />
+            <line x1="3.2" y1="3.2" x2="4.3" y2="4.3" />
+            <line x1="11.7" y1="11.7" x2="12.8" y2="12.8" />
+            <line x1="3.2" y1="12.8" x2="4.3" y2="11.7" />
+            <line x1="11.7" y1="4.3" x2="12.8" y2="3.2" />
+          </g>
+        </symbol>
+        <symbol id="icon-moon" viewBox="0 0 16 16">
+          <path
+            d="M13.5 9.8A5.5 5.5 0 0 1 6.2 2.5a.5.5 0 0 0-.7-.6 6.5 6.5 0 1 0 8.6 8.6.5.5 0 0 0-.6-.7Z"
+            fill="currentColor"
+          />
+        </symbol>
+        <symbol id="icon-back" viewBox="0 0 16 16">
+          <path
+            d="M9.5 3.5 5 8l4.5 4.5"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="icon-pulse" viewBox="0 0 16 16">
+          <circle
+            cx="8"
+            cy="8"
+            r="6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-dasharray="9 22"
+          >
+            <animateTransform
+              attributeName="transform"
+              type="rotate"
+              from="0 8 8"
+              to="360 8 8"
+              dur="0.9s"
+              repeatCount="indefinite"
+            />
+          </circle>
+        </symbol>
+        <symbol id="icon-chevron" viewBox="0 0 16 16">
+          <path
+            d="M4 6 L8 10 L12 6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+        <symbol id="icon-plus" viewBox="0 0 16 16">
+          <path
+            d="M8 3 V13 M3 8 H13"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
+        </symbol>
+        <symbol id="icon-x" viewBox="0 0 16 16">
+          <path
+            d="M4 4 L12 12 M12 4 L4 12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+          />
+        </symbol>
+        <symbol id="icon-arrow-left" viewBox="0 0 16 16">
+          <path
+            d="M11 8 H3 M6 5 L3 8 L6 11"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </symbol>
+      </defs>
+    </svg>
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="logo-dot" aria-hidden="true"></span>
+        <span class="brand">RIFF</span>
+
+        <!-- Project view: back-to-overview link + switcher dropdown -->
+        <div id="project-bar" class="project-bar hidden">
+          <button id="back-to-overview" class="back-link" type="button" title="All projects">
+            <svg width="14" height="14"><use href="#icon-arrow-left" /></svg>
+            <span>All projects</span>
+          </button>
+          <span class="separator">/</span>
+          <div id="project-switcher" class="switcher">
+            <button id="switcher-trigger" class="switcher-trigger" type="button" aria-haspopup="menu" aria-expanded="false">
+              <span id="switcher-label" class="switcher-label">project</span>
+              <svg width="12" height="12"><use href="#icon-chevron" /></svg>
+            </button>
+            <div id="switcher-menu" class="switcher-menu hidden" role="menu"></div>
+          </div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button
+          id="theme-toggle"
+          class="icon-btn"
+          type="button"
+          aria-label="Toggle theme"
+          title="Toggle theme"
+        >
+          <svg class="icon-light" width="16" height="16"><use href="#icon-sun" /></svg>
+          <svg class="icon-dark" width="16" height="16"><use href="#icon-moon" /></svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="bootstrap-banner" class="banner banner-info hidden" role="status">
+      <svg width="14" height="14"><use href="#icon-pulse" /></svg>
+      <span id="bootstrap-banner-text">Bootstrap running…</span>
+      <button id="bootstrap-banner-dismiss" class="banner-dismiss" type="button" aria-label="Dismiss">
+        ×
+      </button>
+    </div>
+
+    <main id="app" class="app">
+      <!-- Overview view: grid of project cards -->
+      <section id="overview-view" class="view overview-view hidden">
+        <div class="overview-header">
+          <h1 class="overview-title">Projects</h1>
+          <p id="overview-subtitle" class="overview-subtitle fg-muted small"></p>
+        </div>
+        <div id="overview-grid" class="overview-grid"></div>
+        <div class="overview-footer">
+          <button id="add-project-toggle" class="btn add-btn" type="button">
+            <svg width="14" height="14"><use href="#icon-plus" /></svg>
+            <span>Add project</span>
+          </button>
+          <form id="add-project-form" class="add-form hidden" autocomplete="off">
+            <input
+              id="add-project-input"
+              class="add-input mono"
+              type="text"
+              placeholder="/absolute/path/to/project"
+              spellcheck="false"
+            />
+            <button id="add-project-browse" type="button" class="btn" title="Choose folder">
+              Browse…
+            </button>
+            <button type="submit" class="btn btn-primary">Add</button>
+            <button id="add-project-cancel" type="button" class="btn">Cancel</button>
+            <span id="add-project-error" class="add-error fg-muted small hidden"></span>
+          </form>
+        </div>
+      </section>
+
+      <!-- Project (kanban) view -->
+      <section id="kanban-view" class="view kanban-view hidden">
+        <nav id="project-tabs" class="project-tabs" aria-label="Project sections"></nav>
+        <div id="kanban-header" class="kanban-header">
+          <div id="kanban-header-actions" class="kanban-header-actions"></div>
+        </div>
+        <div id="project-status" class="project-status hidden"></div>
+        <div id="kanban" class="kanban"></div>
+        <div id="uxruns" class="uxruns hidden"></div>
+      </section>
+
+      <!-- Plan preview overlay (full-screen iframe) -->
+      <section id="preview-view" class="preview-view hidden" role="dialog" aria-modal="true">
+        <div class="preview-bar">
+          <button id="preview-close" class="icon-btn" type="button" aria-label="Close preview">
+            <svg width="16" height="16"><use href="#icon-x" /></svg>
+          </button>
+          <span class="preview-bar-title">Plan Preview</span>
+          <a id="preview-open-tab" class="btn btn-sm" target="_blank" rel="noopener">Open in new tab</a>
+        </div>
+        <iframe id="preview-iframe" class="preview-iframe" sandbox="allow-scripts allow-same-origin"></iframe>
+      </section>
+
+      <!-- Phase detail modal -->
+      <section id="detail-view" class="detail-view hidden" role="dialog" aria-modal="true">
+        <div class="detail-card">
+          <div class="detail-header">
+            <button id="back-btn" class="icon-btn" type="button" aria-label="Close">
+              <svg width="16" height="16"><use href="#icon-back" /></svg>
+            </button>
+            <div class="detail-title-block">
+              <h1 id="detail-title" class="detail-title">Phase</h1>
+              <div id="detail-badges" class="detail-badges"></div>
+            </div>
+          </div>
+
+          <nav id="detail-tabs" class="detail-tabs"></nav>
+
+          <div id="detail-actions" class="detail-actions"></div>
+
+          <div id="detail-body" class="detail-body"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Confirmation modal (used for project remove) -->
+    <div id="confirm-modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-backdrop"></div>
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="confirm-title">Confirm</h2>
+          <button id="confirm-dismiss" class="icon-btn" type="button" aria-label="Dismiss">×</button>
+        </div>
+        <div class="modal-body">
+          <p id="confirm-message" class="fg-muted"></p>
+          <div class="modal-actions">
+            <button id="confirm-cancel" class="btn" type="button">Cancel</button>
+            <button id="confirm-ok" class="btn btn-danger" type="button">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

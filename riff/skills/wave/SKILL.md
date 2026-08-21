@@ -12,7 +12,7 @@ Read `.riff/references/operating-contract.md`. Read `.riff/references/security.m
 3. Treat compiler, lint, and test feedback encountered while building as normal development feedback. Once the candidate is coherent, validate only affected behavior once and record it with `wave validate`. Use `wave retry` only after `wave validate` recorded a concrete failure for this phase. Apply one targeted correction and repeat only the failed check. Park the phase if that formal retry still fails.
 4. Perform a fresh functional review. For a sensitive boundary, perform a focused security review in plain language. A credible HIGH or CRITICAL finding must use `wave park`.
 5. Stage the complete candidate before recording receipts. Record functional and, when required, security receipts with `wave review`. Any later candidate change invalidates them.
-6. Create one atomic commit. Run `wave complete <phase> --commit HEAD`; this verifies the commit tree matches the receipts.
+6. Create one atomic commit. Run `wave complete <phase> --commit HEAD`; this verifies the commit tree matches the receipts. Write its `EXPLAIN-POST.simple.md` projection using `.riff/references/dashboard.md`.
 7. Continue automatically with the next ready independent phase. Stop only when the roadmap is complete or a genuine global blocker requires the user. Use `await`, `block`, or `park` with a concrete reason.
 
 When the user explicitly authorizes continuation of a parked, blocked, or awaiting-human phase, run `wave resume <phase> --reason "..."`. This starts a fresh formal retry budget; it does not weaken validation or review gates.
