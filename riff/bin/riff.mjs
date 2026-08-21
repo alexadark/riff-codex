@@ -553,6 +553,18 @@ function cmdWave(tokens) {
     }
     if (action === 'select' || action === 'resume') {
       const requested = options._[0];
+      if (action === 'resume' && requested) {
+        const resumable = phaseById(state, requested);
+        if (['parked', 'blocked', 'awaiting_human'].includes(resumable.status)) {
+          const active = state.phases.find((item) => item.status === 'active');
+          if (active && active.id !== resumable.id) throw new Error(`phase ${active.id} is active; resume or park it first`);
+          const reason = optionRequired(options, 'reason');
+          resumable.attempts = 0;
+          markPhase(root, state, resumable, 'active', reason);
+          process.stdout.write(`Resumed ${requested}.\n`);
+          return;
+        }
+      }
       const phase = selectPhase(state, requested);
       if (!phase) {
         const unfinished = state.phases.filter((item) => item.status !== 'completed');
@@ -574,10 +586,14 @@ function cmdWave(tokens) {
       markPhase(root, state, phase, status, optionRequired(options, 'reason'));
       process.stdout.write(`${id} is ${status}.\n`);
     } else if (action === 'retry') {
+      const reason = optionRequired(options, 'reason');
+      if (state.lastValidation?.phase !== id || state.lastValidation?.status !== 'fail') {
+        throw new Error('wave retry requires a recorded failed validation for this phase');
+      }
       if ((phase.attempts ?? 0) >= 1) throw new Error('the single targeted correction has already been used; park the phase');
       phase.attempts = 1;
       saveState(root, state);
-      event(root, 'targeted_retry', { phase: id, reason: optionRequired(options, 'reason') });
+      event(root, 'targeted_retry', { phase: id, reason });
       process.stdout.write(`Recorded the one targeted correction for ${id}.\n`);
     } else if (action === 'validate') {
       const status = optionRequired(options, 'status');

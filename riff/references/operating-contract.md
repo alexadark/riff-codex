@@ -18,10 +18,12 @@ Valid phase states are `ready`, `active`, `completed`, `parked`, `blocked`, and 
 1. Read only `PROJECT.md`, `ROADMAP.yaml`, current RIFF state, and references needed by the current boundary.
 2. Resume an active phase, honor an explicit phase, or select the first ready phase.
 3. Build the complete vertical outcome with one writer per worktree. Use read-only research or review subagents only when they add clear value. Give write ownership only when isolated explicitly.
-4. Validate only affected behavior once at the appropriate checkpoint. Hooks accumulate validation needs but never run a full suite or typecheck after each edit.
+4. Treat compiler, lint, and test feedback encountered during construction as normal development feedback. Once the candidate is coherent, validate only affected behavior once at the appropriate checkpoint and record the result. Hooks accumulate validation needs but never run a full suite or typecheck after each edit.
 5. Stage the complete candidate, record its Git tree hash, then obtain a fresh functional review. Load the security reference and obtain a focused security review only for a sensitive boundary.
-6. A concrete failure permits one targeted correction and one repeat of the failed check. Park the phase if that correction fails.
+6. A concrete failure recorded by `wave validate` permits one targeted correction and one repeat of the failed check. Pre-validation development feedback does not consume this retry. Park the phase if the formal correction fails.
 7. Commit the reviewed tree atomically, persist completion, then continue with the next ready phase.
 8. Stop only when the roadmap is complete or a genuine global blocker needs the user.
+
+An explicit user instruction may resume a parked, blocked, or awaiting-human phase. Resumption records the reason, activates the phase, and starts a fresh formal retry budget without bypassing validation or review gates.
 
 Receipts are valid only for their recorded Git tree hash. Any candidate change requires staging again and issuing fresh receipts. Do not create a persistent plan unless the operation is exceptionally destructive, ambiguous, multi-system, or genuinely long-running.
