@@ -9,4 +9,4 @@ Inspect the repository first. Separate implemented facts from preferences, assum
 
 Ask only decisions at the current product boundary, with a recommendation for each. Identify technical debt only when it blocks a vertical outcome. Mark uncertain later work as fog of war.
 
-Draft `PROJECT.md` and a vertical `ROADMAP.yaml` with an explicit justified P0-P3 priority for every phase, then ask for confirmation before writing them. Do not assign one default priority across the roadmap. Preserve existing product documentation unless the user authorizes replacement. After confirmation, write the artifacts, run `node .riff/bin/riff.mjs wave sync`, and stop.
+Draft `PROJECT.md` and a vertical `ROADMAP.yaml` with an explicit justified P0-P3 priority for every phase, then ask for confirmation before writing them. Do not assign one default priority across the roadmap. Treat both artifacts as shared with Claude RIFF. Preserve existing content, roadmap representation, comments, key order, and unknown fields unless the user authorizes a targeted replacement. After confirmation, write the artifacts, run `node .riff-codex/bin/riff.mjs wave sync`, and stop.

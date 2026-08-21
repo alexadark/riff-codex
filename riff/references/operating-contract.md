@@ -5,14 +5,16 @@ This file is the canonical source for persistent state and wave behavior.
 ## Product artifacts
 
 - `PROJECT.md` is the product contract. It records the shared vocabulary, users, outcomes, constraints, architecture, facts, preferences, assumptions, open questions, fog of war, and explicit exclusions.
-- `ROADMAP.yaml` is JSON-formatted YAML. Its root contains `version`, `project`, `phases`, and `out_of_scope`. Each phase contains `id`, `title`, `outcome`, `demo`, `priority`, `depends_on`, `blocking_edges`, `risks`, `sensitive`, `exclusions`, and `status`.
+- `ROADMAP.yaml` is a shared product artifact. RIFF Codex creates a root containing `version`, `project`, `phases`, and `out_of_scope`, and also reads Claude RIFF roadmaps with root `phase-*` entries. Never convert an existing roadmap merely to change formats. When a skill makes an authorized change, preserve unknown fields, comments, key order, and the existing representation with a targeted edit.
 - Roadmap phases are vertical tracer bullets with a result a user can demonstrate. Do not predict exact files, exhaustive tests, or detailed future implementation plans.
 - Every phase has an explicit priority: `P0` for an immediate critical safety or release blocker, `P1` for a high-priority committed outcome, `P2` for normal planned work, and `P3` for a low-priority optional outcome. Never infer a default priority merely for display.
-- `.riff-state/state.json` is written only through the RIFF CLI. `.riff-state/events.ndjson` is the short append-only event stream.
+- `.riff-codex-state/state.json` is written only through the RIFF Codex CLI. `.riff-codex-state/events.ndjson` is the short append-only event stream. Claude's `.riff` and `.riff-state/` are foreign and must never be modified or replaced.
+
+Claude RIFF and RIFF Codex may coexist in one project and share `PROJECT.md` and `ROADMAP.yaml`. Only one runtime may execute a phase at a time.
 
 ## States and readiness
 
-Valid phase states are `ready`, `active`, `completed`, `parked`, `blocked`, and `awaiting_human`. A `ready` phase is selectable only when every `depends_on` phase is `completed`. A parked phase does not prevent independent ready phases from running. `blocked` means an external or global blocker, not an unmet roadmap dependency.
+Valid phase states are `ready`, `active`, `completed`, `parked`, `blocked`, `awaiting_human`, and imported `skipped`. A `ready` phase is selectable only when every `depends_on` phase is terminal (`completed` or imported `skipped`). A parked phase does not prevent independent ready phases from running. `blocked` means an external or global blocker, not an unmet roadmap dependency.
 
 The dashboard presents those operational states using the fixed columns `Todo`, `In progress`, `Done`, `Blocked`, and `Skipped`: `ready` maps to `Todo`, `active` to `In progress`, `completed` to `Done`, and `parked`, `blocked`, or `awaiting_human` to `Blocked`. `Skipped` remains available for imported legacy roadmaps; RIFF Codex does not silently skip committed phases.
 

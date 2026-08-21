@@ -70,7 +70,7 @@ export function loadProfile(_frameworkRoot: string): { profile: Record<string, a
 }
 
 export function resolveProjectConfig(projectRoot: string, _frameworkRoot: string): ProjectConfig {
-  const codex = join(projectRoot, ".riff-state", "config.json");
+  const codex = join(projectRoot, ".riff-codex-state", "config.json");
   if (existsSync(codex)) {
     try {
       const config = JSON.parse(readFileSync(codex, "utf8"));

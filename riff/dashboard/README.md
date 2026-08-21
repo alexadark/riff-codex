@@ -1,6 +1,6 @@
 # RIFF Dashboard
 
-The RIFF dashboard is a local, independent, read-only application shared by legacy RIFF and RIFF Codex projects.
+The RIFF dashboard is a local, independent, read-only application shared by Claude RIFF and RIFF Codex projects.
 It keeps the original multi-project design, project selector, kanban, phase details, plan previews, UX runs, and live refresh.
 
 It doesn't call Claude, Codex, OpenAI, Anthropic, or any other model SDK or agent CLI.
@@ -29,7 +29,7 @@ bun run start
 
 ## Project formats
 
-Legacy RIFF projects are read from:
+Claude RIFF projects are read from:
 
 - `ROADMAP.yaml`
 - `STATE.md`
@@ -39,10 +39,10 @@ Legacy RIFF projects are read from:
 RIFF Codex projects are read from:
 
 - `ROADMAP.yaml`
-- `.riff-state/state.json`
-- `.riff-state/events.ndjson`
-- `.riff-state/dashboard/phases/<id>-<slug>/EXPLAIN.simple.md`
-- `.riff-state/dashboard/phases/<id>-<slug>/EXPLAIN-POST.simple.md`
+- `.riff-codex-state/state.json`
+- `.riff-codex-state/events.ndjson`
+- `.riff-codex-state/dashboard/phases/<id>-<slug>/EXPLAIN.simple.md`
+- `.riff-codex-state/dashboard/phases/<id>-<slug>/EXPLAIN-POST.simple.md`
 
 The Codex state view includes the active wave, next ready phase, last commit and validation, functional and security reviews, security findings in plain language, required human action, recent events, and recorded model routing.
 The phase board projects live Codex states into the fixed columns `Todo`, `In progress`, `Done`, `Blocked`, and `Skipped`. It supports string identifiers such as `2-design` and only renders priorities explicitly declared in the roadmap.

@@ -37,9 +37,9 @@ export class ProjectWatcher {
       join(this.projectRoot, "ROADMAP.yaml"),
       join(this.projectRoot, "STATE.md"),
       join(this.projectRoot, ".planning", "phases"),
-      join(this.projectRoot, ".riff-state", "state.json"),
-      join(this.projectRoot, ".riff-state", "events.ndjson"),
-      join(this.projectRoot, ".riff-state", "dashboard"),
+      join(this.projectRoot, ".riff-codex-state", "state.json"),
+      join(this.projectRoot, ".riff-codex-state", "events.ndjson"),
+      join(this.projectRoot, ".riff-codex-state", "dashboard"),
       join(this.projectRoot, ".uxtest"),
     ].filter((p) => existsSync(p));
 
@@ -100,7 +100,7 @@ export class ProjectWatcher {
       this.scheduleFlush("__top__");
       return;
     }
-    if (rel === join(".riff-state", "state.json") || rel === join(".riff-state", "events.ndjson")) {
+    if (rel === join(".riff-codex-state", "state.json") || rel === join(".riff-codex-state", "events.ndjson")) {
       this.pendingTopLevel.add("state");
       this.scheduleFlush("__top__");
       return;
@@ -118,7 +118,7 @@ export class ProjectWatcher {
       this.scheduleFlush(`phase:${id}`);
       return;
     }
-    if (segments[0] === ".riff-state" && segments[1] === "dashboard" && segments[2] === "phases" && segments[3]) {
+    if (segments[0] === ".riff-codex-state" && segments[1] === "dashboard" && segments[2] === "phases" && segments[3]) {
       const folder = segments[3];
       const filename = segments.slice(4).join("/") || folder;
       const id = this.parsePhaseId(folder);
@@ -137,7 +137,7 @@ export class ProjectWatcher {
   }
 
   private parsePhaseId(folderName: string): string | null {
-    const statePath = join(this.projectRoot, ".riff-state", "state.json");
+    const statePath = join(this.projectRoot, ".riff-codex-state", "state.json");
     if (existsSync(statePath)) {
       try {
         const state = JSON.parse(readFileSync(statePath, "utf8"));

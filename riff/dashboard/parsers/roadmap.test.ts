@@ -11,7 +11,7 @@ function fixture(roadmap: Record<string, unknown>, state?: Record<string, unknow
   roots.push(root);
   writeFileSync(join(root, "ROADMAP.yaml"), `${JSON.stringify(roadmap, null, 2)}\n`);
   if (state) {
-    const stateDir = join(root, ".riff-state");
+    const stateDir = join(root, ".riff-codex-state");
     mkdirSync(stateDir, { recursive: true });
     writeFileSync(join(stateDir, "state.json"), `${JSON.stringify(state, null, 2)}\n`);
   }
@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("RIFF Codex roadmap projection", () => {
-  test("uses live state for the five dashboard columns and preserves string ids", async () => {
+  test("uses live Codex state and reads Claude root phase entries", async () => {
     const phases = [
       { id: "1", title: "Complete", outcome: "Done", priority: "P1", status: "ready" },
       { id: "2-design", title: "Design", outcome: "Doing", priority: "P1", status: "ready" },
@@ -52,6 +52,16 @@ describe("RIFF Codex roadmap projection", () => {
       { id: "3", status: "blocked" },
       { id: "4", status: "todo" },
       { id: "legacy-skip", status: "skipped" },
+    ]);
+
+    const claudeRoot = fixture({
+      name: "Claude",
+      "phase-alpha": { name: "Alpha", status: "done" },
+      "phase-beta": { title: "Beta", status: "todo", depends_on: ["phase-alpha"] },
+    });
+    expect(parseRoadmap(claudeRoot)?.phases.map(({ id, title, depends_on }) => ({ id, title, depends_on }))).toEqual([
+      { id: "alpha", title: "Alpha", depends_on: [] },
+      { id: "beta", title: "Beta", depends_on: ["alpha"] },
     ]);
   });
 

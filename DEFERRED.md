@@ -7,7 +7,7 @@ RIFF V0.1 intentionally does not include:
 - stress testing;
 - RIFF self-improvement loops;
 - provider compatibility or a model gateway;
-- Claude support;
+- executing Claude models from the Codex runtime (coexistence with Claude RIFF is supported);
 - stacked pull requests;
 - exhaustive crash recovery.
 

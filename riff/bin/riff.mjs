@@ -12,6 +12,7 @@ import {
   renameSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -20,11 +21,21 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
+import YAML from 'yaml';
 
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = path.resolve(path.dirname(SCRIPT), '..');
-const PHASE_STATES = new Set(['ready', 'active', 'completed', 'parked', 'blocked', 'awaiting_human']);
+const FRAMEWORK_DIR = '.riff-codex';
+const STATE_DIR = '.riff-codex-state';
+const LEGACY_FRAMEWORK_DIR = '.riff';
+const LEGACY_STATE_DIR = '.riff-state';
+const HOOK_ID = 'riff-codex-hook:';
+const LEGACY_HOOK_ID = 'riff-hook:';
+const GIT_HOOK_MARKER = '# RIFF Codex managed wrapper';
+const LEGACY_GIT_HOOK_MARKER = '# RIFF managed wrapper';
+const PHASE_STATES = new Set(['ready', 'active', 'completed', 'parked', 'blocked', 'awaiting_human', 'skipped']);
+const TERMINAL_PHASE_STATES = new Set(['completed', 'skipped']);
 const ROADMAP_PRIORITIES = new Set(['P0', 'P1', 'P2', 'P3']);
 const SENSITIVE_WORDS = /auth|authori[sz]|tenant|user data|secret|payment|migration|public api|callback|webhook/i;
 
@@ -47,6 +58,10 @@ function gitRoot(candidate = process.cwd()) {
 
 function ensureDir(fileOrDir, isFile = false) {
   mkdirSync(isFile ? path.dirname(fileOrDir) : fileOrDir, { recursive: true });
+}
+
+function pathExists(target) {
+  try { lstatSync(target); return true; } catch { return false; }
 }
 
 function readJson(file, required = true) {
@@ -79,12 +94,12 @@ function now() {
 function pathsFor(root) {
   return {
     root,
-    framework: path.join(root, '.riff'),
-    riff: path.join(root, '.riff-state'),
-    config: path.join(root, '.riff-state', 'config.json'),
-    state: path.join(root, '.riff-state', 'state.json'),
-    events: path.join(root, '.riff-state', 'events.ndjson'),
-    receipts: path.join(root, '.riff-state', 'receipts'),
+    framework: path.join(root, FRAMEWORK_DIR),
+    riff: path.join(root, STATE_DIR),
+    config: path.join(root, STATE_DIR, 'config.json'),
+    state: path.join(root, STATE_DIR, 'state.json'),
+    events: path.join(root, STATE_DIR, 'events.ndjson'),
+    receipts: path.join(root, STATE_DIR, 'receipts'),
     hooks: path.join(root, '.codex', 'hooks.json'),
     roadmap: path.join(root, 'ROADMAP.yaml'),
     project: path.join(root, 'PROJECT.md'),
@@ -148,7 +163,7 @@ function quote(value) {
 function desiredHooks(script = SCRIPT) {
   const handler = (name, extra = {}) => ({
     type: 'command',
-    command: `/usr/bin/env node ${quote(script)} hook ${name} --id riff-hook:${name}`,
+    command: `/usr/bin/env node ${quote(script)} hook ${name} --id ${HOOK_ID}${name}`,
     timeout: 10,
     ...extra,
   });
@@ -162,7 +177,11 @@ function desiredHooks(script = SCRIPT) {
   };
 }
 
-function mergeHooks(existing, script = SCRIPT) {
+function isLegacyCodexHook(command) {
+  return command.includes(LEGACY_HOOK_ID) && command.includes(`/${LEGACY_FRAMEWORK_DIR}/bin/riff.mjs`);
+}
+
+function mergeHooks(existing, script = SCRIPT, removeLegacyCodexHooks = false) {
   const result = existing ?? { description: 'Project-local Codex hooks.' };
   if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('hooks.json root must be an object');
   if (result.hooks !== undefined && (typeof result.hooks !== 'object' || Array.isArray(result.hooks))) throw new Error('hooks.json hooks must be an object');
@@ -170,7 +189,13 @@ function mergeHooks(existing, script = SCRIPT) {
   for (const [eventName, groups] of Object.entries(result.hooks)) {
     if (!Array.isArray(groups)) throw new Error(`hooks.${eventName} must be an array`);
     result.hooks[eventName] = groups
-      .map((group) => ({ ...group, hooks: (group.hooks ?? []).filter((hook) => !String(hook.command ?? '').includes('riff-hook:')) }))
+      .map((group) => ({
+        ...group,
+        hooks: (group.hooks ?? []).filter((hook) => {
+          const command = String(hook.command ?? '');
+          return !command.includes(HOOK_ID) && !(removeLegacyCodexHooks && isLegacyCodexHook(command));
+        }),
+      }))
       .filter((group) => group.hooks.length > 0);
   }
   for (const [eventName, groups] of Object.entries(desiredHooks(script))) {
@@ -186,7 +211,7 @@ function hooksHash(hooks) {
   for (const [eventName, groups] of Object.entries(hooks.hooks ?? {})) {
     for (const group of groups) {
       for (const hook of group.hooks ?? []) {
-        if (String(hook.command ?? '').includes('riff-hook:')) managed.push([eventName, group.matcher ?? '', hook]);
+        if (String(hook.command ?? '').includes(HOOK_ID)) managed.push([eventName, group.matcher ?? '', hook]);
       }
     }
   }
@@ -200,53 +225,127 @@ function gitHooksDir(root) {
   return path.resolve(root, configured);
 }
 
-function installGitHook(root, name) {
+function installGitHook(root, name, migration) {
   const directory = gitHooksDir(root);
   ensureDir(directory);
   const target = path.join(directory, name);
-  const backupDir = path.join(root, '.riff-state', 'git-hooks');
+  const backupDir = path.join(root, STATE_DIR, 'git-hooks');
   ensureDir(backupDir);
   let prior = null;
   if (existsSync(target)) {
     const current = readFileSync(target, 'utf8');
-    if (!current.includes('# RIFF managed wrapper')) {
+    const currentIsCodex = current.includes(GIT_HOOK_MARKER);
+    const currentIsLegacyCodex = (migration.legacyFrameworkOwned || migration.migratedState)
+      && current.includes(LEGACY_GIT_HOOK_MARKER)
+      && current.includes(`/${LEGACY_FRAMEWORK_DIR}/bin/riff.mjs`);
+    if (!currentIsCodex && !currentIsLegacyCodex) {
       const digest = sha(current).slice(0, 12);
       prior = path.join(backupDir, `${name}.${digest}.previous`);
       if (!existsSync(prior)) copyFileSync(target, prior);
     } else {
-      const match = current.match(/^RIFF_PREVIOUS=(.+)$/m);
+      const match = current.match(/^(?:RIFF_CODEX_PREVIOUS|RIFF_PREVIOUS)=(.+)$/m);
       prior = match?.[1] ? JSON.parse(match[1]) : null;
+      const legacyPrefix = `${path.join(root, LEGACY_STATE_DIR)}${path.sep}`;
+      if (migration.migratedState && typeof prior === 'string' && prior.startsWith(legacyPrefix)) {
+        const migratedPrior = path.join(root, STATE_DIR, path.relative(path.join(root, LEGACY_STATE_DIR), prior));
+        if (pathExists(migratedPrior)) prior = migratedPrior;
+      }
     }
   }
   const previousLine = JSON.stringify(prior ?? '');
   const arg = name === 'commit-msg' ? ' "$@"' : '';
-  const wrapper = `#!/bin/sh\n# RIFF managed wrapper\nRIFF_PREVIOUS=${previousLine}\nif [ -n "$RIFF_PREVIOUS" ] && [ -x "$RIFF_PREVIOUS" ]; then "$RIFF_PREVIOUS" "$@" || exit $?; fi\n/usr/bin/env node "$(git rev-parse --show-toplevel)/.riff/bin/riff.mjs" hook git-${name}${arg}\n`;
+  const wrapper = `#!/bin/sh\n${GIT_HOOK_MARKER}\nRIFF_CODEX_PREVIOUS=${previousLine}\nif [ -n "$RIFF_CODEX_PREVIOUS" ] && [ -x "$RIFF_CODEX_PREVIOUS" ]; then "$RIFF_CODEX_PREVIOUS" "$@" || exit $?; fi\n/usr/bin/env node "$(git rev-parse --show-toplevel)/${FRAMEWORK_DIR}/bin/riff.mjs" hook git-${name}${arg}\n`;
   writeFileSync(target, wrapper);
   chmodSync(target, 0o755);
 }
 
+function symlinkResolvesTo(link, expected) {
+  try {
+    return lstatSync(link).isSymbolicLink() && path.resolve(path.dirname(link), readlinkSync(link)) === expected;
+  } catch {
+    return false;
+  }
+}
+
+function legacyStateOwnership(root) {
+  let config;
+  try { config = readJson(path.join(root, LEGACY_STATE_DIR, 'config.json'), false); }
+  catch { return { owned: false, preserveHookApproval: false }; }
+  const cli = String(config?.managed?.cli ?? '');
+  const pluginRoot = config?.managed?.pluginRoot ? path.resolve(String(config.managed.pluginRoot)) : null;
+  const owned = cli === `${LEGACY_FRAMEWORK_DIR}/bin/riff.mjs` && pluginRoot === PLUGIN_ROOT;
+  const preserveHookApproval = owned
+    && typeof config?.hooks?.approvedHash === 'string'
+    && config.hooks.approvedHash.length > 0
+    && config.hooks.approvedHash === config?.managed?.hooksHash;
+  return { owned, preserveHookApproval };
+}
+
+function migrateLegacyInstall(root) {
+  const legacyFramework = path.join(root, LEGACY_FRAMEWORK_DIR);
+  const framework = path.join(root, FRAMEWORK_DIR);
+  const legacyState = path.join(root, LEGACY_STATE_DIR);
+  const state = path.join(root, STATE_DIR);
+  const changes = [];
+  const legacyFrameworkOwned = symlinkResolvesTo(legacyFramework, PLUGIN_ROOT);
+  const ownership = legacyStateOwnership(root);
+  let migratedState = false;
+
+  if (!pathExists(framework) && legacyFrameworkOwned) {
+    renameSync(legacyFramework, framework);
+    changes.push(`${LEGACY_FRAMEWORK_DIR} -> ${FRAMEWORK_DIR}`);
+  } else if (symlinkResolvesTo(framework, PLUGIN_ROOT) && legacyFrameworkOwned) {
+    unlinkSync(legacyFramework);
+    changes.push(`removed obsolete ${LEGACY_FRAMEWORK_DIR} Codex link`);
+  }
+
+  if (!pathExists(state) && pathExists(legacyState) && ownership.owned) {
+    renameSync(legacyState, state);
+    migratedState = true;
+    changes.push(`${LEGACY_STATE_DIR} -> ${STATE_DIR}`);
+  }
+  return {
+    changes,
+    legacyFrameworkOwned,
+    migratedState,
+    preserveHookApproval: migratedState && ownership.preserveHookApproval,
+  };
+}
+
 function ensureFrameworkLink(root) {
-  const target = path.join(root, '.riff');
-  if (existsSync(target) || (() => { try { lstatSync(target); return true; } catch { return false; } })()) {
+  const target = path.join(root, FRAMEWORK_DIR);
+  if (pathExists(target)) {
     const stat = lstatSync(target);
-    if (!stat.isSymbolicLink()) throw new Error('.riff already exists and is not a symlink; preserving it');
+    if (!stat.isSymbolicLink()) throw new Error(`${FRAMEWORK_DIR} already exists and is not a symlink; preserving it`);
     let resolved;
-    try { resolved = path.resolve(path.dirname(target), readlinkSync(target)); } catch (error) { throw new Error(`cannot read .riff symlink: ${error.message}`); }
-    if (resolved !== PLUGIN_ROOT) throw new Error(`.riff points to ${resolved}; expected permanent RIFF folder ${PLUGIN_ROOT}`);
+    try { resolved = path.resolve(path.dirname(target), readlinkSync(target)); } catch (error) { throw new Error(`cannot read ${FRAMEWORK_DIR} symlink: ${error.message}`); }
+    if (resolved !== PLUGIN_ROOT) throw new Error(`${FRAMEWORK_DIR} points to ${resolved}; expected permanent RIFF Codex folder ${PLUGIN_ROOT}`);
     return false;
   }
   symlinkSync(path.relative(root, PLUGIN_ROOT), target);
   return true;
 }
 
-function exposeSkills(root) {
+function exposeSkills(root, migration) {
   const source = path.join(PLUGIN_ROOT, 'skills');
   const destination = path.join(root, '.agents', 'skills');
   ensureDir(destination);
   const preserved = [];
   for (const name of readFileNames(source)) {
-    const target = path.join(destination, name);
-    const desired = path.relative(destination, path.join(root, '.riff', 'skills', name));
+    const target = path.join(destination, `riff-codex-${name}`);
+    const desiredTarget = path.join(root, FRAMEWORK_DIR, 'skills', name);
+    const desired = path.relative(destination, desiredTarget);
+    const legacyTarget = path.join(destination, name);
+    const legacyDesired = path.relative(destination, path.join(root, LEGACY_FRAMEWORK_DIR, 'skills', name));
+    try {
+      if (
+        lstatSync(legacyTarget).isSymbolicLink()
+        && (
+          (migration.legacyFrameworkOwned && readlinkSync(legacyTarget) === legacyDesired)
+          || path.resolve(path.dirname(legacyTarget), readlinkSync(legacyTarget)) === path.join(PLUGIN_ROOT, 'skills', name)
+        )
+      ) unlinkSync(legacyTarget);
+    } catch { /* missing or foreign legacy skill */ }
     let existing = null;
     try { existing = lstatSync(target); } catch { /* missing */ }
     if (existing) {
@@ -267,7 +366,7 @@ function excludeLocalState(root) {
   const exclude = path.resolve(root, run('git', ['rev-parse', '--git-path', 'info/exclude'], { cwd: root }));
   ensureDir(exclude, true);
   const current = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
-  if (!/^\.riff-state\/$/m.test(current)) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF worktree-local state\n.riff-state/\n`);
+  if (!/^\.riff-codex-state\/$/m.test(current)) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF Codex worktree-local state\n${STATE_DIR}/\n`);
 }
 
 function dashboardRegistryFile() {
@@ -284,6 +383,7 @@ function registerDashboardProject(root) {
 }
 
 function syncManaged(root, options = {}) {
+  const migration = options.migration ?? migrateLegacyInstall(root);
   const files = pathsFor(root);
   ensureFrameworkLink(root);
   excludeLocalState(root);
@@ -304,17 +404,17 @@ function syncManaged(root, options = {}) {
       managed: {},
     };
   }
-  if (config.version !== 1) throw new Error('unsupported .riff/config.json version');
+  if (config.version !== 1) throw new Error(`unsupported ${STATE_DIR}/config.json version`);
   const existingHooks = readJson(files.hooks, false);
-  const projectCli = '$(git rev-parse --show-toplevel)/.riff/bin/riff.mjs';
-  const merged = mergeHooks(existingHooks, projectCli);
+  const projectCli = `$(git rev-parse --show-toplevel)/${FRAMEWORK_DIR}/bin/riff.mjs`;
+  const merged = mergeHooks(existingHooks, projectCli, migration.legacyFrameworkOwned || migration.migratedState);
   writeJson(files.hooks, merged);
   const currentHash = hooksHash(merged);
-  const preservedSkills = exposeSkills(root);
-  config.managed = { ...(config.managed ?? {}), version: VERSION, pluginRoot: PLUGIN_ROOT, cli: '.riff/bin/riff.mjs', hooksHash: currentHash, preservedSkills };
+  const preservedSkills = exposeSkills(root, migration);
+  config.managed = { ...(config.managed ?? {}), version: VERSION, pluginRoot: PLUGIN_ROOT, cli: `${FRAMEWORK_DIR}/bin/riff.mjs`, hooksHash: currentHash, preservedSkills };
   config.hooks ??= { approvedHash: null };
-  if (config.hooks.approvedHash !== currentHash) config.hooks.approvedHash = null;
-  if (options.recordApproval) config.hooks.approvedHash = currentHash;
+  if (options.recordApproval || migration.preserveHookApproval) config.hooks.approvedHash = currentHash;
+  else if (config.hooks.approvedHash !== currentHash) config.hooks.approvedHash = null;
   if (options.language) config.language = options.language;
   if (options.artifactLanguage) config.artifactLanguage = options.artifactLanguage;
   if (options.scope) config.project = { ...(config.project ?? {}), scope: options.scope };
@@ -324,11 +424,11 @@ function syncManaged(root, options = {}) {
   writeJson(files.config, config);
   if (!existsSync(files.state)) writeJson(files.state, baseState());
   if (!existsSync(files.events)) writeFileSync(files.events, '');
-  installGitHook(root, 'pre-commit');
-  installGitHook(root, 'commit-msg');
+  installGitHook(root, 'pre-commit', migration);
+  installGitHook(root, 'commit-msg', migration);
   registerDashboardProject(root);
   event(root, options.resync ? 'resync' : 'init', { version: VERSION, hooks_hash: currentHash });
-  return { config, hooks: merged };
+  return { config, hooks: merged, migration };
 }
 
 function parseOptions(tokens) {
@@ -397,6 +497,9 @@ async function cmdInit(tokens) {
   const candidate = path.resolve(options.project_root ?? process.cwd());
   const root = gitRoot(candidate);
   if (root !== candidate) fail(`--project-root must be the Git root (${root})`);
+  let migration;
+  try { migration = migrateLegacyInstall(root); }
+  catch (error) { fail(`cannot migrate existing RIFF Codex installation: ${error.message}`); }
   const existing = readJson(pathsFor(root).config, false) ?? {};
   const needsConfiguration = !existing.onboarding?.completedAt;
   let configuration = { language: options.language };
@@ -405,42 +508,105 @@ async function cmdInit(tokens) {
     configuration = await configureInteractively({ ...existing, language: options.language ?? existing.language });
   }
   try {
-    syncManaged(root, { ...configuration, recordApproval: options.record_hooks_approved });
+    const result = syncManaged(root, { ...configuration, recordApproval: options.record_hooks_approved, migration });
+    if (result.migration.changes.length) process.stdout.write(`Migrated existing RIFF Codex installation: ${result.migration.changes.join(', ')}.\n`);
   } catch (error) { fail(error.message); }
   const config = readJson(pathsFor(root).config);
-  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: .riff -> ${PLUGIN_ROOT}\nSkills: symlinked into .agents/skills; the native plugin supplies the $riff:* namespace.\nState: project-local in .riff-state/.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\nRequired: open /hooks in Codex, review the local hooks, then run riff-codex doctor --record-hooks-approved.\nNo Claude files were created.\n`);
+  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${FRAMEWORK_DIR} -> ${PLUGIN_ROOT}\nSkills: namespaced under .agents/skills/riff-codex-*; the native plugin supplies the $riff:* namespace.\nState: project-local in ${STATE_DIR}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\nRequired: open /hooks in Codex, review the local hooks, then run riff-codex doctor --record-hooks-approved.\nClaude RIFF paths and state were not created or replaced.\n`);
 }
 
 function cmdResync(tokens) {
   const options = parseOptions(tokens);
   const root = gitRoot(options.project_root ?? process.cwd());
-  try { syncManaged(root, { resync: true, recordApproval: options.record_hooks_approved }); }
+  let result;
+  try { result = syncManaged(root, { resync: true, recordApproval: options.record_hooks_approved }); }
   catch (error) { fail(error.message); }
+  if (result.migration.changes.length) process.stdout.write(`Migrated existing RIFF Codex installation: ${result.migration.changes.join(', ')}.\n`);
   process.stdout.write('RIFF managed files repaired. Foreign hook entries and chained Git hooks were preserved.\nRun /hooks if the managed hook hash changed.\n');
+}
+
+const PRIORITY_ALIASES = {
+  p0: 'P0', critical: 'P0', urgent: 'P0',
+  p1: 'P1', high: 'P1',
+  p2: 'P2', medium: 'P2', normal: 'P2',
+  p3: 'P3', low: 'P3',
+};
+
+const STATUS_ALIASES = {
+  ready: 'ready', todo: 'ready', pending: 'ready', planned: 'ready',
+  active: 'active', 'in-progress': 'active', in_progress: 'active', inprogress: 'active', wip: 'active',
+  completed: 'completed', complete: 'completed', done: 'completed', shipped: 'completed',
+  skipped: 'skipped', rejected: 'skipped', cancelled: 'skipped', canceled: 'skipped',
+  parked: 'parked', blocked: 'blocked', awaiting_human: 'awaiting_human',
+};
+
+function normalizeRoadmapPriority(value, required, id) {
+  const priority = PRIORITY_ALIASES[String(value ?? '').trim().toLowerCase()] ?? null;
+  if (required && !ROADMAP_PRIORITIES.has(priority)) throw new Error(`ROADMAP.yaml phase ${id} requires priority P0, P1, P2, or P3`);
+  return priority;
+}
+
+function normalizeRoadmapStatus(value, id) {
+  const status = STATUS_ALIASES[String(value ?? 'ready').trim().toLowerCase()];
+  if (!status) throw new Error(`ROADMAP.yaml phase ${id} has unsupported status ${value}`);
+  return status;
+}
+
+function normalizeStringArray(value) {
+  return Array.isArray(value) ? value.map(String).map((item) => item.trim()).filter(Boolean) : [];
+}
+
+function normalizePhase(id, phase, canonical) {
+  const title = String(phase.title ?? phase.name ?? '').trim();
+  const outcome = String(phase.outcome ?? phase.description ?? phase.rationale ?? phase.goal ?? '').trim();
+  const risks = normalizeStringArray(phase.risks);
+  return {
+    id,
+    title,
+    outcome,
+    demo: String(phase.demo ?? '').trim(),
+    priority: normalizeRoadmapPriority(phase.priority, canonical, id),
+    depends_on: normalizeStringArray(phase.depends_on),
+    blocking_edges: normalizeStringArray(phase.blocking_edges),
+    risks,
+    sensitive: Boolean(phase.sensitive || SENSITIVE_WORDS.test(`${title} ${outcome} ${risks.join(' ')}`)),
+    status: normalizeRoadmapStatus(phase.status, id),
+  };
 }
 
 function readRoadmap(root) {
   const file = pathsFor(root).roadmap;
-  const roadmap = readJson(file);
-  if (roadmap.version !== 1 || !roadmap.project || !Array.isArray(roadmap.phases)) throw new Error('ROADMAP.yaml must be JSON-formatted YAML with version, project, and phases');
-  const phases = roadmap.phases.map((phase, index) => {
-    const priority = String(phase.priority ?? '').toUpperCase();
-    if (!ROADMAP_PRIORITIES.has(priority)) throw new Error(`ROADMAP.yaml phase ${phase.id ?? index + 1} requires priority P0, P1, P2, or P3`);
-    return {
-      id: String(phase.id ?? ''),
-      title: String(phase.title ?? ''),
-      outcome: String(phase.outcome ?? ''),
-      demo: String(phase.demo ?? ''),
-      priority,
-      depends_on: Array.isArray(phase.depends_on) ? phase.depends_on.map(String) : [],
-      blocking_edges: Array.isArray(phase.blocking_edges) ? phase.blocking_edges.map(String) : [],
-      risks: Array.isArray(phase.risks) ? phase.risks.map(String) : [],
-      sensitive: Boolean(phase.sensitive || SENSITIVE_WORDS.test(`${phase.title} ${phase.outcome} ${(phase.risks ?? []).join(' ')}`)),
-      status: phase.status ?? 'ready',
-    };
+  let roadmap;
+  try { roadmap = YAML.parse(readFileSync(file, 'utf8')); }
+  catch (error) { throw new Error(`ROADMAP.yaml cannot be parsed: ${error.message}`); }
+  if (!roadmap || typeof roadmap !== 'object' || Array.isArray(roadmap)) throw new Error('ROADMAP.yaml must contain a mapping');
+
+  const canonical = roadmap.version === 1 && roadmap.project && Array.isArray(roadmap.phases);
+  const claudeArray = !canonical && Array.isArray(roadmap.phases);
+  const legacyEntries = Object.entries(roadmap).filter(([key, value]) => /^phase-[A-Za-z0-9._-]+$/i.test(key) && value && typeof value === 'object' && !Array.isArray(value));
+  if (!canonical && !claudeArray && legacyEntries.length === 0) throw new Error('ROADMAP.yaml must contain either version/project/phases or Claude phase-* entries');
+
+  const phases = canonical || claudeArray
+    ? roadmap.phases.map((phase, index) => normalizePhase(String(phase.id ?? index + 1), phase, canonical))
+    : legacyEntries.map(([key, phase]) => normalizePhase(key.replace(/^phase-/i, ''), phase, false));
+  const ids = new Set(phases.map((phase) => phase.id));
+  phases.forEach((phase) => {
+    phase.depends_on = phase.depends_on.map((dependency) => {
+      if (ids.has(dependency)) return dependency;
+      const unprefixed = dependency.replace(/^phase-/i, '');
+      if (ids.has(unprefixed)) return unprefixed;
+      const prefixed = `phase-${dependency}`;
+      return ids.has(prefixed) ? prefixed : dependency;
+    });
   });
   validateState({ version: 1, phases });
-  return { ...roadmap, phases };
+  const project = canonical
+    ? roadmap.project
+    : {
+        name: typeof roadmap.name === 'string' ? roadmap.name : path.basename(root),
+        objective: typeof roadmap.description === 'string' ? roadmap.description : null,
+      };
+  return { ...roadmap, format: canonical ? 'codex' : 'claude', project, phases, out_of_scope: normalizeStringArray(roadmap.out_of_scope) };
 }
 
 function syncRoadmap(root) {
@@ -448,7 +614,7 @@ function syncRoadmap(root) {
   const state = readState(root);
   const old = new Map(state.phases.map((phase) => [phase.id, phase]));
   state.project = { name: roadmap.project.name ?? null, objective: roadmap.project.objective ?? null };
-  state.roadmap = { source: 'ROADMAP.yaml', out_of_scope: roadmap.out_of_scope ?? [] };
+  state.roadmap = { source: 'ROADMAP.yaml', format: roadmap.format, out_of_scope: roadmap.out_of_scope ?? [] };
   state.phases = roadmap.phases.map((phase) => {
     const prior = old.get(phase.id);
     return prior ? { ...phase, status: prior.status, commit: prior.commit ?? null, attempts: prior.attempts ?? 0, reason: prior.reason ?? null } : { ...phase, commit: null, attempts: 0, reason: null };
@@ -461,7 +627,7 @@ function syncRoadmap(root) {
 
 function dependenciesComplete(state, phase) {
   const byId = new Map(state.phases.map((item) => [item.id, item]));
-  return (phase.depends_on ?? []).every((id) => byId.get(id)?.status === 'completed');
+  return (phase.depends_on ?? []).every((id) => TERMINAL_PHASE_STATES.has(byId.get(id)?.status));
 }
 
 function selectPhase(state, requested) {
@@ -586,7 +752,7 @@ function cmdWave(tokens) {
       }
       const phase = selectPhase(state, requested);
       if (!phase) {
-        const unfinished = state.phases.filter((item) => item.status !== 'completed');
+        const unfinished = state.phases.filter((item) => !TERMINAL_PHASE_STATES.has(item.status));
         process.stdout.write(unfinished.length ? 'No phase is ready. Inspect parked, blocked, or dependency-waiting phases.\n' : 'Roadmap complete.\n');
         return;
       }
@@ -674,7 +840,7 @@ function doctor(root, recordApproval = false) {
   let hooks = null;
   try {
     hooks = readJson(files.hooks);
-    const count = Object.values(hooks.hooks ?? {}).flat().flatMap((group) => group.hooks ?? []).filter((hook) => String(hook.command ?? '').includes('riff-hook:')).length;
+    const count = Object.values(hooks.hooks ?? {}).flat().flatMap((group) => group.hooks ?? []).filter((hook) => String(hook.command ?? '').includes(HOOK_ID)).length;
     if (count < 6) throw new Error(`only ${count}/6 RIFF hook groups found`);
     add('ok', 'Codex hooks', `${count} managed groups installed`);
   } catch (error) { add('error', 'Codex hooks', error.message); }
@@ -690,19 +856,19 @@ function doctor(root, recordApproval = false) {
   try {
     const framework = lstatSync(files.framework);
     const resolved = path.resolve(root, readlinkSync(files.framework));
-    if (!framework.isSymbolicLink() || resolved !== PLUGIN_ROOT) throw new Error(`expected .riff -> ${PLUGIN_ROOT}`);
-    add('ok', 'framework symlink', `.riff -> ${PLUGIN_ROOT}`);
+    if (!framework.isSymbolicLink() || resolved !== PLUGIN_ROOT) throw new Error(`expected ${FRAMEWORK_DIR} -> ${PLUGIN_ROOT}`);
+    add('ok', 'framework symlink', `${FRAMEWORK_DIR} -> ${PLUGIN_ROOT}`);
   } catch (error) { add('error', 'framework symlink', error.message); }
   for (const name of readFileNames(path.join(PLUGIN_ROOT, 'skills'))) {
-    const target = path.join(root, '.agents', 'skills', name);
+    const target = path.join(root, '.agents', 'skills', `riff-codex-${name}`);
     let valid = false;
-    try { valid = lstatSync(target).isSymbolicLink() && path.resolve(path.dirname(target), readlinkSync(target)) === path.join(root, '.riff', 'skills', name); } catch { /* missing */ }
+    try { valid = lstatSync(target).isSymbolicLink() && path.resolve(path.dirname(target), readlinkSync(target)) === path.join(root, FRAMEWORK_DIR, 'skills', name); } catch { /* missing */ }
     if (!valid) add('warn', `skill ${name}`, 'project symlink missing or preserved because a foreign entry owns the path');
   }
   for (const name of ['git', 'node', 'bun']) add(executable(name) ? 'ok' : 'error', `executable ${name}`, executable(name) ? 'available' : 'missing');
   for (const name of ['pre-commit', 'commit-msg']) {
     const target = path.join(gitHooksDir(root), name);
-    const valid = existsSync(target) && readFileSync(target, 'utf8').includes('# RIFF managed wrapper');
+    const valid = existsSync(target) && readFileSync(target, 'utf8').includes(GIT_HOOK_MARKER);
     add(valid ? 'ok' : 'error', `Git ${name}`, valid ? 'installed and chained' : 'missing RIFF wrapper');
   }
   try { dashboardData(root); add('ok', 'dashboard state', 'readable'); }
@@ -1066,8 +1232,8 @@ function cmdHook(tokens) {
       const state = readJson(pathsFor(root).state, false);
       event(root, 'hook_session_start', { source: payload.source, model: payload.model });
       const active = state?.phases?.find((phase) => phase.status === 'active');
-      const context = [`RIFF conversation language: ${config?.language ?? 'en'}; artifact language: ${config?.artifactLanguage ?? 'en'}.`, `Project scope: ${config?.project?.scope ?? 'production'}. Preferences: explanation=${config?.preferences?.explanation ?? 'simple'}, autonomy=${config?.preferences?.autonomy ?? 'loop'}.`, 'Use PROJECT.md and ROADMAP.yaml as product sources; use .riff-state/state.json through the RIFF CLI only.'];
-      if (active) context.push(`Resume interrupted phase ${active.id}. Load .riff/references/operating-contract.md before continuing.`);
+      const context = [`RIFF conversation language: ${config?.language ?? 'en'}; artifact language: ${config?.artifactLanguage ?? 'en'}.`, `Project scope: ${config?.project?.scope ?? 'production'}. Preferences: explanation=${config?.preferences?.explanation ?? 'simple'}, autonomy=${config?.preferences?.autonomy ?? 'loop'}.`, `Use PROJECT.md and ROADMAP.yaml as shared product sources; use ${STATE_DIR}/state.json through the RIFF CLI only.`];
+      if (active) context.push(`Resume interrupted phase ${active.id}. Load ${FRAMEWORK_DIR}/references/operating-contract.md before continuing.`);
       output = { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context.join(' ') } };
     } else if (name === 'pre-compact') {
       const state = readJson(pathsFor(root).state, false);

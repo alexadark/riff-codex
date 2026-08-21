@@ -101,9 +101,9 @@ function slugify(input: string): string {
 }
 
 function findFolderSlug(projectRoot: string, id: string): string | null {
-  const codexProject = existsSync(join(projectRoot, ".riff-state", "state.json"));
+  const codexProject = existsSync(join(projectRoot, ".riff-codex-state", "state.json"));
   const dir = codexProject
-    ? join(projectRoot, ".riff-state", "dashboard", "phases")
+    ? join(projectRoot, ".riff-codex-state", "dashboard", "phases")
     : join(projectRoot, ".planning", "phases");
   if (!existsSync(dir)) return null;
   let entries: string[];
@@ -137,7 +137,7 @@ function resolvePhase(
 
   const folderSlug = findFolderSlug(projectRoot, id);
   const rawSlug = typeof entry.slug === "string" ? entry.slug : "";
-  const rawTitle = typeof entry.title === "string" ? entry.title : "";
+  const rawTitle = typeof entry.title === "string" ? entry.title : typeof entry.name === "string" ? entry.name : "";
 
   let slug = "";
 
@@ -149,7 +149,7 @@ function resolvePhase(
     if (folderSlug && folderSlug !== rawSlug) {
       warnSlugMismatch(projectRoot, id, rawSlug, folderSlug);
     }
-  } else if (existsSync(join(projectRoot, ".riff-state", "state.json")) && rawTitle) {
+  } else if (existsSync(join(projectRoot, ".riff-codex-state", "state.json")) && rawTitle) {
     slug = slugify(rawTitle);
   } else if (folderSlug) {
     slug = folderSlug;
@@ -166,10 +166,11 @@ function resolvePhase(
     typeof entry.description === "string" ? entry.description :
     typeof entry.rationale === "string" ? entry.rationale :
     typeof entry.outcome === "string" ? entry.outcome :
+    typeof entry.goal === "string" ? entry.goal :
     typeof entry.demo === "string" ? entry.demo : "";
 
   let status = normalizeStatus(entry.status);
-  const stateFile = join(projectRoot, ".riff-state", "state.json");
+  const stateFile = join(projectRoot, ".riff-codex-state", "state.json");
   if (existsSync(stateFile)) {
     try {
       const state = JSON.parse(readFileSync(stateFile, "utf8"));
@@ -223,9 +224,9 @@ export function validateRoadmap(parsed: unknown): RoadmapValidation {
   if (!Array.isArray(phases)) {
     // Legacy top-level `phase-N:` format is parsed elsewhere; only flag it as
     // a warning so old roadmaps don't go red.
-    const hasLegacy = Object.keys(obj).some((k) => /^phase-\d+$/i.test(k));
+    const hasLegacy = Object.keys(obj).some((k) => /^phase-[A-Za-z0-9._-]+$/i.test(k));
     if (hasLegacy) {
-      warnings.push("ROADMAP.yaml uses legacy top-level `phase-N:` keys; migrate to a `phases: [...]` array");
+      warnings.push("ROADMAP.yaml uses supported Claude top-level `phase-*:` keys; its existing format will be preserved");
     } else {
       errors.push("ROADMAP.yaml is missing a `phases:` array");
     }
@@ -295,7 +296,7 @@ function logValidationOnce(path: string, validation: RoadmapValidation): void {
 /**
  * Parse ROADMAP.yaml from a project root. Tolerant of two formats:
  *   1. `phases: [{ id, slug, title, status, ... }]` — canonical RIFF template
- *   2. Top-level `phase-N: { ... }` keys — legacy roadmap shape, kept readable
+ *   2. Top-level `phase-*: { ... }` keys — Claude roadmap shape, kept readable
  *      so old projects don't go blank in the dashboard.
  *
  * Schema problems are surfaced via console.warn (once per path+signature) but
@@ -342,17 +343,26 @@ export function parseRoadmap(projectRoot: string): Roadmap | null {
     }
   }
 
-  // Format 2: top-level phase-N keys (only if no phases array was found)
+  // Format 2: top-level phase-* keys (only if no phases array was found)
   if (phases.length === 0) {
     for (const [key, value] of Object.entries(obj)) {
-      const match = /^phase-(\d+)$/i.exec(key);
+      const match = /^phase-([A-Za-z0-9._-]+)$/i.exec(key);
       if (!match) continue;
       if (!value || typeof value !== "object") continue;
       const id = match[1]!;
       const phase = resolvePhase(projectRoot, id, value as Record<string, unknown>);
       if (phase) phases.push(phase);
     }
-    phases.sort((a, b) => Number(a.id) - Number(b.id));
+    phases.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+  }
+
+  const ids = new Set(phases.map((phase) => phase.id));
+  for (const phase of phases) {
+    phase.depends_on = phase.depends_on.map((dependency) => {
+      if (ids.has(dependency)) return dependency;
+      const unprefixed = dependency.replace(/^phase-/i, "");
+      return ids.has(unprefixed) ? unprefixed : dependency;
+    });
   }
 
   const project = obj.project && typeof obj.project === "object" ? obj.project as Record<string, unknown> : {};
@@ -368,8 +378,8 @@ export function parseRoadmap(projectRoot: string): Roadmap | null {
  * The folder is named `${id}-${slug}`. Returns null if not present.
  */
 export function phaseDir(projectRoot: string, phase: Pick<RoadmapPhase, "id" | "slug">): string {
-  if (existsSync(join(projectRoot, ".riff-state"))) {
-    return join(projectRoot, ".riff-state", "dashboard", "phases", `${phase.id}-${phase.slug}`);
+  if (existsSync(join(projectRoot, ".riff-codex-state"))) {
+    return join(projectRoot, ".riff-codex-state", "dashboard", "phases", `${phase.id}-${phase.slug}`);
   }
   return join(projectRoot, ".planning", "phases", `${phase.id}-${phase.slug}`);
 }

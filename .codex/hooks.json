@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff/bin/riff.mjs\" hook session-start --id riff-hook:session-start",
+            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff-codex/bin/riff.mjs\" hook session-start --id riff-codex-hook:session-start",
             "timeout": 10,
             "statusMessage": "Loading RIFF project context",
             "additionalContextLimit": 800
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff/bin/riff.mjs\" hook pre-compact --id riff-hook:pre-compact",
+            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff-codex/bin/riff.mjs\" hook pre-compact --id riff-codex-hook:pre-compact",
             "timeout": 10,
             "statusMessage": "Saving RIFF checkpoint"
           }
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff/bin/riff.mjs\" hook pre-tool --id riff-hook:pre-tool",
+            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff-codex/bin/riff.mjs\" hook pre-tool --id riff-codex-hook:pre-tool",
             "timeout": 10,
             "statusMessage": "Checking RIFF safety boundary"
           }
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff/bin/riff.mjs\" hook post-tool --id riff-hook:post-tool",
+            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff-codex/bin/riff.mjs\" hook post-tool --id riff-codex-hook:post-tool",
             "timeout": 10,
             "statusMessage": "Recording RIFF change signals",
             "additionalContextLimit": 900
@@ -60,7 +60,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff/bin/riff.mjs\" hook stop --id riff-hook:stop",
+            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff-codex/bin/riff.mjs\" hook stop --id riff-codex-hook:stop",
             "timeout": 10,
             "statusMessage": "Checking RIFF handoff"
           }
@@ -72,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff/bin/riff.mjs\" hook session-end --id riff-hook:session-end",
+            "command": "/usr/bin/env node \"$(git rev-parse --show-toplevel)/.riff-codex/bin/riff.mjs\" hook session-end --id riff-codex-hook:session-end",
             "timeout": 3
           }
         ]

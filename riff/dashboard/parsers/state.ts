@@ -49,7 +49,7 @@ const EMPTY_STATE: ProjectState = {
  * destructure safely.
  */
 export function parseProjectState(projectRoot: string): ProjectState | null {
-  const codexPath = join(projectRoot, ".riff-state", "state.json");
+  const codexPath = join(projectRoot, ".riff-codex-state", "state.json");
   if (existsSync(codexPath)) return parseCodexState(codexPath);
   const path = join(projectRoot, "STATE.md");
   if (!existsSync(path)) return null;

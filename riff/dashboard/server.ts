@@ -214,9 +214,9 @@ function lastModifiedMs(projectRoot: string): number | null {
     join(projectRoot, "ROADMAP.yaml"),
     join(projectRoot, "STATE.md"),
     join(projectRoot, ".planning"),
-    join(projectRoot, ".riff-state", "state.json"),
-    join(projectRoot, ".riff-state", "events.ndjson"),
-    join(projectRoot, ".riff-state", "dashboard"),
+    join(projectRoot, ".riff-codex-state", "state.json"),
+    join(projectRoot, ".riff-codex-state", "events.ndjson"),
+    join(projectRoot, ".riff-codex-state", "dashboard"),
     join(projectRoot, ".uxtest", "runs"),
   ];
   let latest: number | null = null;
@@ -242,11 +242,11 @@ function hasUxRuns(projectRoot: string): boolean {
 }
 
 function codexOperationalState(projectRoot: string): Record<string, unknown> | null {
-  const statePath = join(projectRoot, ".riff-state", "state.json");
+  const statePath = join(projectRoot, ".riff-codex-state", "state.json");
   if (!existsSync(statePath)) return null;
   try {
     const state = JSON.parse(readFileSync(statePath, "utf8")) as Record<string, any>;
-    const eventsPath = join(projectRoot, ".riff-state", "events.ndjson");
+    const eventsPath = join(projectRoot, ".riff-codex-state", "events.ndjson");
     const events = existsSync(eventsPath)
       ? readFileSync(eventsPath, "utf8")
           .split("\n")
