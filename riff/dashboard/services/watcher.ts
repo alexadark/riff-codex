@@ -1,17 +1,17 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import chokidar, { type FSWatcher } from "chokidar";
 
 export type WatcherEvent =
   | { type: "roadmap_changed" }
   | { type: "state_changed" }
-  | { type: "phase_changed"; id: number; files: string[] }
+  | { type: "phase_changed"; id: string; files: string[] }
   | { type: "uxtest_runs_changed"; files: string[] };
 
 export type WatcherListener = (event: WatcherEvent) => void;
 
 interface PendingPhaseChange {
-  id: number;
+  id: string;
   files: Set<string>;
 }
 
@@ -24,7 +24,7 @@ export class ProjectWatcher {
   private listeners = new Set<WatcherListener>();
   private watcher: FSWatcher | null = null;
   private timers = new Map<string, ReturnType<typeof setTimeout>>();
-  private pendingPhase = new Map<number, PendingPhaseChange>();
+  private pendingPhase = new Map<string, PendingPhaseChange>();
   private pendingTopLevel = new Set<string>();
   private pendingUxRuns = new Set<string>();
 
@@ -136,11 +136,20 @@ export class ProjectWatcher {
     }
   }
 
-  private parsePhaseId(folderName: string): number | null {
-    const match = /^(\d+)-/.exec(folderName);
-    if (!match) return null;
-    const n = Number(match[1]);
-    return Number.isFinite(n) ? n : null;
+  private parsePhaseId(folderName: string): string | null {
+    const statePath = join(this.projectRoot, ".riff-state", "state.json");
+    if (existsSync(statePath)) {
+      try {
+        const state = JSON.parse(readFileSync(statePath, "utf8"));
+        const ids = Array.isArray(state.phases)
+          ? state.phases.map((phase: { id?: unknown }) => String(phase.id ?? "")).filter(Boolean)
+          : [];
+        ids.sort((left: string, right: string) => right.length - left.length);
+        const id = ids.find((candidate: string) => folderName === candidate || folderName.startsWith(`${candidate}-`));
+        if (id) return id;
+      } catch { /* fall through to legacy numeric folders */ }
+    }
+    return /^(\d+(?:\.\d+)?)-/.exec(folderName)?.[1] ?? null;
   }
 
   private scheduleFlush(key: string): void {
@@ -162,7 +171,7 @@ export class ProjectWatcher {
       return;
     }
     if (key.startsWith("phase:")) {
-      const id = Number(key.slice("phase:".length));
+      const id = key.slice("phase:".length);
       const entry = this.pendingPhase.get(id);
       this.pendingPhase.delete(id);
       if (!entry) return;

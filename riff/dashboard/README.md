@@ -14,7 +14,7 @@ From any initialized RIFF Codex project:
 riff-codex dashboard
 ```
 
-The command registers the current project in `~/.config/riff-dashboard/registry.json`, installs the dashboard's small Bun dependencies once, reuses an existing dashboard process when available, and opens `http://127.0.0.1:4000`.
+The command registers the current project in `~/.config/riff-dashboard/registry.json`, installs the dashboard's small Bun dependencies once, and reuses an existing dashboard only when it comes from the same RIFF Codex build. It restarts stale same-build processes after dashboard source changes and selects the next available port instead of attaching to a different RIFF installation already using port 4000.
 
 The dashboard also reads the legacy RIFF project list from the old framework profile without modifying it.
 Projects added or removed in the UI are stored only in the shared dashboard registry.
@@ -45,6 +45,7 @@ RIFF Codex projects are read from:
 - `.riff-state/dashboard/phases/<id>-<slug>/EXPLAIN-POST.simple.md`
 
 The Codex state view includes the active wave, next ready phase, last commit and validation, functional and security reviews, security findings in plain language, required human action, recent events, and recorded model routing.
+The phase board projects live Codex states into the fixed columns `Todo`, `In progress`, `Done`, `Blocked`, and `Skipped`. It supports string identifiers such as `2-design` and only renders priorities explicitly declared in the roadmap.
 
 ## Producer contract
 

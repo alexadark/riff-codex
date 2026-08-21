@@ -38,6 +38,7 @@ if (!FRAMEWORK_ROOT) {
   );
 }
 const RESOLVED_FRAMEWORK_ROOT = FRAMEWORK_ROOT ?? join(import.meta.dir, "..");
+const DASHBOARD_INSTANCE = process.env.RIFF_DASHBOARD_INSTANCE ?? "unmanaged";
 
 // Boot-time snapshot used only for the startup banner. All API responses
 // re-resolve the profile per request so edits to profile.yaml take effect
@@ -127,7 +128,7 @@ buildContexts(currentRegistry());
 
 // ---------- Helpers ----------
 
-function findPhase(roadmap: Roadmap | null, id: number): RoadmapPhase | null {
+function findPhase(roadmap: Roadmap | null, id: string): RoadmapPhase | null {
   if (!roadmap) return null;
   return roadmap.phases.find((p) => p.id === id) ?? null;
 }
@@ -200,10 +201,9 @@ function progressOf(roadmap: Roadmap | null): ProgressBreakdown {
   return out;
 }
 
-function activePhase(roadmap: Roadmap | null): { id: number; slug: string; title: string } | null {
+function activePhase(roadmap: Roadmap | null): { id: string; slug: string; title: string } | null {
   if (!roadmap) return null;
-  const inProgress = roadmap.phases.find((p) => p.status === "in-progress");
-  const target = inProgress ?? roadmap.phases.find((p) => p.status === "todo");
+  const target = roadmap.phases.find((p) => p.status === "in-progress");
   if (!target) return null;
   return { id: target.id, slug: target.slug, title: target.title };
 }
@@ -336,6 +336,14 @@ function listUxRuns(projectRoot: string): { has_runs_dir: boolean; runs: unknown
 
 const app = new Hono();
 
+/** GET /api/instance — side-effect-free dashboard process identity. */
+app.get("/api/instance", (c) =>
+  c.json({
+    framework_root: RESOLVED_FRAMEWORK_ROOT,
+    dashboard_instance: DASHBOARD_INSTANCE,
+  }),
+);
+
 /** GET /api/projects — overview list of all registered projects. */
 app.get("/api/projects", (c) => {
   const registry = currentRegistry();
@@ -372,6 +380,7 @@ app.get("/api/projects", (c) => {
     projects,
     profile: { dashboard: { level: liveConfig.level, language: liveConfig.language } },
     framework_root: RESOLVED_FRAMEWORK_ROOT,
+    dashboard_instance: DASHBOARD_INSTANCE,
   });
 });
 
@@ -530,8 +539,8 @@ app.get("/api/projects/:slug/phase/:id", async (c) => {
   const ctx = contexts.get(slug);
   if (!ctx) return c.json({ error: "project not found" }, 404);
 
-  const id = Number(c.req.param("id"));
-  if (!Number.isFinite(id)) {
+  const id = c.req.param("id").trim();
+  if (!id) {
     return c.json({ error: "invalid phase id" }, 400);
   }
   const roadmap = parseRoadmap(ctx.root);

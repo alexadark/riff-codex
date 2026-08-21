@@ -6,7 +6,9 @@
   "private": true,
   "scripts": {
     "start": "bun run server.ts",
-    "dev": "bun run --hot server.ts"
+    "dev": "bun run --hot server.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "hono": "^4.6.0",

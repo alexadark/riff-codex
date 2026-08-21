@@ -25,6 +25,7 @@ const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = path.resolve(path.dirname(SCRIPT), '..');
 const PHASE_STATES = new Set(['ready', 'active', 'completed', 'parked', 'blocked', 'awaiting_human']);
+const ROADMAP_PRIORITIES = new Set(['P0', 'P1', 'P2', 'P3']);
 const SENSITIVE_WORDS = /auth|authori[sz]|tenant|user data|secret|payment|migration|public api|callback|webhook/i;
 
 function fail(message, code = 1) {
@@ -422,17 +423,22 @@ function readRoadmap(root) {
   const file = pathsFor(root).roadmap;
   const roadmap = readJson(file);
   if (roadmap.version !== 1 || !roadmap.project || !Array.isArray(roadmap.phases)) throw new Error('ROADMAP.yaml must be JSON-formatted YAML with version, project, and phases');
-  const phases = roadmap.phases.map((phase) => ({
-    id: String(phase.id ?? ''),
-    title: String(phase.title ?? ''),
-    outcome: String(phase.outcome ?? ''),
-    demo: String(phase.demo ?? ''),
-    depends_on: Array.isArray(phase.depends_on) ? phase.depends_on.map(String) : [],
-    blocking_edges: Array.isArray(phase.blocking_edges) ? phase.blocking_edges.map(String) : [],
-    risks: Array.isArray(phase.risks) ? phase.risks.map(String) : [],
-    sensitive: Boolean(phase.sensitive || SENSITIVE_WORDS.test(`${phase.title} ${phase.outcome} ${(phase.risks ?? []).join(' ')}`)),
-    status: phase.status ?? 'ready',
-  }));
+  const phases = roadmap.phases.map((phase, index) => {
+    const priority = String(phase.priority ?? '').toUpperCase();
+    if (!ROADMAP_PRIORITIES.has(priority)) throw new Error(`ROADMAP.yaml phase ${phase.id ?? index + 1} requires priority P0, P1, P2, or P3`);
+    return {
+      id: String(phase.id ?? ''),
+      title: String(phase.title ?? ''),
+      outcome: String(phase.outcome ?? ''),
+      demo: String(phase.demo ?? ''),
+      priority,
+      depends_on: Array.isArray(phase.depends_on) ? phase.depends_on.map(String) : [],
+      blocking_edges: Array.isArray(phase.blocking_edges) ? phase.blocking_edges.map(String) : [],
+      risks: Array.isArray(phase.risks) ? phase.risks.map(String) : [],
+      sensitive: Boolean(phase.sensitive || SENSITIVE_WORDS.test(`${phase.title} ${phase.outcome} ${(phase.risks ?? []).join(' ')}`)),
+      status: phase.status ?? 'ready',
+    };
+  });
   validateState({ version: 1, phases });
   return { ...roadmap, phases };
 }
@@ -765,7 +771,63 @@ function dashboardData(root) {
   };
 }
 
-function cmdDashboard(tokens) {
+async function dashboardIdentity(url) {
+  let response;
+  try {
+    response = await fetch(`${url}/api/instance`, { signal: AbortSignal.timeout(1_000) });
+  } catch {
+    return { reachable: false, frameworkRoot: null, instance: null };
+  }
+  if (!response.ok) return { reachable: true, frameworkRoot: null, instance: null };
+  try {
+    const data = await response.json();
+    return {
+      reachable: true,
+      frameworkRoot: typeof data.framework_root === 'string' ? path.resolve(data.framework_root) : null,
+      instance: typeof data.dashboard_instance === 'string' ? data.dashboard_instance : null,
+    };
+  } catch {
+    return { reachable: true, frameworkRoot: null, instance: null };
+  }
+}
+
+function dashboardFingerprint(dashboardRoot) {
+  const files = [];
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'bun.lock') continue;
+      const absolute = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolute);
+      else if (entry.isFile()) files.push(absolute);
+    }
+  };
+  visit(dashboardRoot);
+  files.sort();
+  return sha(files.map((file) => `${path.relative(dashboardRoot, file)}:${sha(readFileSync(file))}`).join('\n'));
+}
+
+async function dashboardTarget(startPort, explicitPort, dashboardInstance) {
+  for (let offset = 0; offset < 20; offset += 1) {
+    const port = startPort + offset;
+    const url = `http://127.0.0.1:${port}`;
+    const identity = await dashboardIdentity(url);
+    if (!identity.reachable) return { port, url, reuse: false };
+    if (identity.frameworkRoot === PLUGIN_ROOT && identity.instance === dashboardInstance) return { port, url, reuse: true };
+    if (explicitPort) throw new Error(`dashboard port ${port} is already served by another process`);
+  }
+  throw new Error(`no available dashboard port from ${startPort} to ${startPort + 19}`);
+}
+
+async function waitForDashboard(url, dashboardInstance) {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const identity = await dashboardIdentity(url);
+    if (identity.frameworkRoot === PLUGIN_ROOT && identity.instance === dashboardInstance) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
+}
+
+async function cmdDashboard(tokens) {
   const options = parseOptions(tokens);
   const root = gitRoot();
   if (options.snapshot || options.check) {
@@ -788,22 +850,40 @@ function cmdDashboard(tokens) {
 
   const processFile = path.join(homedir(), '.config', 'riff-dashboard', 'server.json');
   const prior = readJson(processFile, false);
-  let alive = false;
-  if (Number.isInteger(prior?.pid)) {
-    try { process.kill(prior.pid, 0); alive = true; } catch { /* stale process record */ }
+  const dashboardInstance = dashboardFingerprint(dashboardRoot);
+  const requestedPort = Number(options.port ?? prior?.port ?? 4000);
+  if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65_535) fail('--port must be a valid TCP port');
+  const priorUrl = typeof prior?.url === 'string' ? prior.url : `http://127.0.0.1:${requestedPort}`;
+  const priorIdentity = await dashboardIdentity(priorUrl);
+  const recordedCurrentFramework = prior?.frameworkRoot === PLUGIN_ROOT && prior?.url === priorUrl;
+  if (
+    priorIdentity.reachable &&
+    (priorIdentity.frameworkRoot === PLUGIN_ROOT || recordedCurrentFramework) &&
+    prior?.dashboardInstance !== dashboardInstance &&
+    Number.isInteger(prior?.pid)
+  ) {
+    try { process.kill(prior.pid, 'SIGTERM'); } catch { /* stale process record */ }
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (!(await dashboardIdentity(priorUrl)).reachable) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   }
-
-  const port = Number(options.port ?? prior?.port ?? 4000);
-  const url = alive ? prior.url : `http://127.0.0.1:${port}`;
-  if (!alive) {
+  let target;
+  try { target = await dashboardTarget(requestedPort, options.port !== undefined, dashboardInstance); }
+  catch (error) { fail(error.message); }
+  const { port, url, reuse } = target;
+  if (!reuse) {
     const child = spawn('bun', ['run', 'server.ts'], {
       cwd: dashboardRoot,
       detached: true,
       stdio: 'ignore',
-      env: { ...process.env, PORT: String(port) },
+      env: { ...process.env, PORT: String(port), RIFF_DASHBOARD_INSTANCE: dashboardInstance },
     });
     child.unref();
-    writeJson(processFile, { version: 1, pid: child.pid, port, url, startedAt: now() });
+    if (!(await waitForDashboard(url, dashboardInstance))) fail(`dashboard failed to start at ${url}`);
+    writeJson(processFile, { version: 1, pid: child.pid, port, url, dashboardRoot, frameworkRoot: PLUGIN_ROOT, dashboardInstance, startedAt: now() });
+  } else if (prior?.url !== url || prior?.frameworkRoot !== PLUGIN_ROOT || prior?.dashboardInstance !== dashboardInstance) {
+    writeJson(processFile, { version: 1, pid: prior?.pid ?? null, port, url, dashboardRoot, frameworkRoot: PLUGIN_ROOT, dashboardInstance, startedAt: prior?.startedAt ?? now() });
   }
   if (!options.no_open && process.platform === 'darwin') spawnSync('open', [url], { stdio: 'ignore' });
   process.stdout.write(`RIFF dashboard: ${url}\nShared, read-only, and independent from Codex or Claude.\n`);
@@ -1020,7 +1100,7 @@ else if (command === '--version' || command === '-v') process.stdout.write(`${VE
 else if (command === 'init') await cmdInit(tokens);
 else if (command === 'resync') cmdResync(tokens);
 else if (command === 'doctor') cmdDoctor(tokens);
-else if (command === 'dashboard') cmdDashboard(tokens);
+else if (command === 'dashboard') await cmdDashboard(tokens);
 else if (command === 'status') cmdStatus();
 else if (command === 'wave') cmdWave(tokens);
 else if (command === 'hook') cmdHook(tokens);

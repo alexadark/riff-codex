@@ -6,13 +6,13 @@ export type PhaseStatus = "todo" | "in-progress" | "done" | "blocked" | "skipped
 export type PhasePriority = "P0" | "P1" | "P2" | "P3";
 
 export interface RoadmapPhase {
-  id: number;
+  id: string;
   slug: string;
   title: string;
   status: PhaseStatus;
-  priority: PhasePriority;
+  priority: PhasePriority | null;
   description: string;
-  depends_on: number[];
+  depends_on: string[];
 }
 
 export interface Roadmap {
@@ -55,8 +55,8 @@ const PRIORITY_ALIASES: Record<string, PhasePriority> = {
   p2: "P2",
   p3: "P3",
   critical: "P0",
-  high: "P0",
-  medium: "P1",
+  high: "P1",
+  medium: "P2",
   normal: "P2",
   low: "P3",
 };
@@ -66,16 +66,20 @@ function normalizeStatus(value: unknown): PhaseStatus {
   return STATUS_ALIASES[value.toLowerCase().trim()] ?? "todo";
 }
 
-function normalizePriority(value: unknown): PhasePriority {
-  if (typeof value !== "string") return "P2";
-  return PRIORITY_ALIASES[value.toLowerCase().trim()] ?? "P2";
+function normalizePriority(value: unknown): PhasePriority | null {
+  if (typeof value !== "string") return null;
+  return PRIORITY_ALIASES[value.toLowerCase().trim()] ?? null;
 }
 
-function toNumberArray(value: unknown): number[] {
+function toStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value
-    .map((v) => (typeof v === "number" ? v : Number(v)))
-    .filter((v) => Number.isFinite(v));
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+}
+
+function isPhaseId(value: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value);
 }
 
 function isSlugLike(value: string): boolean {
@@ -96,7 +100,7 @@ function slugify(input: string): string {
     .slice(0, 60) || "phase";
 }
 
-function findFolderSlug(projectRoot: string, id: number): string | null {
+function findFolderSlug(projectRoot: string, id: string): string | null {
   const codexProject = existsSync(join(projectRoot, ".riff-state", "state.json"));
   const dir = codexProject
     ? join(projectRoot, ".riff-state", "dashboard", "phases")
@@ -115,7 +119,7 @@ function findFolderSlug(projectRoot: string, id: number): string | null {
 
 const warnedSlugMismatch = new Set<string>();
 
-function warnSlugMismatch(projectRoot: string, id: number, yamlSlug: string, folderSlug: string): void {
+function warnSlugMismatch(projectRoot: string, id: string, yamlSlug: string, folderSlug: string): void {
   const key = `${projectRoot}#${id}`;
   if (warnedSlugMismatch.has(key)) return;
   warnedSlugMismatch.add(key);
@@ -126,10 +130,10 @@ function warnSlugMismatch(projectRoot: string, id: number, yamlSlug: string, fol
 
 function resolvePhase(
   projectRoot: string,
-  id: number,
+  id: string,
   entry: Record<string, unknown>,
 ): RoadmapPhase | null {
-  if (!Number.isFinite(id)) return null;
+  if (!isPhaseId(id)) return null;
 
   const folderSlug = findFolderSlug(projectRoot, id);
   const rawSlug = typeof entry.slug === "string" ? entry.slug : "";
@@ -145,6 +149,8 @@ function resolvePhase(
     if (folderSlug && folderSlug !== rawSlug) {
       warnSlugMismatch(projectRoot, id, rawSlug, folderSlug);
     }
+  } else if (existsSync(join(projectRoot, ".riff-state", "state.json")) && rawTitle) {
+    slug = slugify(rawTitle);
   } else if (folderSlug) {
     slug = folderSlug;
   } else if (rawTitle) {
@@ -179,7 +185,7 @@ function resolvePhase(
     status,
     priority: normalizePriority(entry.priority),
     description,
-    depends_on: toNumberArray(entry.depends_on),
+    depends_on: toStringArray(entry.depends_on),
   };
 }
 
@@ -235,8 +241,9 @@ export function validateRoadmap(parsed: unknown): RoadmapValidation {
     const p = entry as Record<string, unknown>;
     const idLabel = typeof p.id === "number" || typeof p.id === "string" ? `id=${p.id}` : "id=?";
 
-    if (typeof p.id !== "number" && (typeof p.id !== "string" || !Number.isFinite(Number(p.id)))) {
-      errors.push(`${where}: missing or non-numeric \`id\``);
+    const phaseId = typeof p.id === "number" || typeof p.id === "string" ? String(p.id).trim() : "";
+    if (!phaseId || !isPhaseId(phaseId)) {
+      errors.push(`${where}: missing or invalid \`id\``);
     }
     if (!codexFormat && (typeof p.slug !== "string" || p.slug.trim() === "")) {
       errors.push(`${where} (${idLabel}): missing required field \`slug\``);
@@ -260,6 +267,9 @@ export function validateRoadmap(parsed: unknown): RoadmapValidation {
     }
     if ("name" in p) {
       errors.push(`${where} (${idLabel}): uses deprecated phase-level \`name:\` field, use \`title:\` instead`);
+    }
+    if (codexFormat && normalizePriority(p.priority) === null) {
+      warnings.push(`${where} (${idLabel}): missing explicit priority P0 | P1 | P2 | P3`);
     }
   });
 
@@ -326,7 +336,7 @@ export function parseRoadmap(projectRoot: string): Roadmap | null {
     for (const entry of obj.phases) {
       if (!entry || typeof entry !== "object") continue;
       const p = entry as Record<string, unknown>;
-      const id = typeof p.id === "number" ? p.id : Number(p.id);
+      const id = String(p.id ?? "").trim();
       const phase = resolvePhase(projectRoot, id, p);
       if (phase) phases.push(phase);
     }
@@ -338,11 +348,11 @@ export function parseRoadmap(projectRoot: string): Roadmap | null {
       const match = /^phase-(\d+)$/i.exec(key);
       if (!match) continue;
       if (!value || typeof value !== "object") continue;
-      const id = Number(match[1]);
+      const id = match[1]!;
       const phase = resolvePhase(projectRoot, id, value as Record<string, unknown>);
       if (phase) phases.push(phase);
     }
-    phases.sort((a, b) => a.id - b.id);
+    phases.sort((a, b) => Number(a.id) - Number(b.id));
   }
 
   const project = obj.project && typeof obj.project === "object" ? obj.project as Record<string, unknown> : {};
