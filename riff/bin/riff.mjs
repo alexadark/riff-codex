@@ -37,6 +37,9 @@ const LEGACY_GIT_HOOK_MARKER = '# RIFF managed wrapper';
 const PHASE_STATES = new Set(['ready', 'active', 'completed', 'parked', 'blocked', 'awaiting_human', 'skipped']);
 const TERMINAL_PHASE_STATES = new Set(['completed', 'skipped']);
 const ROADMAP_PRIORITIES = new Set(['P0', 'P1', 'P2', 'P3']);
+const AUTONOMY_MODES = new Set(['loop', 'guided']);
+const LOOP_STOP_KINDS = new Set(['credentials-or-access', 'third-party-verification', 'destructive-target', 'validation-failure']);
+const PRIORITY_RANK = new Map([['P0', 0], ['P1', 1], ['P2', 2], ['P3', 3]]);
 const SENSITIVE_WORDS = /auth|authori[sz]|tenant|user data|secret|payment|migration|public api|callback|webhook/i;
 
 function fail(message, code = 1) {
@@ -154,6 +157,18 @@ function validateState(state) {
       if (!ids.has(dependency)) throw new Error(`${phase.id} depends on unknown phase ${dependency}`);
     }
   }
+  const byId = new Map(state.phases.map((phase) => [phase.id, phase]));
+  const visiting = new Set();
+  const visited = new Set();
+  const visit = (id) => {
+    if (visiting.has(id)) throw new Error(`dependency cycle detected at phase ${id}`);
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const dependency of byId.get(id).depends_on ?? []) visit(dependency);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const id of ids) visit(id);
 }
 
 function quote(value) {
@@ -405,6 +420,10 @@ function syncManaged(root, options = {}) {
     };
   }
   if (config.version !== 1) throw new Error(`unsupported ${STATE_DIR}/config.json version`);
+  config.preferences ??= {};
+  if (options.autonomy) config.preferences = { ...config.preferences, autonomy: options.autonomy };
+  config.preferences.autonomy ??= 'loop';
+  if (!AUTONOMY_MODES.has(config.preferences.autonomy)) throw new Error('autonomy must be loop or guided');
   const existingHooks = readJson(files.hooks, false);
   const projectCli = `$(git rev-parse --show-toplevel)/${FRAMEWORK_DIR}/bin/riff.mjs`;
   const merged = mergeHooks(existingHooks, projectCli, migration.legacyFrameworkOwned || migration.migratedState);
@@ -419,7 +438,6 @@ function syncManaged(root, options = {}) {
   if (options.artifactLanguage) config.artifactLanguage = options.artifactLanguage;
   if (options.scope) config.project = { ...(config.project ?? {}), scope: options.scope };
   if (options.explanation) config.preferences = { ...(config.preferences ?? {}), explanation: options.explanation };
-  if (options.autonomy) config.preferences = { ...(config.preferences ?? {}), autonomy: options.autonomy };
   if (options.configured) config.onboarding = { completedAt: now() };
   writeJson(files.config, config);
   if (!existsSync(files.state)) writeJson(files.state, baseState());
@@ -494,6 +512,7 @@ async function configureInteractively(existing = {}) {
 
 async function cmdInit(tokens) {
   const options = parseOptions(tokens);
+  if (options.autonomy && !AUTONOMY_MODES.has(options.autonomy)) fail('--autonomy must be loop or guided');
   const candidate = path.resolve(options.project_root ?? process.cwd());
   const root = gitRoot(candidate);
   if (root !== candidate) fail(`--project-root must be the Git root (${root})`);
@@ -502,10 +521,14 @@ async function cmdInit(tokens) {
   catch (error) { fail(`cannot migrate existing RIFF Codex installation: ${error.message}`); }
   const existing = readJson(pathsFor(root).config, false) ?? {};
   const needsConfiguration = !existing.onboarding?.completedAt;
-  let configuration = { language: options.language };
+  let configuration = { language: options.language, autonomy: options.autonomy };
   if (!options.non_interactive && process.stdin.isTTY && process.stdout.isTTY && (options.configure || needsConfiguration)) {
     process.stdout.write('RIFF project configuration\nPress Enter to accept each recommended choice.\n');
-    configuration = await configureInteractively({ ...existing, language: options.language ?? existing.language });
+    configuration = await configureInteractively({
+      ...existing,
+      language: options.language ?? existing.language,
+      preferences: { ...(existing.preferences ?? {}), autonomy: options.autonomy ?? existing.preferences?.autonomy },
+    });
   }
   try {
     const result = syncManaged(root, { ...configuration, recordApproval: options.record_hooks_approved, migration });
@@ -617,7 +640,9 @@ function syncRoadmap(root) {
   state.roadmap = { source: 'ROADMAP.yaml', format: roadmap.format, out_of_scope: roadmap.out_of_scope ?? [] };
   state.phases = roadmap.phases.map((phase) => {
     const prior = old.get(phase.id);
-    return prior ? { ...phase, status: prior.status, commit: prior.commit ?? null, attempts: prior.attempts ?? 0, reason: prior.reason ?? null } : { ...phase, commit: null, attempts: 0, reason: null };
+    return prior
+      ? { ...phase, status: prior.status, commit: prior.commit ?? null, attempts: prior.attempts ?? 0, reason: prior.reason ?? null, blockerKind: prior.blockerKind ?? null }
+      : { ...phase, commit: null, attempts: 0, reason: null, blockerKind: null };
   });
   validateState(state);
   saveState(root, state);
@@ -642,7 +667,14 @@ function selectPhase(state, requested) {
     if (phase.status !== 'ready' || !dependenciesComplete(state, phase)) throw new Error(`phase ${requested} is not ready`);
     return phase;
   }
-  return state.phases.find((phase) => phase.status === 'ready' && dependenciesComplete(state, phase)) ?? null;
+  let selected = null;
+  for (const phase of state.phases) {
+    if (phase.status !== 'ready' || !dependenciesComplete(state, phase)) continue;
+    const rank = PRIORITY_RANK.get(phase.priority) ?? PRIORITY_RANK.size;
+    const selectedRank = selected ? PRIORITY_RANK.get(selected.priority) ?? PRIORITY_RANK.size : Number.POSITIVE_INFINITY;
+    if (!selected || rank < selectedRank) selected = phase;
+  }
+  return selected;
 }
 
 function candidateTree(root) {
@@ -661,15 +693,35 @@ function phaseById(state, id) {
   return phase;
 }
 
-function markPhase(root, state, phase, status, reason = null) {
+function markPhase(root, state, phase, status, reason = null, blockerKind = null) {
   phase.status = status;
   phase.reason = reason;
+  phase.blockerKind = ['awaiting_human', 'blocked', 'parked'].includes(status) ? blockerKind : null;
   state.activeWave = status === 'active' ? { phase: phase.id, startedAt: state.activeWave?.startedAt ?? now(), checkpointAt: now() } : null;
   if (status === 'awaiting_human' || status === 'blocked' || status === 'parked') {
-    state.humanAction = { phase: phase.id, status, reason: reason ?? 'Human attention is required.' };
+    state.humanAction = { phase: phase.id, status, kind: blockerKind, reason: reason ?? 'Human attention is required.' };
   } else if (state.humanAction?.phase === phase.id) state.humanAction = null;
   saveState(root, state);
-  event(root, `phase_${status}`, { phase: phase.id, reason });
+  event(root, `phase_${status}`, { phase: phase.id, kind: blockerKind, reason });
+}
+
+function autonomyMode(root) {
+  const autonomy = readJson(pathsFor(root).config, false)?.preferences?.autonomy ?? 'loop';
+  if (!AUTONOMY_MODES.has(autonomy)) throw new Error(`unsupported autonomy mode ${autonomy}`);
+  return autonomy;
+}
+
+function loopStopKind(root, state, phase, options) {
+  const kind = String(options.kind ?? '');
+  if (!LOOP_STOP_KINDS.has(kind)) {
+    throw new Error(`loop mode may stop only with --kind ${[...LOOP_STOP_KINDS].join(', ')}`);
+  }
+  if (kind === 'validation-failure') {
+    const validationFailed = state.lastValidation?.phase === phase.id && state.lastValidation?.status === 'fail';
+    const reviewFailed = ['functional', 'security'].some((type) => receiptFor(root, phase, type)?.status === 'fail');
+    if (!validationFailed && !reviewFailed) throw new Error('validation-failure requires a recorded failed validation or review for this phase');
+  }
+  return kind;
 }
 
 function parseSeverity(value = 'INFO') {
@@ -711,7 +763,7 @@ function recordReview(root, state, phase, options) {
   if (type === 'security' && status === 'fail') {
     state.securityFindings.push(receipt);
     if (severity === 'HIGH' || severity === 'CRITICAL') {
-      markPhase(root, state, phase, 'parked', receipt.decision_reason);
+      markPhase(root, state, phase, 'parked', receipt.decision_reason, 'validation-failure');
       return receipt;
     }
   }
@@ -731,6 +783,7 @@ function cmdWave(tokens) {
   let state;
   try { state = readState(root); } catch (error) { fail(`${error.message}; run riff-codex init`); }
   try {
+    const autonomy = autonomyMode(root);
     if (action === 'sync') {
       state = syncRoadmap(root);
       process.stdout.write(`${state.phases.length} roadmap phases synchronized.\n`);
@@ -753,7 +806,7 @@ function cmdWave(tokens) {
       const phase = selectPhase(state, requested);
       if (!phase) {
         const unfinished = state.phases.filter((item) => !TERMINAL_PHASE_STATES.has(item.status));
-        process.stdout.write(unfinished.length ? 'No phase is ready. Inspect parked, blocked, or dependency-waiting phases.\n' : 'Roadmap complete.\n');
+        process.stdout.write(unfinished.length ? 'No phase is ready. RIFF will follow dependencies automatically; inspect only recorded hard blockers.\n' : 'Roadmap complete.\n');
         return;
       }
       process.stdout.write(`${JSON.stringify(phase, null, 2)}\n`);
@@ -768,7 +821,8 @@ function cmdWave(tokens) {
       process.stdout.write(`Activated ${id}.\n`);
     } else if (['park', 'block', 'await'].includes(action)) {
       const status = action === 'park' ? 'parked' : action === 'block' ? 'blocked' : 'awaiting_human';
-      markPhase(root, state, phase, status, optionRequired(options, 'reason'));
+      const blockerKind = autonomy === 'loop' ? loopStopKind(root, state, phase, options) : options.kind ?? null;
+      markPhase(root, state, phase, status, optionRequired(options, 'reason'), blockerKind);
       process.stdout.write(`${id} is ${status}.\n`);
     } else if (action === 'retry') {
       const reason = optionRequired(options, 'reason');
@@ -800,6 +854,7 @@ function cmdWave(tokens) {
       phase.commit = run('git', ['rev-parse', commit], { cwd: root });
       phase.status = 'completed';
       phase.reason = null;
+      phase.blockerKind = null;
       state.lastCommit = phase.commit;
       state.activeWave = null;
       state.humanAction = null;
@@ -829,7 +884,13 @@ function doctor(root, recordApproval = false) {
   const add = (status, name, detail) => results.push({ status, name, detail });
   let config = null;
   let state = null;
-  try { config = readJson(files.config); if (config.version !== 1) throw new Error('unsupported version'); add('ok', 'configuration', 'schema version 1'); }
+  try {
+    config = readJson(files.config);
+    if (config.version !== 1) throw new Error('unsupported version');
+    const autonomy = config.preferences?.autonomy ?? 'loop';
+    if (!AUTONOMY_MODES.has(autonomy)) throw new Error(`unsupported autonomy mode ${autonomy}`);
+    add('ok', 'configuration', `schema version 1, autonomy=${autonomy}`);
+  }
   catch (error) { add('error', 'configuration', error.message); }
   try { state = readJson(files.state); validateState(state); add('ok', 'state', `${state.phases.length} phases`); }
   catch (error) { add('error', 'state', error.message); }
@@ -1124,8 +1185,9 @@ function parkForFinding(root, finding) {
   if (active && ['HIGH', 'CRITICAL'].includes(finding.severity)) {
     active.status = 'parked';
     active.reason = finding.decision_reason;
+    active.blockerKind = 'validation-failure';
     state.activeWave = null;
-    state.humanAction = { phase: active.id, status: 'parked', reason: finding.decision_reason };
+    state.humanAction = { phase: active.id, status: 'parked', kind: 'validation-failure', reason: finding.decision_reason };
   }
   saveState(root, state);
 }
@@ -1233,6 +1295,8 @@ function cmdHook(tokens) {
       event(root, 'hook_session_start', { source: payload.source, model: payload.model });
       const active = state?.phases?.find((phase) => phase.status === 'active');
       const context = [`RIFF conversation language: ${config?.language ?? 'en'}; artifact language: ${config?.artifactLanguage ?? 'en'}.`, `Project scope: ${config?.project?.scope ?? 'production'}. Preferences: explanation=${config?.preferences?.explanation ?? 'simple'}, autonomy=${config?.preferences?.autonomy ?? 'loop'}.`, `Use PROJECT.md and ROADMAP.yaml as shared product sources; use ${STATE_DIR}/state.json through the RIFF CLI only.`];
+      if ((config?.preferences?.autonomy ?? 'loop') === 'loop') context.push('Loop autonomy: make conservative product and technical decisions, follow ready dependencies automatically, and do not request human decisions. Stop only for missing credentials or external access, impossible third-party verification, an unidentifiable destructive target, or failed RIFF validation.');
+      else context.push('Guided autonomy: preserve confirmation at product decision boundaries and between phases.');
       if (active) context.push(`Resume interrupted phase ${active.id}. Load ${FRAMEWORK_DIR}/references/operating-contract.md before continuing.`);
       output = { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context.join(' ') } };
     } else if (name === 'pre-compact') {
@@ -1257,7 +1321,7 @@ function cmdStatus() {
 }
 
 function help() {
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff-codex wave complete phase-1 --commit HEAD\n\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff-codex wave complete phase-1 --commit HEAD\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);

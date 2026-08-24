@@ -5,8 +5,10 @@ description: Bring an existing project into RIFF with concise brownfield discove
 
 # Onboard an existing project
 
-Inspect the repository first. Separate implemented facts from preferences, assumptions, and open product decisions. Summarize current user-visible capabilities, architecture, constraints, risks, and vocabulary.
+Inspect the repository and configured autonomy mode first. Separate implemented facts from preferences, assumptions, and open product decisions. Summarize current user-visible capabilities, architecture, constraints, risks, and vocabulary.
 
-Ask only decisions at the current product boundary, with a recommendation for each. Identify technical debt only when it blocks a vertical outcome. Mark uncertain later work as fog of war.
+In default `loop` mode, resolve current product and technical decisions conservatively from repository evidence: preserve existing behavior and data, minimize scope, permissions, dependencies, and external effects, prefer reversible choices, record assumptions, and continue without asking. In `guided` mode, ask only decisions at the current product boundary, with a recommendation for each. Identify technical debt only when it blocks a vertical outcome. Mark uncertain later work as fog of war.
 
-Draft `PROJECT.md` and a vertical `ROADMAP.yaml` with an explicit justified P0-P3 priority for every phase, then ask for confirmation before writing them. Do not assign one default priority across the roadmap. Treat both artifacts as shared with Claude RIFF. Preserve existing content, roadmap representation, comments, key order, and unknown fields unless the user authorizes a targeted replacement. After confirmation, write the artifacts, run `node .riff-codex/bin/riff.mjs wave sync`, and stop.
+Draft `PROJECT.md` and a vertical `ROADMAP.yaml` with an explicit justified P0-P3 priority for every phase. In `loop`, write the conservative draft without a confirmation round. In `guided`, ask for confirmation before writing it. Do not assign one default priority across the roadmap. Treat both artifacts as shared with Claude RIFF. Preserve existing content, roadmap representation, comments, key order, and unknown fields unless the user authorizes a targeted replacement. After the mode-specific boundary, write the artifacts, run `node .riff-codex/bin/riff.mjs wave sync`, and stop.
+
+In `loop`, stop only for missing credentials or external access, impossible third-party verification, an unidentifiable destructive target, or failed RIFF validation. Never create `awaiting_human` for a product or technical decision. `guided` retains its confirmation behavior.

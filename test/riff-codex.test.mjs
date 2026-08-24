@@ -40,6 +40,15 @@ function runCli(root, ...args) {
   });
 }
 
+function runCliFailure(root, ...args) {
+  try {
+    runCli(root, ...args);
+  } catch (error) {
+    return `${error.stderr ?? ''}${error.stdout ?? ''}`;
+  }
+  assert.fail(`expected riff-codex ${args.join(' ')} to fail`);
+}
+
 function writeJson(file, value) {
   mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
@@ -91,6 +100,7 @@ test('installs beside foreign Claude RIFF paths without changing shared artifact
   assert.equal(lstatSync(path.join(root, '.riff-codex')).isSymbolicLink(), true);
   assert.equal(existsSync(path.join(root, '.riff-codex-state', 'state.json')), true);
   assert.equal(existsSync(path.join(root, '.agents', 'skills', 'riff-codex-wave')), true);
+  assert.equal(JSON.parse(readFileSync(path.join(root, '.riff-codex-state', 'config.json'), 'utf8')).preferences.autonomy, 'loop');
   assert.match(runCli(root, 'doctor'), /0 error\(s\)/);
 });
 
@@ -194,4 +204,96 @@ test('reinstallation is idempotent and keeps foreign Codex and Git hooks chained
   assert.equal(readdirSync(path.join(root, '.riff-codex-state', 'git-hooks')).filter((name) => name.startsWith('pre-commit.')).length, 1);
   execFileSync(foreignHook, { cwd: root });
   assert.equal(readFileSync(path.join(root, '.foreign-hook-ran'), 'utf8'), 'chained');
+});
+
+test('loop mode follows dependencies by priority and permits only hard blocker kinds', () => {
+  const root = fixture();
+  runCli(root, 'init', '--project-root', root, '--non-interactive');
+  const phase = (id, priority, status = 'ready', depends_on = []) => ({
+    id,
+    title: id,
+    outcome: id,
+    demo: '',
+    priority,
+    depends_on,
+    blocking_edges: [],
+    risks: [],
+    sensitive: false,
+    status,
+    commit: null,
+    attempts: 0,
+    reason: null,
+    blockerKind: null,
+  });
+  writeJson(path.join(root, '.riff-codex-state', 'state.json'), baseState([
+    phase('low-ready', 'P2'),
+    phase('blocked-p0', 'P0', 'ready', ['dependency']),
+    phase('high-ready', 'P1', 'ready', ['completed-dependency']),
+    phase('dependency', 'P3'),
+    phase('completed-dependency', 'P3', 'completed'),
+  ]));
+
+  assert.equal(JSON.parse(runCli(root, 'wave', 'select')).id, 'high-ready');
+  runCli(root, 'wave', 'activate', 'high-ready');
+  assert.match(
+    runCliFailure(root, 'wave', 'await', 'high-ready', '--reason', 'Need a product decision'),
+    /loop mode may stop only with --kind/,
+  );
+  assert.match(
+    runCliFailure(root, 'wave', 'park', 'high-ready', '--kind', 'validation-failure', '--reason', 'No evidence'),
+    /requires a recorded failed validation or review/,
+  );
+
+  runCli(root, 'wave', 'await', 'high-ready', '--kind', 'credentials-or-access', '--reason', 'Production token is missing');
+  let state = JSON.parse(readFileSync(path.join(root, '.riff-codex-state', 'state.json'), 'utf8'));
+  assert.deepEqual(state.humanAction, {
+    phase: 'high-ready',
+    status: 'awaiting_human',
+    kind: 'credentials-or-access',
+    reason: 'Production token is missing',
+  });
+
+  runCli(root, 'wave', 'resume', 'high-ready', '--reason', 'Production token is available');
+  state = JSON.parse(readFileSync(path.join(root, '.riff-codex-state', 'state.json'), 'utf8'));
+  assert.equal(state.phases.find((item) => item.id === 'high-ready').status, 'active');
+  assert.equal(state.phases.find((item) => item.id === 'high-ready').blockerKind, null);
+  assert.equal(state.humanAction, null);
+
+  writeJson(path.join(root, '.riff-codex-state', 'state.json'), baseState([
+    phase('cycle-a', 'P1', 'ready', ['cycle-b']),
+    phase('cycle-b', 'P1', 'ready', ['cycle-a']),
+  ]));
+  assert.match(runCliFailure(root, 'wave', 'select'), /dependency cycle detected/);
+});
+
+test('guided mode preserves product decision handoffs without blocker kinds', () => {
+  const root = fixture();
+  runCli(root, 'init', '--project-root', root, '--non-interactive', '--autonomy', 'guided');
+  const config = JSON.parse(readFileSync(path.join(root, '.riff-codex-state', 'config.json'), 'utf8'));
+  assert.equal(config.preferences.autonomy, 'guided');
+  const active = {
+    id: 'guided-phase',
+    title: 'Guided phase',
+    outcome: 'Confirm a product choice',
+    demo: '',
+    priority: 'P1',
+    depends_on: [],
+    blocking_edges: [],
+    risks: [],
+    sensitive: false,
+    status: 'active',
+    commit: null,
+    attempts: 0,
+    reason: null,
+  };
+  writeJson(path.join(root, '.riff-codex-state', 'state.json'), {
+    ...baseState([active]),
+    activeWave: { phase: active.id, startedAt: '2026-01-01T00:00:00.000Z', checkpointAt: '2026-01-01T00:00:00.000Z' },
+  });
+
+  runCli(root, 'wave', 'await', active.id, '--reason', 'Choose the product direction');
+  const state = JSON.parse(readFileSync(path.join(root, '.riff-codex-state', 'state.json'), 'utf8'));
+  assert.equal(state.phases[0].status, 'awaiting_human');
+  assert.equal(state.humanAction.kind, null);
+  assert.equal(state.humanAction.reason, 'Choose the product direction');
 });

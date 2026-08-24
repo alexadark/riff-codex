@@ -13,7 +13,7 @@ cd /path/to/application
 riff-codex init
 ```
 
-On first interactive initialization, RIFF asks five concise questions about project scope, conversation and artifact languages, explanation level, and autonomy. Press Enter to accept the recommended choice. Use `riff-codex init --configure` to revisit these preferences or `--non-interactive` in scripts.
+On first interactive initialization, RIFF asks five concise questions about project scope, conversation and artifact languages, explanation level, and autonomy. Press Enter to accept the recommended choice. `loop` is the default; choose `guided` when you want confirmation between phases. Use `riff-codex init --configure` to revisit these preferences or `--non-interactive` in scripts.
 
 `riff-codex init` creates these project-local links and files without claiming Claude RIFF's namespace:
 
@@ -39,12 +39,18 @@ RIFF deliberately does not claim that unapproved hooks are active.
 
 ## Main workflows
 
-- `$riff:start` inspects facts, interviews only at the current decision boundary, asks for confirmation, and writes `PROJECT.md` plus JSON-formatted `ROADMAP.yaml`.
-- `$riff:onboard` performs the same concise shaping for an existing application.
-- `$riff:wave` resumes or selects the next ready vertical phase, validates affected behavior, obtains candidate-bound reviews, commits atomically, persists the result, and loops across independent ready phases.
+- `$riff:start` inspects facts and writes `PROJECT.md` plus JSON-formatted `ROADMAP.yaml`. In `loop`, it chooses conservative product and technical defaults without a confirmation round; `guided` preserves the interview and confirmation flow.
+- `$riff:onboard` applies the same mode-aware shaping to an existing application.
+- `$riff:wave` resumes or selects the highest-priority dependency-ready vertical phase, validates affected behavior, obtains candidate-bound reviews, commits atomically, persists the result, and continues automatically in `loop`. `guided` pauses between phases.
 - `riff-codex dashboard` opens the full shared local dashboard at `http://127.0.0.1:4000`. It combines legacy RIFF and RIFF Codex projects through a shared registry while leaving the legacy framework untouched.
 
 Use `riff-codex --help`, `riff-codex doctor`, and `riff-codex dashboard --snapshot` for the mechanical interfaces. There is intentionally no `riff-codex next`.
+
+## Autonomous decisions
+
+Default `loop` mode chooses the smallest reversible option that preserves the product contract, existing behavior, data, permissions, dependencies, and external systems. Product and technical ambiguity is recorded as an assumption, not turned into `awaiting_human`. RIFF follows roadmap dependencies and priority automatically.
+
+The only `loop` stops are missing credentials or external access, impossible third-party verification, an authorized destructive operation whose exact target cannot be identified safely, or failed RIFF validation or review. `guided` keeps confirmation at product boundaries and between phases. Hook approval and explicit authority for deployment, pushing, publishing, or other external mutations remain separate safety boundaries rather than product decisions.
 
 ## Persistent artifacts
 
