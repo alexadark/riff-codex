@@ -1,10 +1,15 @@
 ---
 name: promote
-description: Promote a reviewed RIFF candidate through an authorized deployment boundary. Use only when the user explicitly invokes $riff:promote or requests promotion.
+description: Handle explicit RIFF scratch-to-production promotion requests. Use only when the user says "promote to production" or "this app is going public"; never use for an ordinary push, deployment, publication, merge, audit, incident, health check, or review request.
 ---
 
-# Promote a reviewed candidate
+# Promote a RIFF project
 
-Load `.riff-codex/references/security.md` only now. Identify the exact candidate, environment, rollback path, required credentials, and external approvals. Verify candidate-bound functional and, when sensitive, security receipts are current.
+RIFF Codex doesn't currently implement the canonical scratch-to-production
+promotion protocol. Report that promotion is temporarily unavailable and stop
+without changing project files, scope, Git state, deployments, or external
+systems.
 
-Explain the expected user impact and recommend whether to proceed. Ask only for missing authority, credentials, or a material environment choice. Never infer permission to deploy, push, publish, migrate, or bypass controls. Record the promotion result as a short RIFF event.
+If the project is already production-scoped, report that no scope promotion is
+needed. Never reinterpret `$riff:promote` as authorization to push, merge,
+publish, deploy, migrate, or bypass controls.
