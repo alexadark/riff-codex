@@ -47,3 +47,9 @@ The dashboard presents those operational states using the fixed columns `Todo`, 
 In `loop`, RIFF automatically resumes a legacy parked, blocked, or awaiting-human phase whose reason is only a product or technical decision, recording the conservative choice. A permitted hard blocker resumes only after it is cleared. In `guided`, explicit user instruction may resume the phase. Resumption records the reason, activates the phase, and starts a fresh formal retry budget without bypassing validation or review gates.
 
 Receipts are valid only for their recorded Git tree hash. Any candidate change requires staging again and issuing fresh receipts. Do not create a persistent plan unless the operation is exceptionally destructive, ambiguous, multi-system, or genuinely long-running.
+
+## Bounded work and reporting
+
+Use direct work for a tiny correction, explicit APEX for an independent bounded feature, and RIFF for dependent phases requiring persistent progress. Before APEX runs inside a RIFF project, inspect the roadmap and current phase. Work belonging to an active phase retains RIFF receipts and completion gates; an independent change need not create a phase or a second state system.
+
+Review both whether the result satisfies the user's request and whether it follows relevant repository standards. Require observable evidence appropriate to the promised behavior; a build alone does not prove a live workflow. Keep receipts internal. The user-facing report gives the outcome, commit, checks, blocker and next phase. PR creation, extensive PR metadata and collaborator-specific delivery dossiers are not completion requirements. Follow explicit publication instructions separately.
