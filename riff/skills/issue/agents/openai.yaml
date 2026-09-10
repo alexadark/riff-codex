@@ -2,3 +2,5 @@ interface:
   display_name: "RIFF GitHub Issue"
   short_description: "Publish one grouped product outcome as an issue"
   default_prompt: "Use $issue through $riff:issue to publish a requested RIFF outcome as a GitHub issue."
+policy:
+  allow_implicit_invocation: false
