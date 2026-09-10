@@ -40,6 +40,7 @@ RIFF deliberately does not claim that unapproved hooks are active.
 ## Main workflows
 
 - `$riff:start` inspects facts and writes `PROJECT.md` plus JSON-formatted `ROADMAP.yaml`. In `loop`, it chooses conservative product and technical defaults without a confirmation round; `guided` preserves the interview and confirmation flow.
+- For a substantial project, `$riff:start` and `$riff:onboard` can add a detailed frame of user stories and criteria, data entities and rights, architecture and integrations, and phases linked to outcomes. Small applications and bounded APEX work stay concise. `$riff:issue` publishes a grouped GitHub issue only when explicitly requested.
 - `$riff:onboard` applies the same mode-aware shaping to an existing application.
 - `$riff:wave` resumes or selects the highest-priority dependency-ready vertical phase, validates affected behavior, obtains candidate-bound reviews, commits atomically, persists the result, and continues automatically in `loop`. `guided` pauses between phases.
 - `riff-codex dashboard` opens the full shared local dashboard at `http://127.0.0.1:4000`. It combines legacy RIFF and RIFF Codex projects through a shared registry while leaving the legacy framework untouched.

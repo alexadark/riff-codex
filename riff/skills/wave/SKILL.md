@@ -5,7 +5,7 @@ description: Execute or resume RIFF roadmap phases as autonomous vertical waves.
 
 # Run a RIFF wave
 
-Read `.riff-codex/references/operating-contract.md` and `.riff-codex/references/model-routing.md`. They own autonomy, readiness, review, retry and stop rules. Load the security reference only for a sensitive phase.
+Read `.riff-codex/references/operating-contract.md` and `.riff-codex/references/model-routing.md`. They own autonomy, readiness, review, retry and stop rules. For a large project, load `.riff-codex/references/project-framing.md` and reuse the selected phase's existing stories, criteria, data boundaries, rights, integrations, decisions, and answers before deepening the phase. Load the security reference only for a sensitive phase.
 
 1. Run `node .riff-codex/bin/riff.mjs wave sync`, then `wave resume` or `wave select [phase-id]`; activate the selected phase without bypassing dependencies.
 2. Implement the complete demonstrable outcome under the operating contract. Respect one writer per worktree and explicit task boundaries.
@@ -14,4 +14,4 @@ Read `.riff-codex/references/operating-contract.md` and `.riff-codex/references/
 5. Commit the reviewed tree and run `wave complete <phase> --commit HEAD`. Write `EXPLAIN-POST.simple.md` following the dashboard reference.
 6. Continue dependency-ready work in `loop`; pause at the contract's boundaries in `guided`. Report the outcome, commit, checks, blocker and next phase plainly. A PR or collaborator metadata dossier is not required.
 
-Never invoke nested `codex exec`, create a scheduler, or use a public `next` command.
+Never invoke nested `codex exec`, create a scheduler, publish GitHub issues without an explicit `$riff:issue` request, or use a public `next` command.
