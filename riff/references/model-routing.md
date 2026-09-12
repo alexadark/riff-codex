@@ -6,7 +6,7 @@ This is the canonical routing policy. Routing is optional and never a quota.
 | --- | --- | --- | --- |
 | Mechanical inventory and exact extraction | GPT-5.6 Luna Light | `low` | Fast when exposed |
 | Repeatable execution needing stronger verification | GPT-5.6 Luna XHigh | `xhigh` | Fast when exposed |
-| Bounded implementation across several files | GPT-5.6 Terra High | `high` | Default |
+| Bounded implementation across several files | GPT-5.6 Luna XHigh | `xhigh` | Fast when exposed |
 | Normal judgment, product discovery, synthesis | GPT-5.6 Sol Medium | `medium` | Default |
 | Small isolated UI adjustment | GPT-5.6 Sol Medium | `medium` | Default |
 | Focused visual implementation and iterative refinement | GPT-5.6 Sol High | `high` | Default |
