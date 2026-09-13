@@ -1116,14 +1116,14 @@ async function cmdDashboard(tokens) {
   process.stdout.write(`RIFF dashboard: ${url}\nShared, read-only, and independent from Codex or Claude.\n`);
 }
 
-function changedFiles(root, payload, staged = false) {
+function changedFiles(root, payload) {
   const files = new Set();
   const command = String(payload?.tool_input?.command ?? '');
   for (const match of command.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)) files.add(match[1].trim());
   try {
-    const args = staged ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR'] : ['status', '--porcelain=v1'];
+    const args = ['status', '--porcelain=v1'];
     const output = run('git', args, { cwd: root });
-    for (const line of output.split('\n').filter(Boolean)) files.add(staged ? line : line.slice(3));
+    for (const line of output.split('\n').filter(Boolean)) files.add(line.slice(3));
   } catch { /* hook remains advisory */ }
   return [...files].map((file) => path.resolve(root, file)).filter((file) => file.startsWith(`${root}${path.sep}`) && existsSync(file) && statSync(file).isFile());
 }
@@ -1131,15 +1131,17 @@ function changedFiles(root, payload, staged = false) {
 const SECRET_PATTERNS = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /\b(?:sk|rk|pk)-(?:live|prod)-[A-Za-z0-9_-]{16,}\b/,
+  /\b(?:sk|rk)_live_[A-Za-z0-9]{16,}\b/,
   /\bsk-proj-[A-Za-z0-9_-]{20,}\b/,
   /\bgh[pousr]_[A-Za-z0-9]{30,}\b/,
   /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/,
   /\bAKIA[0-9A-Z]{16}\b/,
 ];
 
-function scanFile(file) {
-  let text;
-  try { text = readFileSync(file, 'utf8'); } catch { return []; }
+function scanFile(file, text) {
+  if (text === undefined) {
+    try { text = readFileSync(file, 'utf8'); } catch { return []; }
+  }
   const relative = path.basename(file);
   const findings = [];
   if (SECRET_PATTERNS.some((pattern) => pattern.test(text))) findings.push({ kind: 'secret', severity: 'HIGH', summary: `A likely production secret is present in ${relative}.` });
@@ -1170,6 +1172,7 @@ function orphanFinding(root, file) {
 }
 
 function plainFinding(finding) {
+  if (finding.kind === 'environment_file') return { ...finding, what_could_happen: 'Private environment configuration could be committed even when its credentials are not recognized.', affected: 'The services configured by this file.', recommended_fix: 'Unstage the environment file and commit only a sanitized .env.example template.', decision_reason: 'RIFF stops because private environment files must stay out of Git.' };
   if (finding.kind === 'secret') return { ...finding, what_could_happen: 'Someone could use the exposed credential to access a service.', affected: 'The service account and any data it can reach.', recommended_fix: 'Remove and rotate the credential, then use an approved secret store.', decision_reason: 'RIFF stops because the credential pattern is high confidence.' };
   if (finding.kind === 'destructive_migration') return { ...finding, what_could_happen: 'The migration could permanently delete production data.', affected: 'Users whose records are stored in the changed tables.', recommended_fix: 'Use a reviewed expand-and-contract migration or obtain explicit destructive approval.', decision_reason: 'RIFF stops because the destructive SQL is explicit.' };
   if (finding.kind === 'orphan_file') return { ...finding, what_could_happen: 'The new code may never run because nothing connects it to the application.', affected: 'Users expecting the new behavior.', recommended_fix: 'Wire the file into an entry point or remove it if it is unnecessary.', decision_reason: 'RIFF continues because framework routing can make this heuristic incomplete.' };
@@ -1204,11 +1207,12 @@ function accumulateValidation(root, files) {
 
 function preTool(root, payload) {
   const serialized = JSON.stringify(payload.tool_input ?? {});
-  const command = String(payload.tool_input?.command ?? serialized);
+  const command = String(payload.tool_input?.command ?? payload.tool_input?.cmd ?? serialized);
   const destructive = [
     /\brm\s+-[^\n]*r[^\n]*f[^\n]*(?:\s\/\s|\s~\/?\s|\$HOME|\.\.)/i,
     /\bgit\s+(?:reset\s+--hard|clean\s+-[^\n]*f)/i,
-    /\b(?:drop\s+database|truncate\s+table)\b/i,
+    /\bgit\s+push\b[^\n;&|]*(?:\s--force(?:[\s;&|]|=|$)|\s-[A-Za-z]*f[A-Za-z]*(?:[\s;&|]|$))/,
+    /\b(?:drop\s+(?:database|table)|truncate\s+table)\b/i,
   ].find((pattern) => pattern.test(command));
   if (destructive) {
     event(root, 'hook_block', { hook: 'destructive_guard', tool: payload.tool_name });
@@ -1219,11 +1223,18 @@ function preTool(root, payload) {
     return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'RIFF blocked a likely production credential before it reached the tool. Remove the secret and use an approved secret store.' } };
   }
   const oldRiff = '/Users/webstantly/DEV/frameworks/riff';
-  const absolutePaths = [...serialized.matchAll(/\/(?:Users|home|opt|var|tmp)\/[A-Za-z0-9_./ -]+/g)].map((match) => match[0].replace(/["'}\],]+$/, ''));
-  const outside = (serialized.includes(oldRiff) && root !== oldRiff) || absolutePaths.some((candidate) => !path.resolve(candidate).startsWith(`${root}${path.sep}`));
+  const within = (parent, candidate) => {
+    const relative = path.relative(parent, path.resolve(candidate));
+    return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+  };
+  const strings = (value) => typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(strings) : [];
+  const absolutePaths = strings(payload.tool_input).flatMap((value) =>
+    [...value.matchAll(/(["'])(\/(?:Users|home|opt|var|tmp|private)\/.*?)\1|\/(?:Users|home|opt|var|tmp|private)\/[^\s"'`\\;,\)\]}]+/g)].map((match) => match[2] ?? match[0]));
+  const legacy = root !== oldRiff && absolutePaths.some((candidate) => within(oldRiff, candidate));
+  const outside = legacy || absolutePaths.some((candidate) => !within(root, candidate));
   if (outside) {
     event(root, 'hook_warning', { hook: 'boundary', tool: payload.tool_name });
-    return { hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: serialized.includes(oldRiff) ? 'Boundary warning: this tool references the read-only legacy RIFF repository. Do not modify it, change its branch, or run processes there.' : 'Boundary warning: this tool references a path outside the current Git repository. Confirm that external path is within the user-authorized scope before writing.' } };
+    return { hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: legacy ? 'Boundary warning: this tool references the read-only legacy RIFF repository. Do not modify it, change its branch, or run processes there.' : 'Boundary warning: this tool references a path outside the current Git repository. Confirm that external path is within the user-authorized scope before writing.' } };
   }
   return {};
 }
@@ -1231,7 +1242,7 @@ function preTool(root, payload) {
 function postTool(root, payload) {
   const files = changedFiles(root, payload);
   accumulateValidation(root, files);
-  const findings = [...files.flatMap(scanFile), ...files.map((file) => orphanFinding(root, file)).filter(Boolean)].map(plainFinding);
+  const findings = [...files.flatMap((file) => scanFile(file)), ...files.map((file) => orphanFinding(root, file)).filter(Boolean)].map(plainFinding);
   for (const finding of findings) {
     event(root, 'hook_finding', { hook: finding.kind, severity: finding.severity, file: finding.summary });
     parkForFinding(root, finding);
@@ -1244,9 +1255,25 @@ function postTool(root, payload) {
 }
 
 function preCommit(root) {
-  const payload = { tool_input: { command: '' } };
-  const files = changedFiles(root, payload, true);
-  const findings = [...files.flatMap(scanFile), ...files.map((file) => orphanFinding(root, file)).filter(Boolean)].map(plainFinding);
+  // Read paths and bytes from the index, including files removed only from the worktree.
+  // NUL delimiters preserve spaces, newlines and Git's otherwise quoted filenames.
+  let findings;
+  try {
+    const files = execFileSync('git', ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMRT'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+    findings = files.flatMap((file) => {
+      const text = execFileSync('git', ['show', `:${file}`], { cwd: root, encoding: 'utf8', maxBuffer: Infinity, stdio: ['ignore', 'pipe', 'pipe'] });
+      const results = scanFile(path.join(root, file), text);
+      if (/^\.env(?:\.|$)/.test(path.basename(file)) && !file.endsWith('.example')) {
+        results.push({ kind: 'environment_file', severity: 'HIGH', summary: `Private environment file ${file} is staged for commit.` });
+      }
+      const orphan = orphanFinding(root, path.join(root, file));
+      if (orphan) results.push(orphan);
+      return results;
+    }).map(plainFinding);
+  } catch {
+    process.stderr.write('RIFF pre-commit blocked: could not inspect the staged files. Resolve the Git index or read failure before committing.\n');
+    return 1;
+  }
   const blocking = findings.find((finding) => ['HIGH', 'CRITICAL'].includes(finding.severity));
   if (blocking) {
     process.stderr.write(`RIFF pre-commit blocked: ${blocking.summary}\nWhat could happen: ${blocking.what_could_happen}\nAffected: ${blocking.affected}\nRecommended fix: ${blocking.recommended_fix}\nWhy RIFF stops: ${blocking.decision_reason}\n`);

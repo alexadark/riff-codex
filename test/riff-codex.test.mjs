@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -230,6 +230,101 @@ test('reinstallation is idempotent and keeps foreign Codex and Git hooks chained
   assert.equal(readdirSync(path.join(root, '.riff-codex-state', 'git-hooks')).filter((name) => name.startsWith('pre-commit.')).length, 1);
   execFileSync(foreignHook, { cwd: root });
   assert.equal(readFileSync(path.join(root, '.foreign-hook-ran'), 'utf8'), 'chained');
+});
+
+function invokeHook(root, name, input = {}, tool = 'Bash') {
+  const result = spawnSync(process.execPath, [CLI, 'hook', name], {
+    cwd: root, encoding: 'utf8',
+    input: JSON.stringify({ tool_name: tool, tool_input: input }),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}
+
+test('Git pre-commit scans index bytes despite unstaged edits, missing files and unusual names', () => {
+  const root = fixture();
+  runCli(root, 'init', '--project-root', root, '--non-interactive');
+  const file = 'credential with space\nand newline.txt';
+  const absolute = path.join(root, file);
+  const secret = 'AK' + 'IA' + 'A'.repeat(16);
+  const stage = () => execFileSync('git', ['add', '--', file], { cwd: root });
+  const check = () => spawnSync(path.join(root, '.git/hooks/pre-commit'), [], { cwd: root, encoding: 'utf8' });
+  writeFileSync(absolute, secret);
+  stage();
+  writeFileSync(absolute, 'redacted');
+  assert.equal(check().status, 1, 'unstaged redaction cannot hide an indexed secret');
+  rmSync(absolute);
+  assert.equal(check().status, 1, 'worktree removal cannot hide an indexed secret');
+  writeFileSync(absolute, 'redacted');
+  stage();
+  writeFileSync(absolute, secret);
+  assert.equal(check().status, 0, 'only the safe staged bytes are being committed');
+  execFileSync('git', ['-c', 'user.name=Hook Test', '-c', 'user.email=hook@example.invalid', 'commit', '-qm', 'Safe fixture'], { cwd: root });
+  rmSync(absolute);
+  symlinkSync(secret, absolute);
+  stage();
+  assert.equal(check().status, 1, 'a staged file type change must also be scanned');
+});
+
+test('pre-commit rejects private env files but permits sanitized example templates', () => {
+  const root = fixture();
+  for (const file of ['.env', 'nested/.env.production', '.env.example', 'nested/.env.production.example', '.envoy']) {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), 'SERVICE_URL=https://example.invalid\n');
+    execFileSync('git', ['add', '--', file], { cwd: root });
+    const result = spawnSync(process.execPath, [CLI, 'hook', 'git-pre-commit'], { cwd: root, encoding: 'utf8' });
+    const privateFile = file === '.env' || file === 'nested/.env.production';
+    assert.equal(result.status, privateFile ? 1 : 0, `${file}: ${result.stderr}`);
+    if (privateFile) assert.match(result.stderr, /Private environment file/);
+    execFileSync('git', ['rm', '--cached', '--', file], { cwd: root });
+  }
+});
+
+test('live Stripe secrets are detected before tools, after edits and before commits', () => {
+  const root = fixture();
+  for (const prefix of ['sk', 'rk']) {
+    const secret = prefix + '_live_' + 'A'.repeat(32);
+    const before = invokeHook(root, 'pre-tool', { cmd: `echo ${secret}` });
+    assert.equal(before.hookSpecificOutput.permissionDecision, 'deny');
+    writeFileSync(path.join(root, 'credential.txt'), secret);
+    assert.equal(invokeHook(root, 'post-tool', {}, 'apply_patch').decision, 'block');
+    execFileSync('git', ['add', '--', 'credential.txt'], { cwd: root });
+    const commit = spawnSync(process.execPath, [CLI, 'hook', 'git-pre-commit'], { cwd: root, encoding: 'utf8' });
+    assert.equal(commit.status, 1, commit.stderr);
+  }
+  assert.deepEqual(invokeHook(root, 'pre-tool', { command: 'echo sk_test_example' }), {});
+});
+
+test('destructive guard rejects force pushes and table drops while retaining safe controls', () => {
+  const root = fixture();
+  const denied = [
+    ['git', 'push', '--force'], ['git', 'push', 'origin', 'main', '-f'],
+    ['git', 'push', '--force=true'], ['git', 'push', '--force;', 'echo', 'done'], ['DROP', 'TABLE', 'customers'],
+    ['git', 'reset', '--hard'],
+  ];
+  for (const words of denied) {
+    for (const field of ['command', 'cmd']) {
+      const result = invokeHook(root, 'pre-tool', { [field]: words.join(' ') });
+      assert.equal(result.hookSpecificOutput?.permissionDecision, 'deny', words.join(' '));
+    }
+  }
+  for (const words of [['git', 'push', 'origin', 'main'], ['git', 'push', '--force-with-lease'], ['git', 'diff'], ['SELECT', '*', 'FROM', 'customers']]) {
+    assert.deepEqual(invokeHook(root, 'pre-tool', { command: words.join(' ') }), {});
+  }
+});
+
+test('boundary warnings distinguish the current root, descendants, siblings and legacy RIFF', () => {
+  const root = fixture();
+  assert.deepEqual(invokeHook(root, 'pre-tool', { command: `cat "${root}/file with spaces.md"` }), {});
+  assert.deepEqual(invokeHook(root, 'pre-tool', { file_path: root }), {});
+  assert.deepEqual(invokeHook(REPOSITORY, 'pre-tool', { command: `cat "${REPOSITORY}/README.md"` }), {});
+  const sibling = invokeHook(root, 'pre-tool', { command: `cat ${root}-other/file.md` });
+  assert.match(sibling.hookSpecificOutput.additionalContext, /outside the current Git repository/);
+  const parent = invokeHook(root, 'pre-tool', { command: `cat ${root}/../outside.md` });
+  assert.match(parent.hookSpecificOutput.additionalContext, /outside the current Git repository/);
+  const legacyPath = path.join('/Users/webstantly/DEV/frameworks', 'riff', 'README.md');
+  const legacy = invokeHook(root, 'pre-tool', { command: `cat ${legacyPath}` });
+  assert.match(legacy.hookSpecificOutput.additionalContext, /read-only legacy RIFF/);
 });
 
 test('loop mode follows dependencies by priority and permits only hard blocker kinds', () => {

@@ -25,6 +25,14 @@ Initialization excludes `.riff-codex-state/` through Git's local `info/exclude`.
 
 The native plugin definition lives at [`riff/.codex-plugin/plugin.json`](../riff/.codex-plugin/plugin.json). It exposes `$riff:*` skills; it is not a separate execution engine.
 
+## Hook safeguards
+
+RIFF keeps six Codex event handlers and two chained Git hooks. Post-tool hooks collect focused warnings and validation needs; they don't run tests or typechecks after every edit. Validation and candidate-bound review remain workflow checkpoints.
+
+The pre-commit scan reads filenames and content from the Git index. Unstaged edits or local deletions cannot hide content that would be committed. An index read failure blocks the commit. Private `.env` and `.env.*` files are rejected in any directory; `.example` templates are allowed but still scanned for secrets. Live Stripe secret and restricted keys are checked before tools, after edits, and before commits.
+
+The pre-tool guard recognizes ordinary force-push flags and table-drop commands, alongside its existing destructive patterns. Normal pushes and `--force-with-lease` retain their existing behavior. Path warnings compare complete directory boundaries, so a sibling named `riff-codex` isn't mistaken for `riff`. These are focused heuristic safeguards, not a shell sandbox or a complete secret scanner.
+
 ## Terminal commands
 
 Run these from an initialized application, unless noted otherwise.
