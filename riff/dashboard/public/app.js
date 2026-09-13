@@ -831,7 +831,7 @@
 
   function buildArtifactLinks(run, artifacts) {
     const links = [];
-    for (const key of ["trace", "video", "console"]) {
+    for (const key of ["report", "trace", "video", "console"]) {
       const p = artifacts?.[key];
       if (!p) continue;
       links.push(

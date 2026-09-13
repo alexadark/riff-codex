@@ -5,11 +5,8 @@ description: Handle explicit RIFF scratch-to-production promotion requests. Use 
 
 # Promote a RIFF project
 
-RIFF Codex doesn't currently implement the canonical scratch-to-production
-promotion protocol. Report that promotion is temporarily unavailable and stop
-without changing project files, scope, Git state, deployments, or external
-systems.
+Read `.riff-codex/references/evidence.md` for the implemented scope-promotion contract. Inspect the current scope with `node .riff-codex/bin/riff.mjs promote`; if already production-scoped, report that no promotion is needed.
 
-If the project is already production-scoped, report that no scope promotion is
-needed. Never reinterpret `$riff:promote` as authorization to push, merge,
-publish, deploy, migrate, or bypass controls.
+Establish the production boundaries in shared `PROJECT.md`, `ROADMAP.yaml` and `taste.md`, preserving existing decisions. Resolve active phase blockers, stage the candidate and obtain fresh independent architecture, roadmap and functional review artifacts. Apply the checked transition with `promote --apply --architecture FILE --roadmap FILE --functional FILE`, then inspect the resulting scope and incident ledger. Load `.riff-codex/references/security.md`; sensitive projects also require `--security FILE`. Keep the candidate review evidence and report what remains unverified externally.
+
+This promotes RIFF project scope only. It does not authorize push, merge, deployment, publication or destructive changes. For a later explicit Git finalization, use `finish --check` before the authorized action.

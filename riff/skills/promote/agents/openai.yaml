@@ -1,4 +1,4 @@
 interface:
   display_name: "RIFF Promote"
-  short_description: "Reserve promotion for production scope changes"
+  short_description: "Review and promote scratch projects to production"
   default_prompt: "Use $promote through $riff:promote only for an explicit scratch-to-production scope change."

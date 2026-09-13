@@ -47,6 +47,8 @@ The dashboard presents those operational states using the fixed columns `Todo`, 
 
 In `loop`, RIFF automatically resumes a legacy parked, blocked, or awaiting-human phase whose reason is only a product or technical decision, recording the conservative choice. A permitted hard blocker resumes only after it is cleared. In `guided`, explicit user instruction may resume the phase. Resumption records the reason, activates the phase, and starts a fresh formal retry budget without bypassing validation or review gates.
 
+Use [candidate evidence](evidence.md) for executed validation, independent review artifacts and generated screenshot reports. Before explicitly authorized final Git delivery, use `finish --check`; this does not itself publish anything.
+
 Receipts are valid only for their recorded Git tree hash. Any candidate change requires staging again and issuing fresh receipts. Do not create a persistent plan unless the operation is exceptionally destructive, ambiguous, multi-system, or genuinely long-running.
 
 ## Bounded work and reporting

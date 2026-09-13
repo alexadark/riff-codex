@@ -9,6 +9,7 @@ import {
   readFileSync,
   readlinkSync,
   readdirSync,
+  realpathSync,
   renameSync,
   statSync,
   symlinkSync,
@@ -22,6 +23,9 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
+import { inside, localPath, phaseId, withLock, withFileLock } from '../lib/safety.mjs';
+import { verificationEvidence, writeReport } from '../lib/report.mjs';
+import { selectReadyPhase } from '../lib/phase-selection.mjs';
 
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -129,17 +133,20 @@ function baseState() {
 
 function event(root, type, data = {}) {
   const files = pathsFor(root);
+  localPath(root, files.events);
   ensureDir(files.events, true);
   appendFileSync(files.events, `${JSON.stringify({ at: now(), type, ...data })}\n`);
 }
 
 function readState(root) {
+  localPath(root, `${STATE_DIR}/state.json`);
   const state = readJson(pathsFor(root).state);
   validateState(state);
   return state;
 }
 
 function saveState(root, state) {
+  localPath(root, `${STATE_DIR}/state.json`);
   state.updatedAt = now();
   writeJson(pathsFor(root).state, state);
 }
@@ -148,6 +155,7 @@ function validateState(state) {
   if (!state || state.version !== 1 || !Array.isArray(state.phases)) throw new Error('state must use RIFF schema version 1');
   const ids = new Set();
   for (const phase of state.phases) {
+    phaseId(phase.id);
     if (!phase.id || ids.has(phase.id)) throw new Error(`invalid or duplicate phase id: ${phase.id ?? '<missing>'}`);
     if (!PHASE_STATES.has(phase.status)) throw new Error(`invalid state for ${phase.id}: ${phase.status}`);
     ids.add(phase.id);
@@ -234,10 +242,27 @@ function hooksHash(hooks) {
 }
 
 function gitHooksDir(root) {
-  let configured = '';
-  try { configured = run('git', ['config', '--get', 'core.hooksPath'], { cwd: root }); } catch { /* default */ }
-  if (!configured) return path.join(root, '.git', 'hooks');
-  return path.resolve(root, configured);
+  const directory = path.resolve(run('git', ['rev-parse', '--path-format=absolute', '--git-path', 'hooks'], { cwd: root }));
+  const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
+  if (!inside(root, directory) && !inside(common, directory)) throw new Error('Git hooks directory is outside the project and Git common directory');
+  localPath(inside(root, directory) ? root : common, directory);
+  return directory;
+}
+
+function installationPreflight(root) {
+  const directory = gitHooksDir(root);
+  for (const name of [STATE_DIR, '.codex', '.agents', '.agents/skills']) {
+    const target = localPath(root, name);
+    if (existsSync(target) && !statSync(target).isDirectory()) throw new Error(`${name} must be a directory`);
+  }
+  for (const name of ['pre-commit', 'commit-msg']) {
+    const target = path.join(directory, name);
+    if (pathExists(target) && (!existsSync(target) || !statSync(target).isFile())) throw new Error(`existing Git hook must resolve to a regular file: ${name}`);
+  }
+  const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
+  const exclude = path.resolve(root, run('git', ['rev-parse', '--git-path', 'info/exclude'], { cwd: root }));
+  localPath(inside(root, exclude) ? root : common, exclude);
+  for (const name of [STATE_DIR, '.codex/hooks.json', '.agents/skills']) localPath(root, name);
 }
 
 function installGitHook(root, name, migration) {
@@ -247,18 +272,20 @@ function installGitHook(root, name, migration) {
   const backupDir = path.join(root, STATE_DIR, 'git-hooks');
   ensureDir(backupDir);
   let prior = null;
-  if (existsSync(target)) {
+  if (pathExists(target)) {
     const current = readFileSync(target, 'utf8');
-    const currentIsCodex = current.includes(GIT_HOOK_MARKER);
-    const currentIsLegacyCodex = (migration.legacyFrameworkOwned || migration.migratedState)
+    const linked = lstatSync(target).isSymbolicLink();
+    const currentIsCodex = !linked && current.includes(GIT_HOOK_MARKER);
+    const currentIsLegacyCodex = !linked && (migration.legacyFrameworkOwned || migration.migratedState)
       && current.includes(LEGACY_GIT_HOOK_MARKER)
       && current.includes(`/${LEGACY_FRAMEWORK_DIR}/bin/riff.mjs`);
     if (!currentIsCodex && !currentIsLegacyCodex) {
       const digest = sha(current).slice(0, 12);
       prior = path.join(backupDir, `${name}.${digest}.previous`);
-      if (!existsSync(prior)) copyFileSync(target, prior);
+      localPath(root, prior);
+      if (!existsSync(prior)) { copyFileSync(target, prior); chmodSync(prior, lstatSync(target).isSymbolicLink() ? statSync(target).mode & 0o777 : lstatSync(target).mode & 0o777); }
     } else {
-      const match = current.match(/^(?:RIFF_CODEX_PREVIOUS|RIFF_PREVIOUS)=(.+)$/m);
+      const match = current.match(/^# RIFF_CODEX_PREVIOUS_JSON=(.+)$/m) ?? current.match(/^(?:RIFF_CODEX_PREVIOUS|RIFF_PREVIOUS)=(.+)$/m);
       prior = match?.[1] ? JSON.parse(match[1]) : null;
       const legacyPrefix = `${path.join(root, LEGACY_STATE_DIR)}${path.sep}`;
       if (migration.migratedState && typeof prior === 'string' && prior.startsWith(legacyPrefix)) {
@@ -267,11 +294,12 @@ function installGitHook(root, name, migration) {
       }
     }
   }
-  const previousLine = JSON.stringify(prior ?? '');
+  const previousLine = `'${String(prior ?? '').replaceAll("'", "'\"'\"'")}'`;
   const arg = name === 'commit-msg' ? ' "$@"' : '';
-  const wrapper = `#!/bin/sh\n${GIT_HOOK_MARKER}\nRIFF_CODEX_PREVIOUS=${previousLine}\nif [ -n "$RIFF_CODEX_PREVIOUS" ] && [ -x "$RIFF_CODEX_PREVIOUS" ]; then "$RIFF_CODEX_PREVIOUS" "$@" || exit $?; fi\n/usr/bin/env node "$(git rev-parse --show-toplevel)/${FRAMEWORK_DIR}/bin/riff.mjs" hook git-${name}${arg}\n`;
-  writeFileSync(target, wrapper);
-  chmodSync(target, 0o755);
+  const wrapper = `#!/bin/sh\n${GIT_HOOK_MARKER}\n# RIFF_CODEX_PREVIOUS_JSON=${JSON.stringify(prior ?? '')}\nRIFF_CODEX_PREVIOUS=${previousLine}\nif [ -n "$RIFF_CODEX_PREVIOUS" ] && [ -x "$RIFF_CODEX_PREVIOUS" ]; then "$RIFF_CODEX_PREVIOUS" "$@" || exit $?; fi\n/usr/bin/env node "$(git rev-parse --show-toplevel)/${FRAMEWORK_DIR}/bin/riff.mjs" hook git-${name}${arg}\n`;
+  const temporary = `${target}.riff-${process.pid}`;
+  writeFileSync(temporary, wrapper, { flag: 'wx', mode: 0o755 });
+  renameSync(temporary, target);
 }
 
 function symlinkResolvesTo(link, expected) {
@@ -315,6 +343,7 @@ function migrateLegacyInstall(root) {
   }
 
   if (!pathExists(state) && pathExists(legacyState) && ownership.owned) {
+    if (lstatSync(legacyState).isSymbolicLink()) throw new Error('owned legacy state must be a real directory before migration');
     renameSync(legacyState, state);
     migratedState = true;
     changes.push(`${LEGACY_STATE_DIR} -> ${STATE_DIR}`);
@@ -382,6 +411,7 @@ function excludeLocalState(root) {
   ensureDir(exclude, true);
   const current = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
   if (!/^\.riff-codex-state\/$/m.test(current)) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF Codex worktree-local state\n${STATE_DIR}/\n`);
+  if (!/^\.uxtest\/runs\/$/m.test(current)) appendFileSync(exclude, '.uxtest/runs/\n');
 }
 
 function dashboardRegistryFile() {
@@ -390,14 +420,27 @@ function dashboardRegistryFile() {
 
 function registerDashboardProject(root) {
   const file = dashboardRegistryFile();
+  return withFileLock(localPath(homedir(), `${file}.lock`), () => {
   const current = readJson(file, false) ?? { version: 1, projects: [], hidden: [] };
   const projects = Array.isArray(current.projects) ? current.projects.filter((item) => typeof item === 'string') : [];
   const hidden = Array.isArray(current.hidden) ? current.hidden.filter((item) => typeof item === 'string' && item !== root) : [];
   if (!projects.includes(root)) projects.push(root);
   writeJson(file, { version: 1, projects, hidden });
+  });
 }
 
 function syncManaged(root, options = {}) {
+  installationPreflight(root);
+  const installLock = path.resolve(run('git', ['rev-parse', '--path-format=absolute', '--git-path', 'riff-codex-install.lock'], { cwd: root }));
+  const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
+  localPath(inside(root, installLock) ? root : common, installLock);
+  return withFileLock(installLock, () => {
+    const migration = migrateLegacyInstall(root);
+    return withLock(root, () => syncManagedUnlocked(root, { ...options, migration }));
+  });
+}
+
+function syncManagedUnlocked(root, options) {
   const migration = options.migration ?? migrateLegacyInstall(root);
   const files = pathsFor(root);
   ensureFrameworkLink(root);
@@ -516,12 +559,11 @@ async function cmdInit(tokens) {
   const candidate = path.resolve(options.project_root ?? process.cwd());
   const root = gitRoot(candidate);
   if (root !== candidate) fail(`--project-root must be the Git root (${root})`);
-  let migration;
-  try { migration = migrateLegacyInstall(root); }
-  catch (error) { fail(`cannot migrate existing RIFF Codex installation: ${error.message}`); }
-  const existing = readJson(pathsFor(root).config, false) ?? {};
+  try { installationPreflight(root); } catch (error) { fail(error.message); }
+  const existing = readJson(pathsFor(root).config, false) ?? (legacyStateOwnership(root).owned ? readJson(path.join(root, LEGACY_STATE_DIR, 'config.json'), false) : null) ?? {};
   const needsConfiguration = !existing.onboarding?.completedAt;
-  let configuration = { language: options.language, autonomy: options.autonomy };
+  if (options.scope && !['scratch', 'production'].includes(options.scope)) fail('--scope must be scratch or production');
+  let configuration = { language: options.language, autonomy: options.autonomy, scope: options.scope };
   if (!options.non_interactive && process.stdin.isTTY && process.stdout.isTTY && (options.configure || needsConfiguration)) {
     process.stdout.write('RIFF project configuration\nPress Enter to accept each recommended choice.\n');
     configuration = await configureInteractively({
@@ -531,7 +573,8 @@ async function cmdInit(tokens) {
     });
   }
   try {
-    const result = syncManaged(root, { ...configuration, recordApproval: options.record_hooks_approved, migration });
+    if (existing.project?.scope === 'scratch' && configuration.scope === 'production') throw new Error('use promote for a reviewed scratch-to-production transition');
+    const result = syncManaged(root, { ...configuration, recordApproval: options.record_hooks_approved });
     if (result.migration.changes.length) process.stdout.write(`Migrated existing RIFF Codex installation: ${result.migration.changes.join(', ')}.\n`);
   } catch (error) { fail(error.message); }
   const config = readJson(pathsFor(root).config);
@@ -593,6 +636,7 @@ function normalizePhase(id, phase, canonical) {
     blocking_edges: normalizeStringArray(phase.blocking_edges),
     risks,
     sensitive: Boolean(phase.sensitive || SENSITIVE_WORDS.test(`${title} ${outcome} ${risks.join(' ')}`)),
+    verificationRequired: Boolean(phase.verification_required || phase.verification?.required || (Array.isArray(phase.mode) ? phase.mode : [phase.mode]).includes('HITL')),
     status: normalizeRoadmapStatus(phase.status, id),
   };
 }
@@ -636,12 +680,16 @@ function syncRoadmap(root) {
   const roadmap = readRoadmap(root);
   const state = readState(root);
   const old = new Map(state.phases.map((phase) => [phase.id, phase]));
+  const incoming = new Set(roadmap.phases.map((phase) => phase.id));
+  for (const prior of state.phases) {
+    if (!incoming.has(prior.id) && (prior.status !== 'ready' || prior.commit || state.reviews.functional?.phase === prior.id || state.reviews.security?.phase === prior.id || state.lastValidation?.phase === prior.id)) throw new Error(`cannot remove referenced phase ${prior.id}; preserve its history in the roadmap`);
+  }
   state.project = { name: roadmap.project.name ?? null, objective: roadmap.project.objective ?? null };
   state.roadmap = { source: 'ROADMAP.yaml', format: roadmap.format, out_of_scope: roadmap.out_of_scope ?? [] };
   state.phases = roadmap.phases.map((phase) => {
     const prior = old.get(phase.id);
     return prior
-      ? { ...phase, status: prior.status, commit: prior.commit ?? null, attempts: prior.attempts ?? 0, reason: prior.reason ?? null, blockerKind: prior.blockerKind ?? null }
+      ? { ...prior, ...phase, status: prior.status, commit: prior.commit ?? null, attempts: prior.attempts ?? 0, reason: prior.reason ?? null, blockerKind: prior.blockerKind ?? null }
       : { ...phase, commit: null, attempts: 0, reason: null, blockerKind: null };
   });
   validateState(state);
@@ -667,19 +715,17 @@ function selectPhase(state, requested) {
     if (phase.status !== 'ready' || !dependenciesComplete(state, phase)) throw new Error(`phase ${requested} is not ready`);
     return phase;
   }
-  let selected = null;
-  for (const phase of state.phases) {
-    if (phase.status !== 'ready' || !dependenciesComplete(state, phase)) continue;
-    const rank = PRIORITY_RANK.get(phase.priority) ?? PRIORITY_RANK.size;
-    const selectedRank = selected ? PRIORITY_RANK.get(selected.priority) ?? PRIORITY_RANK.size : Number.POSITIVE_INFINITY;
-    if (!selected || rank < selectedRank) selected = phase;
-  }
-  return selected;
+  return selectReadyPhase(state.phases);
 }
 
 function candidateTree(root) {
   try { return run('git', ['write-tree'], { cwd: root }); }
   catch { throw new Error('stage the complete candidate before recording validation or review'); }
+}
+
+function baseline(root) {
+  try { return run('git', ['rev-parse', 'HEAD'], { cwd: root }); }
+  catch { return run('git', ['hash-object', '-w', '-t', 'tree', '--stdin'], { cwd: root, input: '', stdio: ['pipe', 'pipe', 'pipe'] }); }
 }
 
 function optionRequired(options, name) {
@@ -703,6 +749,83 @@ function markPhase(root, state, phase, status, reason = null, blockerKind = null
   } else if (state.humanAction?.phase === phase.id) state.humanAction = null;
   saveState(root, state);
   event(root, `phase_${status}`, { phase: phase.id, kind: blockerKind, reason });
+}
+
+function activePhase(state, phase) {
+  if (phase.status !== 'active' || state.activeWave?.phase !== phase.id || !dependenciesComplete(state, phase)) throw new Error(`phase ${phase.id} must be active with completed dependencies`);
+}
+
+function reviewArtifact(root, file, candidate, type, status) {
+  const bytes = readFileSync(localPath(root, file));
+  const artifact = JSON.parse(bytes);
+  if (artifact.version !== 1 || artifact.candidate !== candidate || artifact.type !== type || artifact.status !== status || typeof artifact.reviewer?.id !== 'string' || !artifact.reviewer.id.trim() || artifact.reviewer.independent !== true || !Array.isArray(artifact.evidence) || !artifact.evidence.length || artifact.evidence.some((item) => typeof item !== 'string' || !item.trim()) || !Array.isArray(artifact.findings)) throw new Error('review artifact needs current candidate, matching type/status, independent reviewer identity, evidence and findings');
+  if (status === 'pass' && artifact.findings.some((finding) => ['HIGH', 'CRITICAL'].includes(String(finding.severity).toUpperCase()))) throw new Error('passing review cannot contain blocking findings');
+  return { artifact, bytes, hash: sha(bytes) };
+}
+
+function storeEvidence(root, kind, bytes) {
+  const digest = sha(bytes);
+  const file = localPath(root, `${STATE_DIR}/evidence/${kind}-${digest}.json`);
+  ensureDir(file, true);
+  if (!existsSync(file)) writeFileSync(file, bytes, { flag: 'wx' });
+  if (sha(readFileSync(file)) !== digest) throw new Error('stored evidence hash mismatch');
+  return { path: path.relative(root, file), hash: digest };
+}
+
+function evidenceValid(root, evidence) {
+  try { return Boolean(evidence?.path && evidence.hash && sha(readFileSync(localPath(root, evidence.path))) === evidence.hash); }
+  catch { return false; }
+}
+
+function requireValidation(root, phase, candidate) {
+  const validation = phase.validation;
+  if (!validation || validation.status !== 'pass' || !validation.executed || validation.candidate !== candidate || !evidenceValid(root, validation.evidence)) throw new Error('a successful executed validation for this exact candidate is required');
+  if (!evidenceValid(root, validation.verification)) throw new Error('verification report is missing or changed');
+  if (phase.verificationRequired && (!validation.verification || validation.verification.verdict !== 'PASS')) throw new Error('this phase requires passing verification evidence');
+  return validation;
+}
+
+function validateCandidate(root, state, phase, options) {
+  const command = optionRequired(options, 'command');
+  const candidate = candidateTree(root);
+  if (options.run !== true) {
+    if (!['pass', 'fail'].includes(options.status)) throw new Error('--status must be pass or fail');
+    state.lastValidation = { phase: phase.id, status: optionRequired(options, 'status'), command, summary: optionRequired(options, 'summary'), candidate, executed: false, at: now() };
+    phase.validation = state.lastValidation;
+    saveState(root, state);
+    return state.lastValidation;
+  }
+  const argv = JSON.parse(command);
+  if (!Array.isArray(argv) || !argv.length || argv.some((arg) => typeof arg !== 'string' || !arg || arg.includes('\0'))) throw new Error('--command must be a JSON argv array');
+  const paths = options.paths ? JSON.parse(options.paths) : phase.allowedPaths;
+  if (!Array.isArray(paths) || !paths.length || paths.some((entry) => typeof entry !== 'string' || !entry || entry === '.' || path.isAbsolute(entry) || entry.split(/[\\/]/).includes('..'))) throw new Error('validation requires explicit project-relative --paths JSON array');
+  paths.forEach((entry) => localPath(root, entry));
+  const base = phase.baseCommit;
+  if (!base) throw new Error('resume this legacy phase with --reason to establish its baseline before validation');
+  const changed = execFileSync('git', ['diff', '--name-only', '-z', base, candidate], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+  const outside = changed.filter((file) => !paths.some((entry) => inside(path.resolve(root, entry), path.resolve(root, file))));
+  if (outside.length) throw new Error(`candidate exceeds declared scope: ${outside.join(', ')}`);
+  run('git', ['diff', '--exit-code'], { cwd: root });
+  const visual = options.verification ? verificationEvidence(root, options.verification, candidate) : undefined;
+  phase.validation = null;
+  state.lastValidation = null;
+  saveState(root, state);
+  const observed = spawnSync(argv[0], argv.slice(1), { cwd: root, encoding: 'utf8', timeout: 60_000, maxBuffer: 8 * 1024 * 1024 });
+  const output = `${observed.stdout ?? ''}${observed.stderr ?? ''}`.replace(/\b(?:sk-proj-|(?:sk|rk)_live_|gh[pousr]_)[A-Za-z0-9_-]+\b/g, '[REDACTED]');
+  let unchanged = candidateTree(root) === candidate;
+  try { run('git', ['diff', '--exit-code'], { cwd: root }); } catch { unchanged = false; }
+  const status = observed.status === 0 && !observed.error && unchanged ? 'pass' : 'fail';
+  const summary = !unchanged ? 'Validation changed the candidate; stage and validate the corrected tree.' : observed.error?.message ?? `Command exited ${observed.status ?? observed.signal}`;
+  const validation = { phase: phase.id, status, command: argv, summary, candidate, executed: true, output, at: now(), allowedPaths: paths, changedPaths: changed, exitCode: observed.status };
+  if (phase.verificationRequired && (!visual || visual.manifest.steps.some((step) => step.status !== 'pass'))) validation.status = 'fail';
+  validation.verification = writeReport(root, { title: phase.title, phase: phase.id, candidate, validation, evidence: visual, steps: phase.verificationRequired && !visual ? [{ name: 'Required verification', status: 'unverified', observed: 'No verification manifest was supplied.' }] : [] });
+  validation.evidence = storeEvidence(root, 'validation', Buffer.from(JSON.stringify(validation)));
+  phase.allowedPaths = paths;
+  phase.validation = validation;
+  state.lastValidation = validation;
+  saveState(root, state);
+  event(root, 'validation', { phase: phase.id, status: validation.status, candidate, report: validation.verification.path });
+  return validation;
 }
 
 function autonomyMode(root) {
@@ -736,13 +859,19 @@ function recordReview(root, state, phase, options) {
   const status = optionRequired(options, 'status');
   if (!['pass', 'fail'].includes(status)) throw new Error('--status must be pass or fail');
   const severity = type === 'security' ? parseSeverity(options.severity) : null;
+  const candidate = candidateTree(root);
+  if (options.candidate && options.candidate !== candidate) throw new Error('review candidate differs from the current staged tree');
+  if (status === 'pass') requireValidation(root, phase, candidate);
+  const proof = reviewArtifact(root, optionRequired(options, 'evidence'), candidate, type, status);
   const receipt = {
     version: 1,
     phase: phase.id,
     type,
     status,
     severity,
-    candidate: options.candidate ?? candidateTree(root),
+    candidate,
+    evidence: storeEvidence(root, `${phase.id}-${type}`, proof.bytes),
+    reviewer: proof.artifact.reviewer,
     summary: optionRequired(options, 'summary'),
     what_could_happen: options.what_could_happen ?? null,
     affected: options.affected ?? null,
@@ -757,7 +886,7 @@ function recordReview(root, state, phase, options) {
       if (!receipt[field]) throw new Error(`security failures require --${field.replaceAll('_', '-')}`);
     }
   }
-  writeJson(path.join(pathsFor(root).receipts, `${phase.id}-${type}.json`), receipt);
+  writeJson(localPath(root, path.join(pathsFor(root).receipts, `${phase.id}-${type}.json`)), receipt);
   state.reviews[type] = receipt;
   if (options.model) state.model = { name: options.model, reasoning: options.reasoning ?? null, fast_available: options.fast_available === 'true' };
   if (type === 'security' && status === 'fail') {
@@ -773,7 +902,7 @@ function recordReview(root, state, phase, options) {
 }
 
 function receiptFor(root, phase, type) {
-  return readJson(path.join(pathsFor(root).receipts, `${phase.id}-${type}.json`), false);
+  return readJson(localPath(root, path.join(pathsFor(root).receipts, `${phaseId(phase.id)}-${type}.json`)), false);
 }
 
 function cmdWave(tokens) {
@@ -798,12 +927,17 @@ function cmdWave(tokens) {
           if (active && active.id !== resumable.id) throw new Error(`phase ${active.id} is active; resume or park it first`);
           const reason = optionRequired(options, 'reason');
           resumable.attempts = 0;
+          resumable.baseCommit ??= baseline(root);
           markPhase(root, state, resumable, 'active', reason);
           process.stdout.write(`Resumed ${requested}.\n`);
           return;
         }
       }
       const phase = selectPhase(state, requested);
+      if (action === 'resume' && phase?.status === 'active' && !phase.baseCommit) {
+        phase.baseCommit = baseline(root);
+        saveState(root, state);
+      }
       if (!phase) {
         const unfinished = state.phases.filter((item) => !TERMINAL_PHASE_STATES.has(item.status));
         process.stdout.write(unfinished.length ? 'No phase is ready. RIFF will follow dependencies automatically; inspect only recorded hard blockers.\n' : 'Roadmap complete.\n');
@@ -817,14 +951,17 @@ function cmdWave(tokens) {
     const phase = phaseById(state, id);
     if (action === 'activate') {
       const selected = selectPhase(state, id);
+      selected.baseCommit ??= baseline(root);
       markPhase(root, state, selected, 'active');
       process.stdout.write(`Activated ${id}.\n`);
     } else if (['park', 'block', 'await'].includes(action)) {
+      activePhase(state, phase);
       const status = action === 'park' ? 'parked' : action === 'block' ? 'blocked' : 'awaiting_human';
       const blockerKind = autonomy === 'loop' ? loopStopKind(root, state, phase, options) : options.kind ?? null;
       markPhase(root, state, phase, status, optionRequired(options, 'reason'), blockerKind);
       process.stdout.write(`${id} is ${status}.\n`);
     } else if (action === 'retry') {
+      activePhase(state, phase);
       const reason = optionRequired(options, 'reason');
       if (state.lastValidation?.phase !== id || state.lastValidation?.status !== 'fail') {
         throw new Error('wave retry requires a recorded failed validation for this phase');
@@ -835,22 +972,25 @@ function cmdWave(tokens) {
       event(root, 'targeted_retry', { phase: id, reason });
       process.stdout.write(`Recorded the one targeted correction for ${id}.\n`);
     } else if (action === 'validate') {
-      const status = optionRequired(options, 'status');
-      if (!['pass', 'fail'].includes(status)) throw new Error('--status must be pass or fail');
-      state.lastValidation = { phase: id, status, command: optionRequired(options, 'command'), summary: optionRequired(options, 'summary'), candidate: options.candidate ?? null, at: now() };
-      saveState(root, state);
-      event(root, 'validation', state.lastValidation);
-      process.stdout.write(`Validation ${status} recorded for ${id}.\n`);
+      activePhase(state, phase);
+      const validation = validateCandidate(root, state, phase, options);
+      process.stdout.write(`Validation ${validation.status} recorded for ${id}.\n${validation.verification ? `Report: ${path.join(root, validation.verification.path)}\n` : 'Declaration only; use --run for completion evidence.\n'}`);
+      if (validation.status === 'fail') process.exitCode = 1;
     } else if (action === 'review') {
+      activePhase(state, phase);
       const receipt = recordReview(root, state, phase, options);
       process.stdout.write(`${receipt.type} review ${receipt.status} recorded for ${id} at ${receipt.candidate}.\n`);
     } else if (action === 'complete') {
       const commit = optionRequired(options, 'commit');
+      if (phase.status === 'completed' && phase.commit === run('git', ['rev-parse', commit], { cwd: root })) { process.stdout.write(`${id} already completed.\n`); return; }
+      activePhase(state, phase);
       const commitTree = run('git', ['rev-parse', `${commit}^{tree}`], { cwd: root });
+      if (run('git', ['rev-parse', commit], { cwd: root }) !== run('git', ['rev-parse', 'HEAD'], { cwd: root })) throw new Error('completion must refer to current HEAD');
+      requireValidation(root, phase, commitTree);
       const functional = receiptFor(root, phase, 'functional');
       const security = receiptFor(root, phase, 'security');
-      if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree) throw new Error('a passing functional receipt for the exact commit tree is required');
-      if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree)) throw new Error('a passing security receipt for the exact sensitive commit tree is required');
+      if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree || !evidenceValid(root, functional.evidence)) throw new Error('a passing functional receipt with intact evidence for the exact commit tree is required');
+      if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree || !evidenceValid(root, security.evidence))) throw new Error('a passing security receipt with intact evidence for the exact sensitive commit tree is required');
       phase.commit = run('git', ['rev-parse', commit], { cwd: root });
       phase.status = 'completed';
       phase.reason = null;
@@ -928,9 +1068,11 @@ function doctor(root, recordApproval = false) {
   }
   for (const name of ['git', 'node', 'bun']) add(executable(name) ? 'ok' : 'error', `executable ${name}`, executable(name) ? 'available' : 'missing');
   for (const name of ['pre-commit', 'commit-msg']) {
-    const target = path.join(gitHooksDir(root), name);
-    const valid = existsSync(target) && readFileSync(target, 'utf8').includes(GIT_HOOK_MARKER);
-    add(valid ? 'ok' : 'error', `Git ${name}`, valid ? 'installed and chained' : 'missing RIFF wrapper');
+    try {
+      const target = path.join(gitHooksDir(root), name);
+      const valid = existsSync(target) && !lstatSync(target).isSymbolicLink() && readFileSync(target, 'utf8').includes(GIT_HOOK_MARKER);
+      add(valid ? 'ok' : 'error', `Git ${name}`, valid ? 'installed and chained' : 'missing RIFF wrapper');
+    } catch (error) { add('error', `Git ${name}`, error.message); }
   }
   try { dashboardData(root); add('ok', 'dashboard state', 'readable'); }
   catch (error) { add('error', 'dashboard state', error.message); }
@@ -983,7 +1125,7 @@ function dashboardData(root) {
     progress: { completed: phases.completed.length, total: state.phases.length },
     activeWave: state.activeWave,
     phases,
-    nextReady: ready[0] ?? null,
+    nextReady: selectReadyPhase(state.phases),
     lastCommit: state.lastCommit ?? gitCommit,
     lastValidation: state.lastValidation,
     reviews: {
@@ -1288,13 +1430,15 @@ function preCommit(root) {
   const active = state.phases.find((phase) => phase.status === 'active');
   if (!active) return 0;
   const candidate = candidateTree(root);
+  try { requireValidation(root, active, candidate); }
+  catch (error) { process.stderr.write(`RIFF pre-commit blocked: ${error.message}\n`); return 1; }
   const functional = receiptFor(root, active, 'functional');
   const security = receiptFor(root, active, 'security');
-  if (!functional || functional.status !== 'pass' || functional.candidate !== candidate) {
+  if (!functional || functional.status !== 'pass' || functional.candidate !== candidate || !evidenceValid(root, functional.evidence)) {
     process.stderr.write('RIFF pre-commit blocked: the active wave needs a fresh passing functional review receipt for this exact staged tree.\n');
     return 1;
   }
-  if (active.sensitive && (!security || security.status !== 'pass' || security.candidate !== candidate)) {
+  if (active.sensitive && (!security || security.status !== 'pass' || security.candidate !== candidate || !evidenceValid(root, security.evidence))) {
     process.stderr.write('RIFF pre-commit blocked: this sensitive wave needs a fresh passing security receipt for this exact staged tree.\n');
     return 1;
   }
@@ -1348,8 +1492,83 @@ function cmdStatus() {
   process.stdout.write(`${data.project.name ?? 'Unshaped project'}: ${data.project.objective ?? 'no objective yet'}\n${data.progress.completed}/${data.progress.total} phases completed. Active: ${data.activeWave?.phase ?? 'none'}. Next: ${data.nextReady?.id ?? 'none'}.\nHuman action: ${data.humanAction?.reason ?? 'none'}\n`);
 }
 
+function cmdReport(tokens) {
+  const root = gitRoot();
+  const options = parseOptions(tokens);
+  const candidate = candidateTree(root);
+  const evidence = verificationEvidence(root, optionRequired(options, 'evidence'), candidate);
+  const report = writeReport(root, { title: evidence.manifest.title ?? 'Verification report', candidate, phase: options.phase ?? 'verification', evidence });
+  event(root, 'verification_report', report);
+  process.stdout.write(`${path.join(root, report.path)}\n${report.verdict}\n`);
+}
+
+function cmdFinish(tokens) {
+  const options = parseOptions(tokens);
+  if (!options.check) throw new Error('finish currently requires --check; Git publication remains an explicit separate action');
+  const root = gitRoot();
+  const state = readState(root);
+  if (state.phases.some((phase) => !TERMINAL_PHASE_STATES.has(phase.status))) throw new Error('unfinished phases remain');
+  for (const phase of state.phases.filter((phase) => phase.status === 'completed')) {
+    const tree = run('git', ['rev-parse', `${phase.commit}^{tree}`], { cwd: root });
+    requireValidation(root, phase, tree);
+    for (const type of phase.sensitive ? ['functional', 'security'] : ['functional']) {
+      const receipt = receiptFor(root, phase, type);
+      if (receipt?.status !== 'pass' || receipt.candidate !== tree || !evidenceValid(root, receipt.evidence)) throw new Error(`phase ${phase.id} lacks intact ${type} evidence`);
+    }
+    run('git', ['merge-base', '--is-ancestor', phase.commit, 'HEAD'], { cwd: root });
+  }
+  if (run('git', ['status', '--porcelain'], { cwd: root })) throw new Error('commit or preserve pending project changes before finishing');
+  process.stdout.write(`Ready for explicit Git finalization at ${run('git', ['rev-parse', 'HEAD'], { cwd: root })}.\nNo push, merge or deployment performed.\n`);
+}
+
+function cmdPromote(tokens) {
+  const options = parseOptions(tokens);
+  const root = gitRoot();
+  const config = readJson(pathsFor(root).config);
+  if (config.project?.scope === 'production') { process.stdout.write('Already production scope.\n'); return; }
+  if (config.project?.scope !== 'scratch') throw new Error('promotion requires a scratch-scoped project');
+  const candidate = candidateTree(root);
+  if (!options.apply) { process.stdout.write(`Promotion candidate: ${candidate}\nPrepare PROJECT.md, ROADMAP.yaml and taste.md, stage changes, then supply independent architecture, roadmap and functional review artifacts with --apply; include security for sensitive boundaries.\n`); return; }
+  for (const file of ['PROJECT.md', 'ROADMAP.yaml', 'taste.md']) if (!readFileSync(localPath(root, file), 'utf8').trim()) throw new Error(`missing production artifact ${file}`);
+  readRoadmap(root);
+  for (const file of ['PROJECT.md', 'ROADMAP.yaml', 'taste.md']) run('git', ['cat-file', '-e', `${candidate}:${file}`], { cwd: root });
+  run('git', ['diff', '--exit-code'], { cwd: root });
+  const state = readState(root);
+  if (state.phases.some((phase) => ['active', 'parked', 'blocked', 'awaiting_human'].includes(phase.status))) throw new Error('resolve active work and blockers before scope promotion');
+  const architecture = reviewArtifact(root, optionRequired(options, 'architecture'), candidate, 'architecture', 'pass');
+  const roadmap = reviewArtifact(root, optionRequired(options, 'roadmap'), candidate, 'roadmap', 'pass');
+  const functional = reviewArtifact(root, optionRequired(options, 'functional'), candidate, 'functional', 'pass');
+  const sensitive = state.phases.some((phase) => phase.sensitive) || SENSITIVE_WORDS.test(readFileSync(path.join(root, 'PROJECT.md'), 'utf8'));
+  const security = sensitive ? reviewArtifact(root, optionRequired(options, 'security'), candidate, 'security', 'pass') : null;
+  config.project.scope = 'production';
+  config.promotion = { candidate, at: now(), architecture: storeEvidence(root, 'architecture', architecture.bytes), roadmap: storeEvidence(root, 'roadmap', roadmap.bytes), functional: storeEvidence(root, 'functional', functional.bytes), security: security ? storeEvidence(root, 'security', security.bytes) : null };
+  const ledger = localPath(root, 'INCIDENTS.md');
+  if (!existsSync(ledger)) writeFileSync(ledger, '# Production incidents\n\nAppend-only incident history.\n', { flag: 'wx' });
+  writeJson(localPath(root, pathsFor(root).config), config);
+  event(root, 'scope_promoted', { candidate });
+  process.stdout.write('Scope promoted from scratch to production. Existing phases preserved. No deployment performed.\n');
+}
+
+function cmdIncident(tokens) {
+  if (tokens[0] !== 'log') throw new Error('use incident log --evidence FILE');
+  const options = parseOptions(tokens.slice(1));
+  const root = gitRoot();
+  const entry = readJson(localPath(root, optionRequired(options, 'evidence')));
+  for (const field of ['id', 'title', 'impact', 'rootCause', 'prevention']) if (typeof entry[field] !== 'string' || !entry[field].trim()) throw new Error(`incident requires ${field}`);
+  phaseId(entry.id);
+  if (!['critical', 'high', 'medium', 'low'].includes(entry.severity)) throw new Error('incident requires a valid severity');
+  const file = localPath(root, 'INCIDENTS.md');
+  const previous = existsSync(file) ? readFileSync(file, 'utf8') : '# Production incidents\n';
+  const marker = `<!-- incident:${entry.id} -->`;
+  if (previous.includes(marker)) { process.stdout.write(`Incident ${entry.id} already recorded.\n`); return; }
+  const line = (text) => String(text).replace(/[\r\n]+/g, ' ');
+  appendFileSync(file, `${existsSync(file) ? '' : previous}\n${marker}\n## ${now().slice(0, 10)}: ${line(entry.title)}\n\n- **Severity:** ${entry.severity}\n- **Phase:** ${line(entry.phase ?? 'not specified')}\n- **Impact:** ${line(entry.impact)}\n- **Root cause:** ${line(entry.rootCause)}\n- **Prevention:** ${line(entry.prevention)}\n`);
+  event(root, 'incident_recorded', { id: entry.id, severity: entry.severity });
+  process.stdout.write(`Incident ${entry.id} appended to INCIDENTS.md.\n`);
+}
+
 function help() {
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --status pass --command "npm test -- relevant" --summary "Affected behavior passes"\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works"\n  riff-codex wave complete phase-1 --commit HEAD\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -1360,7 +1579,17 @@ else if (command === 'resync') cmdResync(tokens);
 else if (command === 'doctor') cmdDoctor(tokens);
 else if (command === 'dashboard') await cmdDashboard(tokens);
 else if (command === 'status') cmdStatus();
-else if (command === 'wave') cmdWave(tokens);
-else if (command === 'hook') cmdHook(tokens);
+else if (['report', 'promote', 'incident', 'finish'].includes(command)) {
+  try {
+    const action = () => ({ report: cmdReport, promote: cmdPromote, incident: cmdIncident, finish: cmdFinish })[command](tokens);
+    if (command === 'finish') action(); else withLock(gitRoot(), action);
+  } catch (error) { fail(error.message); }
+}
+else if (command === 'wave') {
+  try { if (tokens[0] === 'select') cmdWave(tokens); else withLock(gitRoot(), () => cmdWave(tokens)); } catch (error) { fail(error.message); }
+}
+else if (command === 'hook') {
+  try { if (['post-tool', 'pre-compact'].includes(tokens[0])) withLock(gitRoot(), () => cmdHook(tokens)); else cmdHook(tokens); } catch (error) { fail(error.message); }
+}
 else if (command === 'next') fail('riff-codex next is intentionally deferred; use $riff:wave or riff-codex wave select');
 else fail(`unknown command ${command}; run riff-codex --help`);

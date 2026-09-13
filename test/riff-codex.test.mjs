@@ -418,3 +418,150 @@ test('guided mode preserves product decision handoffs without blocker kinds', ()
   assert.equal(state.humanAction.kind, null);
   assert.equal(state.humanAction.reason, 'Choose the product direction');
 });
+
+function lifecycleFixture(scope = 'production') {
+  const root = fixture();
+  writeFileSync(path.join(root, '.gitignore'), '.riff-codex\n.agents/\n.codex/\n.home/\n');
+  writeFileSync(path.join(root, 'README.md'), '# Fixture\n');
+  execFileSync('git', ['add', '--', '.gitignore', 'README.md'], { cwd: root });
+  execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Fixture baseline'], { cwd: root });
+  runCli(root, 'init', '--project-root', root, '--non-interactive', '--scope', scope);
+  return root;
+}
+function roadmapFixture(root, phases) {
+  writeJson(path.join(root, 'ROADMAP.yaml'), { version: 1, project: { name: 'Fixture' }, phases });
+  runCli(root, 'wave', 'sync');
+}
+const fixturePhase = (id, priority = 'P2', depends_on = []) => ({ id, title: id, outcome: 'Visible result', priority, depends_on });
+function proofFile(root, type, candidate, status = 'pass') {
+  const file = path.join(root, '.riff-codex-state', `${type}-review.json`);
+  writeJson(file, { version: 1, candidate, type, status, reviewer: { id: 'fresh-test-reviewer', independent: true }, evidence: ['README.md:1 inspected'], findings: [] });
+  return file;
+}
+
+test('installation preflight protects shared directories and preserves linked hook sources', () => {
+  const container = fixture();
+  const outside = path.join(container, 'shared');
+  mkdirSync(outside);
+  for (const mode of ['absolute', 'relative', 'directory-link', 'dangling']) {
+    const root = path.join(container, mode);
+    mkdirSync(root); execFileSync('git', ['init', '-q'], { cwd: root });
+    if (mode === 'absolute' || mode === 'relative') execFileSync('git', ['config', 'core.hooksPath', mode === 'absolute' ? outside : '../shared'], { cwd: root });
+    if (mode === 'directory-link') { symlinkSync(outside, path.join(root, 'hooks')); execFileSync('git', ['config', 'core.hooksPath', 'hooks'], { cwd: root }); }
+    if (mode === 'dangling') symlinkSync(path.join(outside, 'missing'), path.join(root, '.git/hooks/pre-commit'));
+    assert.match(runCliFailure(root, 'init', '--project-root', root, '--non-interactive'), /outside|symlink|regular file/);
+    assert.equal(existsSync(path.join(root, '.riff-codex')), false, 'preflight must precede installation writes');
+  }
+  const root = path.join(container, 'linked'); mkdirSync(root); execFileSync('git', ['init', '-q'], { cwd: root });
+  const foreign = path.join(outside, 'foreign.sh');
+  const bytes = '#!/bin/sh\nprintf chained > .foreign-ran\n';
+  writeFileSync(foreign, bytes); chmodSync(foreign, 0o755);
+  symlinkSync(foreign, path.join(root, '.git/hooks/pre-commit'));
+  runCli(root, 'init', '--project-root', root, '--non-interactive');
+  assert.equal(readFileSync(foreign, 'utf8'), bytes);
+  assert.equal(lstatSync(path.join(root, '.git/hooks/pre-commit')).isSymbolicLink(), false);
+  execFileSync(path.join(root, '.git/hooks/pre-commit'), { cwd: root });
+  assert.equal(readFileSync(path.join(root, '.foreign-ran'), 'utf8'), 'chained');
+});
+
+test('phase completion requires executed scoped validation and intact independent review evidence', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [fixturePhase('a'), fixturePhase('b', 'P2', ['a'])]);
+  runCli(root, 'wave', 'activate', 'a');
+  assert.match(runCliFailure(root, 'wave', 'complete', 'b', '--commit', 'HEAD'), /active with completed dependencies/);
+  assert.match(runCliFailure(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /executed validation/);
+  runCli(root, 'wave', 'validate', 'a', '--status', 'pass', '--command', 'not-executed', '--summary', 'Declaration');
+  assert.match(runCliFailure(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /executed validation/);
+  execFileSync('git', ['add', '--', 'ROADMAP.yaml'], { cwd: root });
+  assert.match(runCliFailure(root, 'wave', 'validate', 'a', '--run', '--command', '["node","-e","process.exit(1)"]', '--paths', '["ROADMAP.yaml"]'), /Validation fail/);
+  assert.match(runCliFailure(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Review'), /executed validation/);
+  assert.match(runCliFailure(root, 'wave', 'validate', 'a', '--run', '--command', '["node","-e","process.exit(0)"]', '--paths', '["README.md"]'), /exceeds declared scope/);
+  const result = runCli(root, 'wave', 'validate', 'a', '--run', '--command', JSON.stringify(['node', '-e', 'console.log("observed pass")']), '--paths', '["ROADMAP.yaml"]');
+  assert.match(result, /Report: .*report.html/);
+  const candidate = execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
+  assert.match(runCliFailure(root, 'wave', 'validate', 'a', '--run', '--command', 'bad-json'), /JSON|Unexpected token/);
+  const proof = proofFile(root, 'functional', candidate);
+  const validProof = readFileSync(proof, 'utf8');
+  writeJson(proof, { ...JSON.parse(validProof), reviewer: { id: true, independent: true } });
+  assert.match(runCliFailure(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Invalid identity', '--evidence', proof), /review artifact needs/);
+  writeFileSync(proof, validProof);
+  const reportPath = result.split('Report: ')[1].trim();
+  const reportBytes = readFileSync(reportPath);
+  writeFileSync(reportPath, 'changed report');
+  assert.match(runCliFailure(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Report changed', '--evidence', proof), /report is missing or changed/);
+  writeFileSync(reportPath, reportBytes);
+  runCli(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Reviewed behavior', '--evidence', proof);
+  execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Verified phase'], { cwd: root });
+  assert.match(runCli(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /a completed/);
+  assert.match(runCli(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /already completed/);
+  assert.equal(JSON.parse(runCli(root, 'wave', 'select')).id, 'b');
+});
+
+test('state synchronization, locking and displayed priorities preserve lifecycle invariants', () => {
+  const root = lifecycleFixture();
+  const phases = [fixturePhase('low', 'P3'), fixturePhase('urgent', 'P0')];
+  roadmapFixture(root, phases);
+  assert.equal(JSON.parse(runCli(root, 'wave', 'select')).id, 'urgent');
+  assert.match(runCli(root, 'status'), /Next: urgent/);
+  const lock = path.join(root, '.riff-codex-state/write.lock');
+  writeJson(lock, { pid: process.pid });
+  assert.match(runCliFailure(root, 'wave', 'sync'), /busy/);
+  rmSync(lock);
+  for (const file of [path.join(root, '.git/riff-codex-install.lock'), path.join(root, '.home/.config/riff-dashboard/registry.json.lock')]) {
+    writeJson(file, { pid: process.pid });
+    assert.match(runCliFailure(root, 'resync'), /busy/);
+    rmSync(file);
+  }
+  runCli(root, 'wave', 'activate', 'urgent');
+  writeJson(path.join(root, 'ROADMAP.yaml'), { version: 1, project: {}, phases: [phases[0]] });
+  assert.match(runCliFailure(root, 'wave', 'sync'), /cannot remove referenced phase urgent/);
+  assert.match(runCli(root, 'status'), /Active: urgent/);
+  writeJson(path.join(root, 'ROADMAP.yaml'), { version: 1, project: {}, phases: [fixturePhase('../../outside')] });
+  assert.match(runCliFailure(root, 'wave', 'sync'), /invalid phase id/);
+});
+
+test('verification report embeds real image bytes, escapes content and rejects stale or missing evidence', () => {
+  const root = lifecycleFixture();
+  const candidate = execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
+  const image = path.join(root, '.riff-codex-state/screen.png');
+  writeFileSync(image, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4E8AAAAASUVORK5CYII=', 'base64'));
+  const file = path.join(root, '.riff-codex-state/verification.json');
+  const manifest = { version: 1, candidate, title: 'Report <script>alert(1)</script>', steps: [{ name: 'Visual example', status: 'pass', observed: 'Fixture image attached', screenshot: image, viewport: '320 × 600' }, { name: 'External check', status: 'unverified', observed: 'Access unavailable' }] };
+  writeJson(file, manifest);
+  const output = runCli(root, 'report', '--evidence', file);
+  assert.match(output, /UNVERIFIED/);
+  const html = readFileSync(output.split('\n')[0], 'utf8');
+  assert.match(html, /data:image\/png;base64/);
+  assert.match(html, /1 unverified/);
+  assert.equal(html.includes('<script>alert'), false);
+  writeJson(file, { ...manifest, candidate: 'stale' });
+  assert.match(runCliFailure(root, 'report', '--evidence', file), /current candidate/);
+  writeJson(file, { ...manifest, steps: [{ ...manifest.steps[0], screenshot: 'missing.png' }] });
+  assert.match(runCliFailure(root, 'report', '--evidence', file), /ENOENT/);
+});
+
+test('production promotion requires reviews and incident capture remains append-only and idempotent', () => {
+  const root = lifecycleFixture('scratch');
+  roadmapFixture(root, []);
+  writeFileSync(path.join(root, 'PROJECT.md'), '# Project\nReal production boundaries.\n');
+  writeFileSync(path.join(root, 'taste.md'), '# Taste\nPreserve user data.\n');
+  execFileSync('git', ['add', '--', 'PROJECT.md', 'ROADMAP.yaml', 'taste.md'], { cwd: root });
+  assert.match(runCliFailure(root, 'init', '--project-root', root, '--non-interactive', '--scope', 'production'), /use promote/);
+  assert.match(runCliFailure(root, 'promote', '--apply'), /architecture is required/);
+  const candidate = execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
+  const architecture = proofFile(root, 'architecture', candidate);
+  const roadmap = proofFile(root, 'roadmap', candidate);
+  const functional = proofFile(root, 'functional', candidate);
+  assert.match(runCliFailure(root, 'promote', '--apply', '--architecture', architecture, '--roadmap', roadmap), /functional is required/);
+  assert.match(runCli(root, 'promote', '--apply', '--architecture', architecture, '--roadmap', roadmap, '--functional', functional), /Scope promoted/);
+  const file = path.join(root, '.riff-codex-state/incident.json');
+  writeJson(file, { id: 'incident-1', title: 'Fixture incident', severity: 'low', impact: 'Observed interruption', rootCause: 'Test condition', prevention: 'Regression check' });
+  runCli(root, 'incident', 'log', '--evidence', file);
+  const before = readFileSync(path.join(root, 'INCIDENTS.md'), 'utf8');
+  runCli(root, 'incident', 'log', '--evidence', file);
+  assert.equal(readFileSync(path.join(root, 'INCIDENTS.md'), 'utf8'), before);
+  assert.match(runCliFailure(root, 'finish', '--check'), /pending project changes/);
+  execFileSync('git', ['add', '--', 'INCIDENTS.md'], { cwd: root });
+  execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Production records'], { cwd: root });
+  assert.match(runCli(root, 'finish', '--check'), /Ready for explicit Git finalization/);
+});

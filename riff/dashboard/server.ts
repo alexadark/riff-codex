@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { Hono } from "hono";
+import { selectReadyPhase } from "../lib/phase-selection.mjs";
 import { streamSSE } from "hono/streaming";
 import {
   addProject,
@@ -258,8 +259,7 @@ function codexOperationalState(projectRoot: string): Record<string, unknown> | n
           })
       : [];
     const phases = Array.isArray(state.phases) ? state.phases : [];
-    const complete = new Set(phases.filter((phase: any) => phase.status === "completed").map((phase: any) => String(phase.id)));
-    const nextReady = phases.find((phase: any) => phase.status === "ready" && (phase.depends_on ?? []).every((id: unknown) => complete.has(String(id))));
+    const nextReady = selectReadyPhase(phases);
     const phaseNames = (status: string) => phases
       .filter((phase: any) => phase.status === status)
       .map((phase: any) => `${phase.id} - ${phase.title}`);

@@ -21,13 +21,15 @@ This page keeps installation internals and contributor references out of the get
 | `.riff-codex-state/receipts/` | Validation and review evidence tied to the reviewed Git tree. |
 | `.riff-codex-state/dashboard/phases/` | Derived explanations displayed by the dashboard. |
 
-Initialization excludes `.riff-codex-state/` through Git's local `info/exclude`. It also installs Git `pre-commit` and `commit-msg` wrappers that chain existing hooks. The shared dashboard registry is at `~/.config/riff-dashboard/registry.json`.
+Initialization excludes `.riff-codex-state/` and generated `.uxtest/runs/` through Git's local `info/exclude`. It also installs Git `pre-commit` and `commit-msg` wrappers that chain existing hooks. The shared dashboard registry is at `~/.config/riff-dashboard/registry.json`.
 
 The native plugin definition lives at [`riff/.codex-plugin/plugin.json`](../riff/.codex-plugin/plugin.json). It exposes `$riff:*` skills; it is not a separate execution engine.
 
 ## Hook safeguards
 
 RIFF keeps six Codex event handlers and two chained Git hooks. Post-tool hooks collect focused warnings and validation needs; they don't run tests or typechecks after every edit. Validation and candidate-bound review remain workflow checkpoints.
+
+Installation rejects hook directories outside the project or its Git common directory. Existing hook sources are preserved through local backups and atomic wrapper replacement; an external symlink target is never overwritten. State mutations use a process lock.
 
 The pre-commit scan reads filenames and content from the Git index. Unstaged edits or local deletions cannot hide content that would be committed. An index read failure blocks the commit. Private `.env` and `.env.*` files are rejected in any directory; `.example` templates are allowed but still scanned for secrets. Live Stripe secret and restricted keys are checked before tools, after edits, and before commits.
 
@@ -85,3 +87,7 @@ Read the [dashboard README](../riff/dashboard/README.md) and [projection contrac
 - [Map](../riff/skills/map/SKILL.md), [learn stack](../riff/skills/learn-stack/SKILL.md), [incident](../riff/skills/incident/SKILL.md), [deep audit](../riff/skills/deep-audit/SKILL.md), and [promote](../riff/skills/promote/SKILL.md): less frequent workflows.
 
 For framework code changes, the existing test command is `npm test` from the RIFF Codex checkout. Documentation changes need link, content, and rendering checks rather than a full application test run.
+
+## Executed evidence and production lifecycle
+
+See [candidate evidence](../riff/references/evidence.md) for the executable validation, review artifact, screenshot report, promotion, incident ledger and finalization contracts. Reports are generated under `.uxtest/runs/` and exposed by the existing dashboard. A status declaration alone no longer permits phase completion.
