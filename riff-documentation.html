@@ -1,612 +1,502 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-style="brutalist" data-theme="light">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="RIFF for Codex. A visual field manual for turning a request into a checked, documented repository change.">
-  <title>RIFF for Codex | The Field Manual</title>
-  <style>
-    :root {
-      --paper: #f4f0e6;
-      --paper-deep: #e8e1d1;
-      --ink: #10100e;
-      --ink-soft: #393831;
-      --line: #10100e;
-      --yellow: #e7ff00;
-      --red: #ff4d2e;
-      --blue: #9de7ff;
-      --shadow: 8px 8px 0 var(--ink);
-      --max: 1240px;
-      --serif: Georgia, "Times New Roman", serif;
-      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    }
-
-    *, *::before, *::after { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      background: var(--paper);
-      color: var(--ink);
-      font-family: var(--serif);
-      font-size: 18px;
-      line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
-    ::selection { background: var(--yellow); color: var(--ink); }
-    a { color: inherit; }
-    button, code, pre, .mono { font-family: var(--mono); }
-    button { color: inherit; }
-    :focus-visible { outline: 4px solid var(--red); outline-offset: 4px; }
-
-    .skip-link {
-      position: absolute;
-      left: 16px;
-      top: -60px;
-      z-index: 20;
-      padding: 10px 14px;
-      background: var(--yellow);
-      border: 3px solid var(--ink);
-      font: 700 13px/1 var(--mono);
-      text-transform: uppercase;
-    }
-    .skip-link:focus { top: 16px; }
-
-    .wrap { width: min(var(--max), calc(100% - 40px)); margin: 0 auto; }
-    .topline {
-      border-bottom: 4px solid var(--line);
-      background: var(--yellow);
-      font: 700 12px/1.2 var(--mono);
-      letter-spacing: .11em;
-      text-transform: uppercase;
-    }
-    .topline .wrap {
-      display: flex;
-      justify-content: space-between;
-      gap: 20px;
-      padding: 11px 0;
-    }
-
-    .hero {
-      border-bottom: 4px solid var(--line);
-      background: var(--paper);
-    }
-    .hero-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
-      gap: 42px;
-      align-items: end;
-      padding: 54px 0 48px;
-    }
-    .eyebrow, .label {
-      margin: 0 0 14px;
-      font: 700 12px/1.2 var(--mono);
-      letter-spacing: .14em;
-      text-transform: uppercase;
-    }
-    .eyebrow::before { content: "↳ "; color: var(--red); }
-    .hero h1 {
-      margin: 0;
-      font: 900 clamp(7rem, 22vw, 18rem)/.72 var(--mono);
-      letter-spacing: -.13em;
-      transform: translateX(-.07em);
-    }
-    .hero h1 span { color: var(--red); }
-    .hero-standfirst {
-      max-width: 680px;
-      margin: 34px 0 0;
-      font: 700 clamp(1.55rem, 3.2vw, 2.65rem)/1.03 var(--serif);
-      letter-spacing: -.03em;
-    }
-    .hero-standfirst em { font-style: normal; background: var(--yellow); padding: 0 .12em; }
-    .hero-side {
-      display: flex;
-      flex-direction: column;
-      gap: 22px;
-      align-items: stretch;
-    }
-    .heritage {
-      margin: 0;
-      padding: 15px 17px 14px;
-      border: 3px solid var(--ink);
-      background: var(--yellow);
-      box-shadow: var(--shadow);
-      font: 700 15px/1.35 var(--mono);
-    }
-    .heritage small { display: block; margin-top: 9px; font-size: 10px; line-height: 1.3; text-transform: uppercase; }
-    .ascii {
-      margin: 0;
-      padding: 17px 14px;
-      overflow-x: auto;
-      background: var(--ink);
-      color: var(--yellow);
-      border: 3px solid var(--ink);
-      font: 700 clamp(7px, 1.25vw, 14px)/1.05 var(--mono);
-      letter-spacing: 0;
-      white-space: pre;
-    }
-    .ascii-caption { margin: -15px 0 0; padding: 0 4px; font: 10px/1 var(--mono); text-transform: uppercase; }
-    .button-row { display: flex; flex-wrap: wrap; gap: 13px; margin-top: 28px; }
-    .button, .copy-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 44px;
-      padding: 11px 15px;
-      border: 3px solid var(--ink);
-      border-radius: 0;
-      background: var(--yellow);
-      font: 700 12px/1.1 var(--mono);
-      letter-spacing: .04em;
-      text-decoration: none;
-      text-transform: uppercase;
-      cursor: pointer;
-      box-shadow: 4px 4px 0 var(--ink);
-      transition: transform .12s, box-shadow .12s, background .12s;
-    }
-    .button:hover, .copy-button:hover { background: var(--red); }
-    .button:active, .copy-button:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
-    .button--plain { background: var(--paper); }
-
-    .ticker {
-      overflow: hidden;
-      border-bottom: 4px solid var(--line);
-      background: var(--ink);
-      color: var(--yellow);
-      white-space: nowrap;
-    }
-    .ticker p {
-      width: max-content;
-      margin: 0;
-      padding: 13px 0 11px;
-      font: 700 13px/1 var(--mono);
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      animation: ticker 25s linear infinite;
-    }
-    .ticker b { color: var(--red); padding: 0 26px; }
-    @keyframes ticker { to { transform: translateX(-33.333%); } }
-
-    .site-nav {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      border-bottom: 4px solid var(--line);
-      background: var(--yellow);
-    }
-    .site-nav .wrap { display: flex; gap: 0; overflow-x: auto; scrollbar-width: thin; }
-    .site-nav a {
-      flex: 0 0 auto;
-      padding: 15px 18px 13px;
-      border-right: 3px solid var(--ink);
-      font: 700 12px/1 var(--mono);
-      text-decoration: none;
-      text-transform: uppercase;
-    }
-    .site-nav a:first-child { border-left: 3px solid var(--ink); }
-    .site-nav a:hover, .site-nav a:focus-visible { background: var(--ink); color: var(--yellow); }
-
-    main { padding: 70px 0 90px; }
-    .section { scroll-margin-top: 74px; padding: 0 0 82px; }
-    .section + .section { padding-top: 70px; border-top: 4px solid var(--line); }
-    .section-kicker {
-      display: flex;
-      align-items: baseline;
-      gap: 15px;
-      margin-bottom: 19px;
-      font: 700 12px/1 var(--mono);
-      letter-spacing: .14em;
-      text-transform: uppercase;
-    }
-    .section-kicker strong { color: var(--red); font-size: 19px; }
-    .section h2 {
-      max-width: 900px;
-      margin: 0 0 25px;
-      font: 900 clamp(3rem, 8vw, 7.5rem)/.84 var(--mono);
-      letter-spacing: -.1em;
-      text-transform: uppercase;
-    }
-    .section-intro {
-      max-width: 790px;
-      margin: 0 0 39px;
-      font-size: clamp(1.35rem, 2.8vw, 2rem);
-      line-height: 1.12;
-      letter-spacing: -.02em;
-    }
-    .section-intro mark { background: var(--yellow); padding: 0 .08em; }
-
-    .card-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
-    .card {
-      min-height: 190px;
-      padding: 20px 19px 17px;
-      border: 3px solid var(--ink);
-      background: var(--paper-deep);
-      box-shadow: 6px 6px 0 var(--ink);
-    }
-    .card:nth-child(2) { background: var(--yellow); }
-    .card:nth-child(3) { background: var(--blue); }
-    .card:nth-child(4) { background: var(--red); }
-    .card .number { display: block; margin-bottom: 35px; font: 700 12px/1 var(--mono); }
-    .card h3 { margin: 0 0 8px; font: 900 1.55rem/.92 var(--mono); letter-spacing: -.06em; text-transform: uppercase; }
-    .card p { margin: 0; font-size: 1.02rem; line-height: 1.25; }
-    .quote {
-      max-width: 840px;
-      margin: 56px 0 0;
-      padding: 22px 25px 20px;
-      border-top: 9px solid var(--ink);
-      border-bottom: 3px solid var(--ink);
-      font: 700 clamp(1.7rem, 4vw, 3.1rem)/1.04 var(--serif);
-      letter-spacing: -.025em;
-    }
-    .quote cite { display: block; margin-top: 16px; font: 700 11px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
-
-    .install-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(270px, .8fr); gap: 26px; align-items: start; }
-    .step-stack { display: grid; gap: 15px; }
-    .terminal-card { position: relative; padding: 18px 64px 17px 18px; border: 3px solid var(--ink); background: var(--ink); color: var(--yellow); }
-    .terminal-card::before { content: "RUN THIS"; display: block; margin-bottom: 13px; color: var(--red); font: 700 10px/1 var(--mono); letter-spacing: .14em; }
-    .terminal-card code { display: block; overflow-x: auto; white-space: pre-wrap; font-size: clamp(.72rem, 1.5vw, .95rem); line-height: 1.6; }
-    .copy-button {
-      position: absolute;
-      top: 14px;
-      right: 13px;
-      min-width: 38px;
-      min-height: 34px;
-      padding: 6px 8px;
-      border-width: 2px;
-      background: var(--yellow);
-      box-shadow: 3px 3px 0 var(--paper);
-      font-size: 10px;
-    }
-    .copy-button:hover { box-shadow: 3px 3px 0 var(--paper); }
-    .copy-status { min-height: 20px; margin: 8px 0 0; color: var(--red); font: 700 11px/1.25 var(--mono); }
-    .requirements { border: 3px solid var(--ink); background: var(--yellow); box-shadow: var(--shadow); }
-    .requirements h3 { margin: 0; padding: 15px 17px 12px; border-bottom: 3px solid var(--ink); font: 900 1.35rem/1 var(--mono); letter-spacing: -.06em; text-transform: uppercase; }
-    .requirements ul { margin: 0; padding: 17px 19px 19px 36px; }
-    .requirements li { padding: 5px 0; font-size: 1.05rem; line-height: 1.25; }
-    .requirements code { font-size: .78em; }
-    .note { margin: 25px 0 0; padding: 17px 19px 16px; border: 3px solid var(--ink); border-left: 14px solid var(--red); background: var(--paper-deep); }
-    .note strong { display: block; margin-bottom: 5px; font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
-    .note p { max-width: 850px; margin: 0; font-size: 1.05rem; line-height: 1.3; }
-    .note code { font-size: .8em; }
-    .two-paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 30px; }
-    .path { padding: 23px 21px 19px; border: 3px solid var(--ink); background: var(--paper-deep); box-shadow: 6px 6px 0 var(--ink); }
-    .path--yellow { background: var(--yellow); }
-    .path .path-command { display: block; margin-bottom: 18px; color: var(--red); font: 900 clamp(1.1rem, 2.4vw, 1.7rem)/1 var(--mono); }
-    .path h3 { margin: 0 0 7px; font: 900 1.55rem/.95 var(--mono); letter-spacing: -.07em; text-transform: uppercase; }
-    .path p { margin: 0; font-size: 1.08rem; line-height: 1.25; }
-
-    .flow-shell { border: 3px solid var(--ink); background: var(--paper-deep); box-shadow: var(--shadow); }
-    .flow-map { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0; padding: 25px 21px 23px; align-items: stretch; }
-    .flow-node { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 120px; padding: 13px; border: 3px solid var(--ink); background: var(--paper); }
-    .flow-node:not(:last-child)::after { content: "→"; position: absolute; z-index: 1; right: -22px; top: 50%; width: 38px; transform: translateY(-50%); text-align: center; background: var(--yellow); font: 900 24px/1 var(--mono); }
-    .flow-node:nth-child(2), .flow-node:nth-child(4), .flow-node:nth-child(7) { background: var(--yellow); }
-    .flow-node:nth-child(5), .flow-node:nth-child(8) { background: var(--blue); }
-    .flow-node .flow-no { display: block; margin-bottom: 15px; color: var(--red); font: 700 10px/1 var(--mono); }
-    .flow-node strong { overflow-wrap: anywhere; font: 900 clamp(.95rem, 1.7vw, 1.25rem)/.98 var(--mono); letter-spacing: -.07em; text-transform: uppercase; }
-    .flow-node small { display: block; margin-top: 8px; font-size: .86rem; line-height: 1.15; }
-    .flow-bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 0 21px 25px; }
-    .flow-branch { padding: 14px 15px 13px; border: 3px solid var(--ink); background: var(--red); }
-    .flow-branch strong { display: block; margin-bottom: 5px; font: 900 1rem/1 var(--mono); text-transform: uppercase; }
-    .flow-branch p { margin: 0; font-size: 1rem; line-height: 1.2; }
-    .flow-branch--dashboard { background: var(--blue); }
-    .flow-caption { margin: 0; padding: 12px 21px 13px; border-top: 3px solid var(--ink); font: 700 11px/1.3 var(--mono); letter-spacing: .04em; text-transform: uppercase; }
-
-    .interactive { display: grid; grid-template-columns: minmax(200px, .4fr) minmax(0, 1fr); gap: 22px; margin-top: 38px; }
-    .flow-tabs { display: grid; gap: 8px; align-content: start; }
-    .flow-tab { display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 13px; border: 3px solid var(--ink); background: var(--paper); text-align: left; font: 700 12px/1.1 var(--mono); cursor: pointer; }
-    .flow-tab:hover, .flow-tab[aria-selected="true"] { background: var(--yellow); }
-    .flow-tab[aria-selected="true"] { box-shadow: 4px 4px 0 var(--ink); transform: translate(-2px, -2px); }
-    .flow-tab .tab-number { display: inline-grid; place-items: center; flex: 0 0 24px; height: 24px; background: var(--ink); color: var(--yellow); font-size: 10px; }
-    .flow-explanation { min-height: 280px; padding: 24px 25px; border: 3px solid var(--ink); background: var(--yellow); box-shadow: var(--shadow); }
-    .flow-explanation[hidden] { display: none; }
-    .flow-explanation .label { margin-bottom: 19px; color: var(--red); }
-    .flow-explanation h3 { margin: 0 0 11px; font: 900 clamp(1.7rem, 4vw, 3rem)/.9 var(--mono); letter-spacing: -.08em; text-transform: uppercase; }
-    .flow-explanation p { max-width: 620px; margin: 0 0 15px; font-size: 1.2rem; line-height: 1.2; }
-    .flow-explanation code { display: inline-block; padding: 7px 9px; border: 2px solid var(--ink); background: var(--paper); font-size: .8rem; }
-
-    .command-list { display: grid; gap: 13px; }
-    .command-row { display: grid; grid-template-columns: minmax(170px, .55fr) minmax(0, 1.1fr) minmax(130px, .7fr); gap: 15px; align-items: center; padding: 17px 16px; border: 3px solid var(--ink); background: var(--paper-deep); }
-    .command-row:nth-child(odd) { background: var(--yellow); }
-    .command-row h3 { margin: 0; font: 900 1.35rem/.9 var(--mono); letter-spacing: -.08em; text-transform: uppercase; }
-    .command-row p { margin: 0; font-size: 1.03rem; line-height: 1.17; }
-    .command-row code { font-size: .82em; word-break: break-word; }
-    .command-row .button-row { margin: 0; }
-    .command-row .copy-button { position: static; min-width: 0; width: 100%; background: var(--paper); box-shadow: 3px 3px 0 var(--ink); }
-    .command-row .copy-button:hover { background: var(--red); }
-    .command-row .copy-status { grid-column: 2 / -1; margin: -4px 0 0; }
-
-    .reading-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-    .reading-link { display: flex; flex-direction: column; justify-content: space-between; min-height: 168px; padding: 18px 17px 15px; border: 3px solid var(--ink); background: var(--yellow); box-shadow: 5px 5px 0 var(--ink); text-decoration: none; }
-    .reading-link:nth-child(2) { background: var(--red); }
-    .reading-link:nth-child(3) { background: var(--blue); }
-    .reading-link:nth-child(4) { background: var(--paper-deep); }
-    .reading-link:hover { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--ink); }
-    .reading-link .label { margin: 0; font-size: 10px; }
-    .reading-link strong { font: 900 1.5rem/.92 var(--mono); letter-spacing: -.07em; text-transform: uppercase; }
-    .reading-link span:last-child { align-self: end; font: 700 18px/1 var(--mono); }
-    .final-note { margin-top: 42px; padding: 28px 25px 25px; border: 3px solid var(--ink); background: var(--ink); color: var(--paper); }
-    .final-note h3 { margin: 0 0 10px; color: var(--yellow); font: 900 clamp(1.7rem, 4vw, 3rem)/.9 var(--mono); letter-spacing: -.08em; text-transform: uppercase; }
-    .final-note p { max-width: 720px; margin: 0; font-size: 1.2rem; line-height: 1.2; }
-
-    footer { border-top: 4px solid var(--line); background: var(--yellow); }
-    .footer-grid { display: flex; justify-content: space-between; gap: 25px; padding: 27px 0 30px; }
-    footer p { margin: 0; font: 700 11px/1.35 var(--mono); text-transform: uppercase; }
-    footer .footer-brand { font: 900 2.2rem/.8 var(--mono); letter-spacing: -.1em; }
-
-    @media (max-width: 900px) {
-      .hero-grid, .install-grid { grid-template-columns: 1fr; }
-      .hero-side { max-width: 620px; }
-      .card-grid, .reading-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .flow-map { grid-template-columns: repeat(8, minmax(130px, 1fr)); overflow-x: auto; }
-      .flow-node { min-width: 130px; }
-    }
-    @media (max-width: 650px) {
-      body { font-size: 16px; }
-      .wrap { width: min(var(--max), calc(100% - 28px)); }
-      .topline .wrap { display: block; }
-      .topline .wrap span:last-child { display: block; margin-top: 5px; }
-      .hero-grid { gap: 35px; padding: 38px 0 40px; }
-      .hero h1 { font-size: clamp(5.4rem, 27vw, 9rem); }
-      .hero-standfirst { margin-top: 26px; }
-      main { padding-top: 47px; }
-      .section { padding-bottom: 55px; }
-      .section + .section { padding-top: 50px; }
-      .section h2 { font-size: clamp(2.9rem, 16vw, 5rem); }
-      .card-grid, .two-paths, .flow-bottom, .reading-grid, .interactive { grid-template-columns: 1fr; }
-      .card { min-height: 0; }
-      .card .number { margin-bottom: 25px; }
-      .flow-shell { box-shadow: 5px 5px 0 var(--ink); }
-      .flow-map { display: flex; flex-direction: column; gap: 15px; padding: 19px 17px; overflow: visible; }
-      .flow-node { min-height: 92px; min-width: 0; }
-      .flow-node:not(:last-child)::after { content: "↓"; right: auto; top: auto; bottom: -24px; left: 50%; width: 34px; transform: translateX(-50%); }
-      .flow-bottom { padding: 0 17px 19px; }
-      .flow-caption { padding-left: 17px; padding-right: 17px; }
-      .interactive { gap: 18px; }
-      .flow-explanation { box-shadow: 5px 5px 0 var(--ink); }
-      .command-row { grid-template-columns: 1fr; gap: 10px; }
-      .command-row .copy-status { grid-column: auto; }
-      .ascii { font-size: 7px; }
-      .footer-grid { display: block; }
-      footer p + p { margin-top: 15px; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      html { scroll-behavior: auto; }
-      *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
-    }
-    @media print {
-      .site-nav, .ticker, .button-row, .copy-button { display: none; }
-      .hero h1 { font-size: 7rem; }
-      .section, .section + .section { padding: 30px 0; }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How to install RIFF for Codex, plan a project, run checked work, and resume it later.">
+<title>RIFF for Codex</title>
+<style>
+:root{
+  color-scheme:light;
+  --pp-font:'Helvetica Neue',Helvetica,Arial,sans-serif;
+  --pp-font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --pp-bg:#ffffff;--pp-surface:#f0f0f0;--pp-surface-hover:#e5e5e5;
+  --pp-border:#000000;--pp-text:#000000;--pp-text-muted:#555555;
+  --pp-accent:#000000;--pp-success:#000000;--pp-warning:#000000;--pp-danger:#ff0000;
+  --pp-radius:0;--pp-radius-lg:0;
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --pp-bg:#000000;--pp-surface:#111111;--pp-surface-hover:#1a1a1a;
+  --pp-border:#ffffff;--pp-text:#ffffff;--pp-text-muted:#aaaaaa;
+  --pp-accent:#ffffff;--pp-success:#ffffff;--pp-warning:#ffffff;
+}
+*{box-sizing:border-box}
+html{font-size:16px;scroll-padding-top:110px}
+body{margin:0;background:var(--pp-bg);color:var(--pp-text);font:1.0625rem/1.6 var(--pp-font)}
+button,input,select,textarea{font:inherit;color:inherit}
+button,a,summary{-webkit-tap-highlight-color:transparent}
+button{cursor:pointer;border:2px solid var(--pp-border);border-radius:0;background:var(--pp-bg);padding:10px 16px;min-height:44px}
+button:hover{background:var(--pp-surface-hover)}
+a{color:inherit;text-decoration-thickness:1px;text-underline-offset:4px}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:3px solid var(--pp-accent);outline-offset:4px}
+[hidden]{display:none!important}
+.wrap{width:min(1280px,calc(100% - 64px));margin-inline:auto}
+.skip{position:absolute;top:-100px;left:16px;background:var(--pp-bg);padding:12px;z-index:10}
+.skip:focus{top:8px}
+header{border-bottom:4px solid var(--pp-border);padding:36px 0 30px}
+.header-grid{display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center}
+h1{font-size:clamp(2.5rem,5.5vw,4.5rem);line-height:1.05;letter-spacing:-.045em;margin:0 0 16px;font-weight:800}
+.slogan{font-size:1.125rem;font-weight:600;margin:0}
+.header-tools{display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-top:22px}
+.ascii{font:1rem/1.12 var(--pp-font-mono);margin:0;overflow:auto;max-width:100%;padding:4px 0}
+nav{border-bottom:2px solid var(--pp-border);background:var(--pp-bg);position:sticky;top:0;z-index:3}
+.tabs{display:flex;flex-wrap:wrap;gap:0}
+.tabs button{font-size:1rem;font-weight:600;border:0;border-right:1px solid var(--pp-border);border-bottom:1px solid var(--pp-border);padding:15px 18px;flex:1 0 auto}
+.tabs button[aria-selected="true"]{color:var(--pp-bg);background:var(--pp-text)}
+main{padding-top:36px;padding-bottom:56px;min-height:60vh}
+.panel>h2{font-size:clamp(1.75rem,3.5vw,2.5rem);line-height:1.15;letter-spacing:-.025em;margin:0 0 24px}
+h3{font-size:1.375rem;line-height:1.3;letter-spacing:-.01em;margin:32px 0 12px}
+h4{font-size:1.125rem;margin:0 0 8px}
+p{margin:0 0 18px;max-width:75ch}
+ul,ol{margin:0 0 20px;padding-left:24px;max-width:78ch}
+li+li{margin-top:8px}
+code,pre{font-family:var(--pp-font-mono);font-size:1rem}
+code{overflow-wrap:anywhere}
+pre{white-space:pre;overflow-x:auto;line-height:1.55;margin:0}
+.lead{font-size:1.25rem;line-height:1.5;max-width:72ch}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;margin:24px 0}
+.box{border:2px solid var(--pp-border);padding:24px;min-width:0}
+.box h3{margin-top:0}.box p:last-child{margin-bottom:0}
+.note{border-left:5px solid var(--pp-border);padding:18px 22px;background:var(--pp-surface);margin:24px 0;max-width:85ch}
+.note p:last-child{margin:0}
+.command{border:2px solid var(--pp-border);margin:16px 0 24px;max-width:100%}
+.command-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:8px 14px;background:var(--pp-surface);border-bottom:1px solid var(--pp-border);font-size:1rem}
+.command-bar button{padding:6px 14px;flex-shrink:0}
+.command pre{padding:20px}
+.copy-status{display:block;min-height:0;padding:0 20px;font-size:1rem}
+.copy-status:not(:empty){padding-bottom:16px}
+.table-scroll{overflow-x:auto;border:2px solid var(--pp-border);margin:20px 0 28px}
+table{border-collapse:collapse;width:100%;font-size:1rem;text-align:left}
+th,td{padding:16px 18px;vertical-align:top;border-bottom:1px solid var(--pp-border)}
+th{font-weight:700;background:var(--pp-surface)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:600;min-width:150px}
+caption{text-align:left;padding:14px 18px;border-bottom:2px solid var(--pp-border);font-weight:700;background:var(--pp-surface)}
+.flow{border:2px solid var(--pp-border);padding:24px;margin:24px 0}
+.flow-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px}
+.flow-path{list-style:none;margin:0;padding:0;max-width:none}
+.flow-path li{margin:0;position:relative;padding-bottom:30px}
+.flow-path li:not(:last-child)::after{content:'↓';position:absolute;bottom:0;left:50%;font-size:1.25rem;font-weight:700;line-height:30px}
+.flow-path li:last-child{padding-bottom:0}
+.flow-path button{width:100%;text-align:left;display:grid;grid-template-columns:30px 1fr;gap:10px;padding:14px 16px}
+.flow-path button[aria-pressed="true"]{background:var(--pp-text);color:var(--pp-bg)}
+.flow-path strong{display:block}
+.flow-path span{font-size:1rem}
+.flow-info{align-self:start;position:sticky;top:110px;background:var(--pp-surface);padding:24px;border:2px solid var(--pp-border)}
+.flow-info h3{margin-top:0}
+.flow-info code{display:block;margin-top:16px}
+.flow-connections{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:24px}
+.flow-connections>div{border:2px solid var(--pp-border);padding:18px;min-width:0}
+.flow-connections h3{font-size:1.125rem;margin:0 0 8px}
+.flow-connections p{font-size:1rem;margin:0}
+.flow-connections .display-path{border-style:dashed;grid-column:1/-1}
+.flow-connections .display-path p+p{margin-top:8px}
+details{border-top:2px solid var(--pp-border);margin-top:24px;padding:18px 0}
+summary{cursor:pointer;font-weight:700;font-size:1.125rem;min-height:44px;padding:6px 0}
+details>div{padding-top:12px}
+.sources{list-style:none;padding:0;max-width:none}
+.sources li{display:grid;grid-template-columns:minmax(180px,.5fr) 1fr;gap:24px;padding:16px 0;border-bottom:1px solid var(--pp-border);margin:0}
+.sources a{font-weight:600}
+footer{border-top:2px solid var(--pp-border);padding:24px 0;font-size:1rem}
+footer .wrap{display:flex;gap:24px;justify-content:space-between;flex-wrap:wrap}
+footer p{margin:0}
+@media(max-width:850px){
+ .header-grid{grid-template-columns:1fr}.ascii{width:max-content}
+ .flow-layout{grid-template-columns:1fr}.flow-info{position:static}
+ .grid{grid-template-columns:1fr}.tabs button{flex:1 0 25%}
+ nav{position:static}html{scroll-padding-top:20px}
+}
+@media(max-width:520px){
+ .wrap{width:calc(100% - 32px)}header{padding:24px 0}
+ .tabs button{flex-basis:50%;padding:12px 8px}.header-tools{gap:16px}
+ .box,.flow,.flow-info{padding:16px}.flow-connections{grid-template-columns:1fr}
+ .sources li{grid-template-columns:1fr;gap:6px}
+ .command pre{padding:16px}.command-bar{padding:8px 12px}
+ h1{font-size:2.5rem}
+}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+@media print{
+ nav,header button,.copy-button,.header-tools{display:none!important}
+ .panel[hidden]{display:block!important}.panel{break-before:page}
+ .flow-info{position:static}.wrap{width:100%}
+ body{background:white;color:black}.flow-path button{color:black!important;background:white!important}
+}
+</style>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to manual</a>
-  <div class="topline">
-    <div class="wrap"><span>RIFF for Codex / field manual 01</span><span>Shape the work. Run the wave. Keep the proof.</span></div>
-  </div>
-
-  <header class="hero" id="top">
-    <div class="wrap hero-grid">
-      <div>
-        <p class="eyebrow">From an idea to working software</p>
-        <h1>R<span>I</span>FF</h1>
-        <p class="hero-standfirst">You bring the idea. Codex builds it in <em>small useful steps</em>. RIFF keeps the plan and progress clear.</p>
-        <div class="button-row">
-          <a class="button" href="#start">Start here ↓</a>
-          <a class="button button--plain" href="#flow">See the flow ↓</a>
-        </div>
-      </div>
-      <div class="hero-side">
-        <p class="heritage">Build like a band of six. Ship like one.<small>Heritage slogan. Codex coordinates the work and uses extra help when a task benefits from it.</small></p>
-        <pre class="ascii" aria-label="ASCII art spelling RIFF">██████╗ ██╗███████╗███████╗
+<a class="skip" href="#main">Skip to content</a>
+<header>
+<div class="wrap header-grid">
+ <div>
+  <h1>RIFF for Codex</h1>
+  <p class="slogan">Build like a band of six. Ship like one.</p>
+  <div class="header-tools"><a href="README.md">README</a><button id="theme-toggle" type="button" aria-pressed="false">Dark theme</button></div>
+ </div>
+ <pre class="ascii" aria-label="RIFF ASCII logo">██████╗ ██╗███████╗███████╗
 ██╔══██╗██║██╔════╝██╔════╝
 ██████╔╝██║█████╗  █████╗
 ██╔══██╗██║██╔══╝  ██╔══╝
 ██║  ██║██║██║     ██║
 ╚═╝  ╚═╝╚═╝╚═╝     ╚═╝</pre>
-        <p class="ascii-caption">Your idea / your plan / your progress</p>
-      </div>
-    </div>
-  </header>
+</div>
+</header>
+<nav aria-label="Documentation">
+<div class="wrap tabs" role="tablist" aria-label="RIFF documentation sections">
+ <button id="tab-overview" type="button" role="tab" aria-controls="overview" aria-selected="true" tabindex="0">Overview</button>
+ <button id="tab-installation" type="button" role="tab" aria-controls="installation" aria-selected="false" tabindex="-1">Installation</button>
+ <button id="tab-workflow" type="button" role="tab" aria-controls="workflow" aria-selected="false" tabindex="-1">Workflow</button>
+ <button id="tab-roles" type="button" role="tab" aria-controls="roles" aria-selected="false" tabindex="-1">Roles &amp; models</button>
+ <button id="tab-checks" type="button" role="tab" aria-controls="checks" aria-selected="false" tabindex="-1">Checks &amp; failures</button>
+ <button id="tab-commands" type="button" role="tab" aria-controls="commands" aria-selected="false" tabindex="-1">Commands</button>
+ <button id="tab-progress" type="button" role="tab" aria-controls="progress" aria-selected="false" tabindex="-1">Progress &amp; resume</button>
+ <button id="tab-reference" type="button" role="tab" aria-controls="reference" aria-selected="false" tabindex="-1">Reference</button>
+</div>
+</nav>
+<main id="main" class="wrap">
+<section id="overview" class="panel" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
+<h2>What RIFF does</h2>
+<p class="lead">RIFF helps Codex turn your request into a clear plan, build it in useful steps, check the results, and remember where to continue.</p>
+<p>You describe the application or improvement you want. Codex does the work. RIFF provides the instructions and progress records that keep that work connected to the goal. You can use it for a new idea or an application that already exists.</p>
+<div class="grid">
+ <div class="box"><h3>The project brief</h3><p><code>PROJECT.md</code> says what you are building, who it is for, what matters, and what is outside the current scope. It gives future work the same starting point, even after a break.</p></div>
+ <div class="box"><h3>The roadmap</h3><p><code>ROADMAP.yaml</code> divides the goal into steps you can try. Each step has a priority and lists anything that must be completed first. RIFF calls a step a <strong>phase</strong>.</p></div>
+</div>
+<p>For a recipe app, a useful first phase is “save a recipe and find it again.” A later phase might add search. Each phase should deliver a usable result, rather than leaving you with several disconnected pieces of an unfinished feature.</p>
+<h3>Your first conversation</h3>
+<p>For a new idea, choose <code>$riff:start</code>. For an existing application, choose <code>$riff:onboard</code>. Describe the result you want in ordinary language.</p>
+<div class="command"><div class="command-bar"><span>In Codex</span><button class="copy-button" type="button" data-copy="first-request">Copy</button></div><pre id="first-request">$riff:start I want a recipe app where I can save a recipe,
+find it later, and read the ingredients while cooking.</pre><span class="copy-status" role="status"></span></div>
+<p>RIFF prepares the brief and roadmap. Read them and correct anything that does not match your intent. Then use <code>$riff:wave</code> to start building. A wave works through the next ready phases; starting or onboarding alone does not begin implementation.</p>
+<h3>How much you direct</h3>
+<div class="table-scroll"><table><thead><tr><th>Mode</th><th>What happens</th></tr></thead><tbody>
+<tr><td>Loop, the default</td><td>RIFF makes conservative choices, records assumptions, and continues through ready work. It preserves existing behavior and data and avoids adding speculative scope.</td></tr>
+<tr><td>Guided</td><td>RIFF asks about the current planning decisions and pauses between phases so you can direct what happens next.</td></tr>
+</tbody></table></div>
+<p>You choose the mode during installation and can change it with <code>riff-codex init --configure</code>. Both modes still require the relevant checks. Uploading code to GitHub or putting the application online needs your instruction.</p>
+<p><a href="#installation" data-section-link="installation">Install RIFF</a> or <a href="#workflow" data-section-link="workflow">follow the complete workflow</a>.</p>
+</section>
 
-  <div class="ticker" aria-hidden="true"><p>PROJECT.md <b>✳</b> ROADMAP.yaml <b>✳</b> READY STEP <b>✳</b> CODEX BUILDS <b>✳</b> CHECKS + REVIEW <b>✳</b> SAVED PROGRESS <b>✳</b> PROJECT.md <b>✳</b> ROADMAP.yaml <b>✳</b> READY STEP <b>✳</b> CODEX BUILDS <b>✳</b> CHECKS + REVIEW <b>✳</b> SAVED PROGRESS <b>✳</b></p></div>
-
-  <nav class="site-nav" aria-label="Manual sections">
-    <div class="wrap">
-      <a href="#what">01 / What</a>
-      <a href="#start">02 / Start</a>
-      <a href="#flow">03 / Flow</a>
-      <a href="#commands">04 / Commands</a>
-      <a href="#reading">05 / Read more</a>
-    </div>
-  </nav>
-
-  <main id="main" class="wrap">
-    <section class="section" id="what" aria-labelledby="what-title">
-      <div class="section-kicker"><strong>01</strong><span>What RIFF does</span></div>
-      <h2 id="what-title">Know what happens next.</h2>
-      <p class="section-intro">RIFF helps you turn an idea into working software. It keeps the plan, the checks, and the progress together while <mark>Codex coordinates the build.</mark></p>
-      <div class="card-grid">
-        <article class="card"><span class="number">/ 01</span><h3>The brief</h3><p><code>PROJECT.md</code> says what you are building, who it serves, and where the edges are.</p></article>
-        <article class="card"><span class="number">/ 02</span><h3>Roadmap</h3><p><code>ROADMAP.yaml</code> turns the outcome into small useful steps in the order they need to happen.</p></article>
-        <article class="card"><span class="number">/ 03</span><h3>The checks</h3><p>Checks and review look at the actual change before a step is marked complete.</p></article>
-        <article class="card"><span class="number">/ 04</span><h3>Dashboard</h3><p>Progress files feed a local read-only dashboard. The dashboard observes; it cannot execute work.</p></article>
-      </div>
-      <blockquote class="quote">“Describe the result you want. Follow the work. Try what gets built.”<cite>Your part in the process</cite></blockquote>
-    </section>
-
-    <section class="section" id="start" aria-labelledby="start-title">
-      <div class="section-kicker"><strong>02</strong><span>Start / install</span></div>
-      <h2 id="start-title">Install once. Start building.</h2>
-      <p class="section-intro">Run these commands in Terminal. Download RIFF once and keep its folder in place. Then connect your project by replacing the example path with your own. Your project must use Git; the installation guide covers new folders too.</p>
-      <div class="install-grid">
-        <div class="step-stack">
-          <div class="terminal-card"><button class="copy-button" type="button" data-copy="git clone https://github.com/alexadark/riff-codex.git ~/riff-codex&#10;cd ~/riff-codex&#10;npm install&#10;npm link" aria-label="Copy installation commands">COPY</button><code>git clone https://github.com/alexadark/riff-codex.git ~/riff-codex
+<section id="installation" class="panel" role="tabpanel" aria-labelledby="tab-installation" tabindex="0">
+<h2>Installation</h2>
+<p>Install RIFF once in a permanent folder, then connect each application you want to use it in. Each application keeps its own plan and progress.</p>
+<h3>1. Check what you need</h3>
+<ul>
+<li>Codex, installed and signed in.</li>
+<li>Git, which keeps the history of changes to your application.</li>
+<li>Node.js 20 or newer, with npm included. These run and install RIFF.</li>
+<li>Bun, which runs the dashboard and is required by the full setup check.</li>
+<li>A GitHub account with access to the private <code>alexadark/riff-codex</code> repository.</li>
+</ul>
+<p>In Terminal, <code>git --version</code>, <code>node --version</code>, <code>npm --version</code>, and <code>bun --version</code> tell you whether those tools are available. Install any missing tool before continuing.</p>
+<h3>2. Download RIFF</h3>
+<div class="command"><div class="command-bar"><span>In Terminal, once</span><button class="copy-button" type="button" data-copy="install-code">Copy</button></div><pre id="install-code">git clone https://github.com/alexadark/riff-codex.git ~/riff-codex
 cd ~/riff-codex
 npm install
-npm link</code><p class="copy-status" aria-live="polite"></p></div>
-          <div class="terminal-card"><button class="copy-button" type="button" data-copy="cd /path/to/your-project&#10;riff-codex init" aria-label="Copy project initialization commands">COPY</button><code>cd /path/to/your-project
-riff-codex init</code><p class="copy-status" aria-live="polite"></p></div>
-        </div>
-        <aside class="requirements" aria-labelledby="requirements-title">
-          <h3 id="requirements-title">Before you begin</h3>
-          <ul>
-            <li>A GitHub account with access to RIFF Codex</li>
-            <li>Codex, installed and signed in</li><li>Git, for saving change history</li>
-            <li>Node 20 or newer, with npm</li>
-            <li>Bun, for the dashboard and setup check</li>
-          </ul>
-        </aside>
-      </div>
-      <div class="note"><strong>Approve the automatic checks</strong><p>Open a fresh Codex session in your project. Open <code>/hooks</code>, review and approve RIFF’s automatic checks. Then record your approval in Terminal with <code>riff-codex doctor --record-hooks-approved</code>. This command records your approval; it does not give it for you.</p></div>
-      <div class="two-paths">
-        <article class="path path--yellow"><span class="path-command">$riff:start</span><h3>New project</h3><p>Describe your idea in Codex. RIFF prepares the project brief and the first plan. It writes <code>PROJECT.md</code> and <code>ROADMAP.yaml</code>.</p></article>
-        <article class="path"><span class="path-command">$riff:onboard</span><h3>Existing app</h3><p>Use this when an application already exists. RIFF reads what is there and plans improvements while preserving what works.</p></article>
-      </div>
-      <p class="note"><strong>In the Codex conversation</strong><span>Choose RIFF start or onboard in the skill picker if the names are not visible. Details live in the <a href="docs/installation.md">installation guide</a>. Run <code>$riff:wave</code> separately when you are ready to start building.</span></p>
-    </section>
+npm link</pre><span class="copy-status" role="status"></span></div>
+<p>Keep this folder in place: your projects will refer to it. If you already downloaded RIFF, use that folder and run <code>npm install</code> and <code>npm link</code> there. You do not need another copy.</p>
+<h3>3. Connect your application</h3>
+<p>Replace the example path with your application's folder. It must already use Git. For a completely new folder, run <code>git init</code> there first.</p>
+<div class="command"><div class="command-bar"><span>In your project's Terminal</span><button class="copy-button" type="button" data-copy="init-code">Copy</button></div><pre id="init-code">cd /path/to/your-project
+riff-codex init</pre><span class="copy-status" role="status"></span></div>
+<p>RIFF asks about project scope, conversation language, document language, explanation level, and loop or guided mode. Press Enter to accept a suggested choice. This connects the tools; it does not write your product plan yet.</p>
+<h3>4. Make the skills available in Codex</h3>
+<p>Open the application in a fresh Codex session. Initialization adds RIFF entries to the project's skill picker. Choose the RIFF start, onboard, wave, or other skill there.</p>
+<p>The exact <code>$riff:...</code> names in this manual are provided by the native RIFF plugin in the checkout's <code>riff/</code> folder. <code>npm link</code> and <code>riff-codex init</code> do not enable the plugin themselves. If those names are unavailable, select the corresponding installed project skill. See the <a href="docs/installation.md#make-the-skills-available">installation guide</a> for the distinction.</p>
+<h3>5. Approve the automatic checks</h3>
+<p>In Codex, open <code>/hooks</code>, review RIFF's project checks, and approve them. Hooks are checks triggered automatically at certain moments while work happens. After you have actually approved them, record that approval:</p>
+<div class="command"><div class="command-bar"><span>In your project's Terminal</span><button class="copy-button" type="button" data-copy="doctor-code">Copy</button></div><pre id="doctor-code">riff-codex doctor --record-hooks-approved</pre><span class="copy-status" role="status"></span></div>
+<p>This records your approval and checks the setup; it cannot approve the hooks for you. Read any reported error or warning. A roadmap that has not been created yet is normal before your first start or onboard request.</p>
+<p>Now choose start or onboard in Codex, describe your project, and read the resulting plan before using <code>$riff:wave</code>.</p>
+<details><summary>Update RIFF or change preferences</summary><div>
+<p>To revisit the setup choices, run <code>riff-codex init --configure</code> in the application. To update RIFF, finish active work first, check that its permanent folder has no uncommitted edits, then run <code>git pull --ff-only</code> and <code>npm install</code> there. Run <code>riff-codex resync</code> and <code>riff-codex doctor</code> in each application afterward.</p>
+<p>If the hooks changed, review and approve them again before recording approval. All projects connected to that RIFF folder use its updated instructions. The <a href="docs/installation.md">installation guide</a> includes troubleshooting.</p>
+</div></details>
+</section>
 
-    <section class="section" id="flow" aria-labelledby="flow-title">
-      <div class="section-kicker"><strong>03</strong><span>Interactive flow</span></div>
-      <h2 id="flow-title">Request in. Proof out.</h2>
-      <p class="section-intro">Follow the arrows from your request to a checked result. RIFF repeats the cycle while there is ready work. Select a step below to explore an example.</p>
-      <div class="flow-shell">
-        <div class="flow-map" aria-label="RIFF default workflow diagram">
-          <div class="flow-node"><span class="flow-no">01 / BEGIN</span><strong>User request</strong><small>“Help me save recipes.”</small></div>
-          <div class="flow-node"><span class="flow-no">02 / BRIEF</span><strong>PROJECT.md</strong><small>What are we building?</small></div>
-          <div class="flow-node"><span class="flow-no">03 / PLAN</span><strong>ROADMAP.yaml</strong><small>Small useful steps</small></div>
-          <div class="flow-node"><span class="flow-no">04 / READY</span><strong>Select next ready step</strong><small>Earlier steps finished</small></div>
-          <div class="flow-node"><span class="flow-no">05 / BUILD</span><strong>Codex builds</strong><small>One useful step</small></div>
-          <div class="flow-node"><span class="flow-no">06 / PROVE</span><strong>Checks + review</strong><small>Continue only if it passes</small></div>
-          <div class="flow-node"><span class="flow-no">07 / SAVE</span><strong>Save checked work</strong><small>Keep progress and history</small></div>
-          <div class="flow-node"><span class="flow-no">08 / LOOP</span><strong>Next ready step</strong><small>Repeat the work</small></div>
-        </div>
-        <div class="flow-bottom">
-          <div class="flow-branch"><strong>06 fails → correct → recheck</strong><p>If the correction passes, go to 07. If it still fails, record the blocker instead of marking the step complete.</p></div>
-          <div class="flow-branch flow-branch--dashboard"><strong>Plan + progress ⇢ dashboard</strong><p>The dashboard shows the plan, completed work, and blockers. You start work in Codex.</p></div>
-        </div>
-        <p class="flow-caption">08 ↩ 04: choose the next ready step. When the plan is complete, the loop ends. The dashboard only displays information.</p>
-      </div>
+<section id="workflow" class="panel" role="tabpanel" aria-labelledby="tab-workflow" tabindex="0">
+<h2>How the work moves</h2>
+<p>The brief and roadmap guide the build. Checks decide whether the result can be saved as complete. Saved progress tells RIFF what to do next. Select a step for an example.</p>
+<div class="flow" aria-label="RIFF workflow and information flow">
+<div class="flow-layout">
+<ol class="flow-path">
+<li><button type="button" data-step="1" aria-pressed="true" aria-controls="step-explanation"><span>1</span><span><strong>Your request</strong>Describe the result you want.</span></button></li>
+<li><button type="button" data-step="2" aria-pressed="false" aria-controls="step-explanation"><span>2</span><span><strong>Project brief + roadmap</strong>Agree what to build and in what order.</span></button></li>
+<li><button type="button" data-step="3" aria-pressed="false" aria-controls="step-explanation"><span>3</span><span><strong>Select or resume a phase</strong>Choose work whose earlier steps are complete.</span></button></li>
+<li><button type="button" data-step="4" aria-pressed="false" aria-controls="step-explanation"><span>4</span><span><strong>Codex builds</strong>Implement one usable result.</span></button></li>
+<li><button type="button" data-step="5" aria-pressed="false" aria-controls="step-explanation"><span>5</span><span><strong>Check and review</strong>Verify the changed behavior.</span></button></li>
+<li><button type="button" data-step="6" aria-pressed="false" aria-controls="step-explanation"><span>6</span><span><strong>Save code and progress</strong>Record the reviewed result as complete.</span></button></li>
+<li><button type="button" data-step="7" aria-pressed="false" aria-controls="step-explanation"><span>7</span><span><strong>Continue or finish</strong>Return to step 3 while ready work remains.</span></button></li>
+</ol>
+<div id="step-explanation" class="flow-info" aria-live="polite" aria-atomic="true">
+<h3>Your request</h3><p>Describe what someone should be able to do and why. Codex can investigate the application and the technical choices.</p><code>“Let me save a recipe and find it later.”</code>
+</div>
+</div>
+<div class="flow-connections">
+<div><h3>5 fails → correction → check again</h3><p>A formal failed check permits a focused correction and one repeat. If it still fails, RIFF records a blocker instead of completing the phase.</p></div>
+<div><h3>7 → 3: the work loop</h3><p>Loop mode selects the next ready phase. Guided mode pauses between phases. When the roadmap is complete, work ends.</p></div>
+<div class="display-path"><h3>Brief + roadmap + progress ⇢ dashboard</h3><p>The dashboard reads the planned work, saved state, and short explanations of intended and verified results. Completed phases and blockers both appear there.</p><p>This is a one-way display path. The dashboard does not start Codex, run a phase, or change the plan.</p></div>
+</div>
+</div>
+<h3>What makes a phase ready</h3>
+<p>Each phase lists earlier work it needs. Search may need saved recipes first. RIFF does not bypass that requirement because search has a higher priority. Among phases that are ready, it chooses the highest priority; roadmap order breaks a tie.</p>
+<p>Priorities run from P0, an immediate critical blocker, through P1, a high-priority outcome, to P2, normal planned work, and P3, optional work. A blocked phase can leave independent work free to continue.</p>
+<h3>How much planning happens first</h3>
+<p>A small app gets a concise brief and roadmap. A larger product may need the important user journeys, what success looks like, who can access which data, and how outside services connect. RIFF records those in the shared project documents and adds detail when a phase needs it.</p>
+<p>The roadmap describes useful outcomes. It does not need to predict every future file, test, or implementation decision. Use <code>$riff:add-phase</code> to add a larger improvement and <code>$riff:quick</code> for a small separate change.</p>
+</section>
 
-      <div class="interactive">
-        <div class="flow-tabs" role="tablist" aria-label="Flow step explanations">
-          <button class="flow-tab" type="button" role="tab" aria-selected="true" aria-controls="flow-panel-1" data-flow="1"><span class="tab-number">1</span>User request</button>
-          <button class="flow-tab" type="button" role="tab" aria-selected="false" aria-controls="flow-panel-2" data-flow="2"><span class="tab-number">2</span>Write the brief</button>
-          <button class="flow-tab" type="button" role="tab" aria-selected="false" aria-controls="flow-panel-3" data-flow="3"><span class="tab-number">3</span>Choose the ready step</button>
-          <button class="flow-tab" type="button" role="tab" aria-selected="false" aria-controls="flow-panel-4" data-flow="4"><span class="tab-number">4</span>Build and check</button>
-          <button class="flow-tab" type="button" role="tab" aria-selected="false" aria-controls="flow-panel-5" data-flow="5"><span class="tab-number">5</span>Save and continue</button>
-        </div>
-        <div class="flow-panels">
-          <article class="flow-explanation" id="flow-panel-1" role="tabpanel"><p class="label">Step 01 / begin</p><h3>Start with the outcome.</h3><p>Say what someone should be able to do. RIFF uses that request to focus on one useful change at a time.</p><code>“Let me save a recipe and find it later.”</code></article>
-          <article class="flow-explanation" id="flow-panel-2" role="tabpanel" hidden><p class="label">Step 02 / brief</p><h3>Keep the goal clear.</h3><p><code>PROJECT.md</code> says who the app is for, what it should do, and what can wait.</p><code>PROJECT.md → what we are building</code></article>
-          <article class="flow-explanation" id="flow-panel-3" role="tabpanel" hidden><p class="label">Step 03 / ready</p><h3>Take the next useful step.</h3><p><code>ROADMAP.yaml</code> lists useful steps and what must happen first. RIFF chooses the most important step that is ready to begin.</p><code>Save a recipe → find it later → search recipes</code></article>
-          <article class="flow-explanation" id="flow-panel-4" role="tabpanel" hidden><p class="label">Step 04 / proof</p><h3>Build, check, review.</h3><p>Codex builds the step, checks the changed behavior, and gets a fresh review. A saved recipe should be there when you look for it.</p><code>change → checks → review</code></article>
-          <article class="flow-explanation" id="flow-panel-5" role="tabpanel" hidden><p class="label">Step 05 / loop</p><h3>Keep progress and history.</h3><p>RIFF saves the checked changes in your project’s history and records progress, then finds the next ready step. A failure gets a correction and a recheck, or a recorded blocker.</p><code>save → next ready step</code></article>
-        </div>
-      </div>
-    </section>
+<section id="roles" class="panel" role="tabpanel" aria-labelledby="tab-roles" tabindex="0">
+<h2>Who does the work</h2>
+<p>Codex coordinates the work using RIFF's instructions. It can use additional agents for useful, separate assignments. These are responsibilities that the work needs, rather than a fixed group of agents launched for every request.</p>
+<div class="table-scroll"><table><thead><tr><th>Responsibility</th><th>What it contributes</th></tr></thead><tbody>
+<tr><td>You</td><td>The goal, important preferences, corrections to direction, and authorization for publication.</td></tr>
+<tr><td>Codex coordinating</td><td>Reads the project, chooses the next valid action, keeps work within scope, combines results, and reports what happened.</td></tr>
+<tr><td>Planning</td><td>Turns the request into a product brief and demonstrable phases, with priorities and prerequisites.</td></tr>
+<tr><td>Implementation</td><td>Builds the selected outcome and handles ordinary development feedback. An independent assignment can be given to a worker with clear ownership.</td></tr>
+<tr><td>Functional review</td><td>Takes a fresh look at whether the actual change satisfies the request and relevant project rules.</td></tr>
+<tr><td>Security review</td><td>Examines sensitive changes such as access rights, user data, payments, or migrations. It focuses on the changed boundary.</td></tr>
+<tr><td>Diagnosis</td><td>Investigates a concrete failure before choosing a focused correction.</td></tr>
+</tbody></table></div>
+<p>RIFF's automatic checks and dashboard are software tools, not extra AI teammates. The original “band of six” slogan is retained as RIFF's signature; it does not prescribe an agent count in RIFF Codex.</p>
+<h3>When work can happen in parallel</h3>
+<p>Separate research or review tasks may run alongside implementation when useful. Editing assignments need explicit, separate ownership so two agents do not overwrite the same work. The coordinating task still owns integration and the final judgment. Parallel work is optional, not a quota.</p>
+<h3>How models are chosen</h3>
+<p>RIFF's routing reference matches the work to the required level of reasoning. Model availability depends on the current Codex environment. The table describes the repository's policy, not a claim about which model is running this page or your current conversation.</p>
+<div class="table-scroll"><table><thead><tr><th>Work</th><th>Repository policy</th></tr></thead><tbody>
+<tr><td>Inventory and exact extraction</td><td>Luna with low reasoning effort.</td></tr>
+<tr><td>Bounded implementation and repeatable checks</td><td>Luna with XHigh reasoning effort.</td></tr>
+<tr><td>Product decisions, synthesis, and small UI changes</td><td>Sol with Medium reasoning effort.</td></tr>
+<tr><td>Focused visual implementation</td><td>Sol with High reasoning effort.</td></tr>
+<tr><td>Major design work or exceptional architecture decisions</td><td>A bounded Sol XHigh pass; Max is reserved for an exceptional problem still unresolved after XHigh.</td></tr>
+</tbody></table></div>
+<p>Fast is used for Luna when the runtime exposes it. RIFF does not claim that Fast is active when it cannot select it. Read the <a href="riff/references/model-routing.md">model routing reference</a> for the full conditions.</p>
+</section>
 
-    <section class="section" id="commands" aria-labelledby="commands-title">
-      <div class="section-kicker"><strong>04</strong><span>Daily use</span></div>
-      <h2 id="commands-title">Five moves you need.</h2>
-      <p class="section-intro">Use the namespaced Codex skills from a project with RIFF enabled. Start or onboard shapes the work; wave runs it as a separate action.</p>
-      <div class="command-list">
-        <article class="command-row"><h3>$riff:status</h3><p>See what is done, what is blocked, and what comes next.</p><code>$riff:status</code><button class="copy-button" type="button" data-copy="$riff:status" aria-label="Copy status command">COPY</button><p class="copy-status" aria-live="polite"></p></article>
-        <article class="command-row"><h3>$riff:wave</h3><p>Start building or continue where you left off.</p><code>$riff:wave</code><button class="copy-button" type="button" data-copy="$riff:wave" aria-label="Copy wave command">COPY</button><p class="copy-status" aria-live="polite"></p></article>
-        <article class="command-row"><h3>$riff:quick</h3><p>Make a small change that does not need a new plan.</p><code>$riff:quick</code><button class="copy-button" type="button" data-copy="$riff:quick" aria-label="Copy quick command">COPY</button><p class="copy-status" aria-live="polite"></p></article>
-        <article class="command-row"><h3>$riff:debug</h3><p>Diagnose a concrete failure and make a focused correction.</p><code>$riff:debug</code><button class="copy-button" type="button" data-copy="$riff:debug" aria-label="Copy debug command">COPY</button><p class="copy-status" aria-live="polite"></p></article>
-        <article class="command-row"><h3>$riff:dashboard</h3><p>Open the local read-only view of saved progress.</p><code>$riff:dashboard</code><button class="copy-button" type="button" data-copy="$riff:dashboard" aria-label="Copy dashboard command">COPY</button><p class="copy-status" aria-live="polite"></p></article>
-      </div>
-      <div class="note"><strong>Loop or guided</strong><p><code>loop</code> is the default: RIFF continues through ready steps. Choose <code>guided</code> during initialization when you want confirmation between steps. Revisit the preference with <code>riff-codex init --configure</code>.</p></div>
-    </section>
+<section id="checks" class="panel" role="tabpanel" aria-labelledby="tab-checks" tabindex="0">
+<h2>Checks and failures</h2>
+<p>A phase is complete when its promised result has been checked, the required reviews have passed, and the reviewed code has been saved in Git. Selecting a phase or finishing an edit does not meet that standard on its own.</p>
+<div class="table-scroll"><table><thead><tr><th>Check</th><th>What it answers</th><th>Recipe app example</th></tr></thead><tbody>
+<tr><td>Changed behavior</td><td>Does the feature actually work in the conditions the phase promises?</td><td>Save a recipe, return to the list, and open the saved recipe.</td></tr>
+<tr><td>Functional review</td><td>Does the change satisfy the request and the project's rules?</td><td>Check that saving works and that the empty or error state remains understandable.</td></tr>
+<tr><td>Focused security review</td><td>Could a sensitive change expose data or give someone access they should not have?</td><td>If recipes are private, check that another account cannot read them.</td></tr>
+<tr><td>Completion record</td><td>Do the saved code and progress refer to the same reviewed result?</td><td>Record the checked recipe feature as complete, with its local Git commit.</td></tr>
+</tbody></table></div>
+<h3>Why a review belongs to one version</h3>
+<p>RIFF records which exact set of files was reviewed. If those files change afterward, the old approval no longer describes the new result. The changed version needs fresh evidence before completion. The technical records are kept in the project's local RIFF state.</p>
+<h3>What automatic checks do</h3>
+<p>Hooks run at specific points in the workflow. They can flag a concern for review or block a high-confidence destructive or security problem. Warnings about possible access or input issues are not, by themselves, proof of a vulnerability.</p>
+<p>RIFF avoids running a full test suite after every edit. It collects what needs checking and validates the affected behavior at the appropriate point. A credible high or critical security finding stops the phase until corrected.</p>
+<h3>If a check fails</h3>
+<ol>
+<li>Codex can correct ordinary errors while building the feature.</li>
+<li>Once a formal RIFF check fails, the workflow permits one focused correction and one repeat of that failed check.</li>
+<li>If the correction still fails, the phase is recorded as blocked from completion. Independent ready work may continue.</li>
+</ol>
+<h3>Other reasons loop mode stops</h3>
+<ul>
+<li>Required credentials or access are missing.</li>
+<li>A required check depends on an outside service and cannot be completed.</li>
+<li>A destructive action is authorized, but its exact target cannot be identified safely.</li>
+<li>A required check or review has failed and the permitted correction did not resolve it.</li>
+</ul>
+<p>Ordinary product or technical choices are handled conservatively in loop mode. Guided mode also pauses for the requested decisions. A missing service check is recorded as missing evidence, not reported as a successful result.</p>
+<h3>Local completion and publication</h3>
+<p>A local commit is a saved point in your project's history. It does not upload the code, merge a pull request, deploy the app, or prove the live service works. Those actions need your instruction and their own checks when they are part of the requested outcome.</p>
+</section>
 
-    <section class="section" id="reading" aria-labelledby="reading-title">
-      <div class="section-kicker"><strong>05</strong><span>Further reading</span></div>
-      <h2 id="reading-title">Keep going.</h2>
-      <p class="section-intro">The field manual gets you moving. These guides keep the details close when you need them.</p>
-      <div class="reading-grid">
-        <a class="reading-link" href="docs/installation.md"><span class="label">Guide 01</span><strong>Installation</strong><span aria-hidden="true">↗</span></a>
-        <a class="reading-link" href="docs/usage.md"><span class="label">Guide 02</span><strong>Usage</strong><span aria-hidden="true">↗</span></a>
-        <a class="reading-link" href="docs/how-it-works.md"><span class="label">Guide 03</span><strong>How it works</strong><span aria-hidden="true">↗</span></a>
-        <a class="reading-link" href="docs/technical-reference.md"><span class="label">Guide 04</span><strong>Technical reference</strong><span aria-hidden="true">↗</span></a>
-      </div>
-      <p class="note"><strong>When work pauses</strong><span>RIFF records a blocker if access is missing, an outside service cannot be checked, an authorized destructive action has an unclear target, or a check still fails. Uploading to GitHub or putting an app online needs your instruction.</span></p>
-      <div class="final-note"><h3>Make one good move.</h3><p>Describe your idea with start, or bring an existing app with onboard. Read the plan, then use wave to begin.</p></div>
-    </section>
-  </main>
+<section id="commands" class="panel" role="tabpanel" aria-labelledby="tab-commands" tabindex="0">
+<h2>Commands</h2>
+<p>Use the <code>$riff:...</code> commands in a Codex conversation, or select their corresponding project skills. Add the result you want in your own words. Terminal commands are listed separately below.</p>
+<div class="table-scroll"><table><thead><tr><th>In Codex</th><th>When to use it</th><th>What it does</th></tr></thead><tbody>
+<tr><td><code>$riff:start</code></td><td>A new product idea</td><td>Prepares a project brief and roadmap. Does not start building.</td></tr>
+<tr><td><code>$riff:onboard</code></td><td>An existing application</td><td>Inspects what is there and prepares or extends the shared plan.</td></tr>
+<tr><td><code>$riff:wave</code></td><td>Ready to build or continue</td><td>Resumes active work or chooses the next ready phase, checks it, and saves progress.</td></tr>
+<tr><td><code>$riff:status</code></td><td>You need an update</td><td>Reports current progress, blockers, and the next action.</td></tr>
+<tr><td><code>$riff:dashboard</code></td><td>You want a visual overview</td><td>Opens the local progress dashboard.</td></tr>
+<tr><td><code>$riff:quick</code></td><td>A small separate change</td><td>Builds, checks, reviews, and commits a change that does not need a new roadmap phase.</td></tr>
+<tr><td><code>$riff:debug</code></td><td>Something is broken</td><td>Investigates the failure and aims for a focused correction.</td></tr>
+<tr><td><code>$riff:add-phase</code></td><td>A larger new improvement</td><td>Adds a justified phase to the roadmap.</td></tr>
+<tr><td><code>$riff:map</code></td><td>You need to understand existing code</td><td>Maps application behavior, structure, and boundaries.</td></tr>
+<tr><td><code>$riff:learn-stack</code></td><td>A technology fact needs research</td><td>Researches the exact facts needed for the current work.</td></tr>
+<tr><td><code>$riff:incident</code></td><td>An application incident is active</td><td>Contains and investigates the incident within project boundaries.</td></tr>
+<tr><td><code>$riff:deep-audit</code></td><td>You explicitly want an exhaustive security audit</td><td>Routes the audit to Codex Security, when available.</td></tr>
+<tr><td><code>$riff:promote</code></td><td>You explicitly request promotion to production</td><td>Handles the promotion boundary and required evidence.</td></tr>
+<tr><td><code>$riff:issue</code></td><td>You explicitly want a GitHub issue</td><td>Publishes grouped work from the current project plan. It is not an automatic wave step.</td></tr>
+</tbody></table></div>
+<div class="command"><div class="command-bar"><span>Fix a specific problem in Codex</span><button class="copy-button" type="button" data-copy="debug-example">Copy</button></div><pre id="debug-example">$riff:debug I click Save after entering a recipe, but it never
+appears in the list. I expected to see it immediately.</pre><span class="copy-status" role="status"></span></div>
+<p>For a small change, try <code>$riff:quick Make the empty list explain how to add a recipe.</code> For a larger addition, try <code>$riff:add-phase Let me share a recipe with a friend.</code></p>
+<h3>In Terminal</h3>
+<div class="table-scroll"><table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody>
+<tr><td><code>riff-codex init</code></td><td>Connect the current Git project to RIFF.</td></tr>
+<tr><td><code>riff-codex init --configure</code></td><td>Revisit languages, explanations, scope, and autonomy.</td></tr>
+<tr><td><code>riff-codex doctor</code></td><td>Check the installation without recording new approval.</td></tr>
+<tr><td><code>riff-codex resync</code></td><td>Refresh the managed links and hooks after an update.</td></tr>
+<tr><td><code>riff-codex status</code></td><td>Read saved project progress.</td></tr>
+<tr><td><code>riff-codex dashboard</code></td><td>Open the shared local dashboard, normally on port 4000.</td></tr>
+<tr><td><code>riff-codex dashboard --snapshot</code></td><td>Print the dashboard's data snapshot.</td></tr>
+<tr><td><code>riff-codex --help</code></td><td>List the available terminal operations.</td></tr>
+</tbody></table></div>
+<p>Terminal wave operations manage RIFF's records. The conversation skill <code>$riff:wave</code> coordinates the actual build. This repository has no <code>riff-codex next</code> command.</p>
+</section>
 
-  <footer>
-    <div class="wrap footer-grid"><p class="footer-brand">RIFF / CODEX</p><p>Build like a band of six. Ship like one.<br>Your idea · checked results · clear progress</p><p><a href="#top">Back to top ↑</a></p></div>
-  </footer>
+<section id="progress" class="panel" role="tabpanel" aria-labelledby="tab-progress" tabindex="0">
+<h2>Progress and resuming work</h2>
+<p>The roadmap describes the work. RIFF's local state records where that work stands. Short explanations make the intended and verified results readable in the dashboard.</p>
+<div class="table-scroll"><table><thead><tr><th>Dashboard column</th><th>Meaning</th></tr></thead><tbody>
+<tr><td>Todo</td><td>Planned work. A phase can only be selected once the earlier work it needs is complete.</td></tr>
+<tr><td>In progress</td><td>The phase is active. It has not yet met the completion checks.</td></tr>
+<tr><td>Done</td><td>The required checks and reviews passed and the reviewed result was committed.</td></tr>
+<tr><td>Blocked</td><td>A recorded problem prevents completion. The underlying state can be parked, blocked, or awaiting action.</td></tr>
+<tr><td>Skipped</td><td>A status supported for imported older roadmaps. RIFF Codex does not silently skip committed work.</td></tr>
+</tbody></table></div>
+<h3>Return to the same project</h3>
+<div class="command"><div class="command-bar"><span>First, in Codex</span><button class="copy-button" type="button" data-copy="resume-status">Copy</button></div><pre id="resume-status">$riff:status</pre><span class="copy-status" role="status"></span></div>
+<p>Read what is active or blocked. Once a real blocker is cleared, continue with the same wave command:</p>
+<div class="command"><div class="command-bar"><span>Then, in Codex</span><button class="copy-button" type="button" data-copy="resume-wave">Copy</button></div><pre id="resume-wave">$riff:wave</pre><span class="copy-status" role="status"></span></div>
+<p>RIFF resumes active work or chooses the next ready phase using the saved state. You do not need to recreate the plan or edit a progress file yourself.</p>
+<h3>What the dashboard reads</h3>
+<p>The shared dashboard is a local Bun application. It reads registered projects, their plans, and saved progress. It also shows explanations written before a phase and updated with verified results after completion. It does not call Codex or Claude, use an AI API, or execute a wave.</p>
+<p>The usual address is <code>http://127.0.0.1:4000</code>. This documentation page is a separate manual; it is not the live project dashboard.</p>
+<h3>What is saved where</h3>
+<p><code>PROJECT.md</code> and <code>ROADMAP.yaml</code> live with the application. Progress, review records, events, and dashboard explanations live in <code>.riff-codex-state/</code>. That local folder is excluded from Git.</p>
+<p>Returning to the same working folder preserves that local context. A clone on another computer does not automatically contain those progress records. Do not treat the dashboard as a backup, or edit the saved state to mark work complete.</p>
+<h3>Using Claude RIFF in the same application</h3>
+<p>Claude RIFF and RIFF Codex can share the project brief and roadmap. Their tools and progress folders remain separate: Claude owns <code>.riff</code> and <code>.riff-state/</code>; Codex owns <code>.riff-codex</code> and <code>.riff-codex-state/</code>. Only one should execute a given phase at a time.</p>
+<p>The Claude manual explains a different runner, with different commands and roles. This page retains the useful explanation topics but describes this RIFF Codex repository's actual behavior.</p>
+</section>
 
-  <script>
-    (() => {
-      const setCopyStatus = (button, message, isError) => {
-        const status = button.parentElement.querySelector('.copy-status');
-        if (!status) return;
-        status.textContent = message;
-        status.style.color = button.closest('.terminal-card') ? 'var(--yellow)' : 'var(--ink)';
-        button.textContent = isError ? 'COPY' : 'COPIED';
-        window.setTimeout(() => {
-          status.textContent = '';
-          button.textContent = 'COPY';
-        }, 2600);
-      };
-
-      const fallbackCopy = (value) => {
-        const textarea = document.createElement('textarea');
-        textarea.value = value;
-        textarea.setAttribute('readonly', '');
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        const copied = document.execCommand('copy');
-        textarea.remove();
-        if (!copied) throw new Error('copy command failed');
-      };
-
-      document.querySelectorAll('[data-copy]').forEach((button) => {
-        button.addEventListener('click', async () => {
-          const value = button.dataset.copy || '';
-          try {
-            if (navigator.clipboard && window.isSecureContext) {
-              await navigator.clipboard.writeText(value);
-            } else {
-              fallbackCopy(value);
-            }
-            setCopyStatus(button, 'Command copied to clipboard.', false);
-          } catch (error) {
-            setCopyStatus(button, 'Copy failed. Select the command manually.', true);
-          }
-        });
-      });
-
-      const flowTabs = [...document.querySelectorAll('[data-flow]')];
-      const flowPanels = [...document.querySelectorAll('.flow-explanation')];
-      const selectFlow = (selected) => {
-        flowTabs.forEach((tab) => {
-          const active = tab.dataset.flow === selected;
-          tab.setAttribute('aria-selected', String(active));
-          tab.tabIndex = active ? 0 : -1;
-        });
-        flowPanels.forEach((panel) => {
-          panel.hidden = panel.id !== `flow-panel-${selected}`;
-        });
-      };
-      flowTabs.forEach((tab, index) => {
-        tab.addEventListener('click', () => selectFlow(tab.dataset.flow));
-        tab.addEventListener('keydown', (event) => {
-          if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) return;
-          event.preventDefault();
-          const direction = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
-          const next = (index + direction + flowTabs.length) % flowTabs.length;
-          flowTabs[next].focus();
-          selectFlow(flowTabs[next].dataset.flow);
-        });
-      });
-      selectFlow('1');
-    })();
-  </script>
+<section id="reference" class="panel" role="tabpanel" aria-labelledby="tab-reference" tabindex="0">
+<h2>Reference</h2>
+<p>These files contain the detailed instructions behind the behavior described here. The project brief and roadmap remain the shared product sources; this manual is an explanation of how RIFF uses them.</p>
+<ul class="sources">
+<li><a href="docs/installation.md">Installation guide</a><span>Prerequisites, skills, hook approval, updates, and setup problems.</span></li>
+<li><a href="docs/usage.md">Everyday use</a><span>Examples for new ideas, existing applications, small changes, and fixes.</span></li>
+<li><a href="docs/how-it-works.md">How it works</a><span>The project flow, who does what, and what completion means.</span></li>
+<li><a href="docs/technical-reference.md">Technical reference</a><span>File locations, terminal commands, and coexistence with Claude RIFF.</span></li>
+<li><a href="riff/references/operating-contract.md">Operating contract</a><span>Phase selection, autonomy, retries, reviews, and completion rules.</span></li>
+<li><a href="riff/references/project-framing.md">Project framing</a><span>When a larger project needs more detail about users, data, rights, and integrations.</span></li>
+<li><a href="riff/references/model-routing.md">Model routing</a><span>The model and effort policy for different kinds of work.</span></li>
+<li><a href="riff/references/security.md">Security boundary</a><span>Sensitive changes, findings, and the required review.</span></li>
+<li><a href="riff/references/dashboard.md">Dashboard contract</a><span>How readable phase explanations are produced and displayed.</span></li>
+<li><a href="riff/dashboard/README.md">Dashboard setup</a><span>The standalone dashboard's configuration and operation.</span></li>
+</ul>
+<details><summary>Internal files</summary><div>
+<div class="table-scroll"><table><thead><tr><th>Path in your application</th><th>Purpose</th></tr></thead><tbody>
+<tr><td><code>.riff-codex</code></td><td>Link to the permanent RIFF checkout's framework folder.</td></tr>
+<tr><td><code>.agents/skills/riff-codex-*</code></td><td>Project entries that expose the RIFF skills.</td></tr>
+<tr><td><code>.codex/hooks.json</code></td><td>RIFF checks merged with the project's existing Codex hooks.</td></tr>
+<tr><td><code>.riff-codex-state/config.json</code></td><td>Preferences and recorded approval of the current hooks.</td></tr>
+<tr><td><code>.riff-codex-state/state.json</code></td><td>Current progress. Written only through RIFF's commands.</td></tr>
+<tr><td><code>.riff-codex-state/receipts/</code></td><td>Check and review evidence tied to the reviewed code.</td></tr>
+<tr><td><code>.riff-codex-state/events.ndjson</code></td><td>A short history of events.</td></tr>
+<tr><td><code>.riff-codex-state/dashboard/phases/</code></td><td>Explanations of planned and verified phase results.</td></tr>
+</tbody></table></div>
+<p>Initialization also chains existing Git pre-commit and commit-message hooks. It preserves foreign Claude files and does not rewrite an existing roadmap just to change its format.</p>
+</div></details>
+</section>
+</main>
+<footer><div class="wrap"><a href="README.md">README</a><p>RIFF for Codex</p></div></footer>
+<script>
+(() => {
+ 'use strict';
+ const tabs = [...document.querySelectorAll('[role="tab"]')];
+ const panels = [...document.querySelectorAll('.panel')];
+ function selectSection(id, updateHash = true) {
+  if (!panels.some(panel => panel.id === id)) return;
+  tabs.forEach(tab => {
+   const selected = tab.getAttribute('aria-controls') === id;
+   tab.setAttribute('aria-selected', String(selected));
+   tab.tabIndex = selected ? 0 : -1;
+  });
+  panels.forEach(panel => { panel.hidden = panel.id !== id; });
+  if (updateHash) {
+   try { history.replaceState(null, '', '#' + id); } catch (_) { /* Works without history access. */ }
+  }
+ }
+ tabs.forEach((tab, index) => {
+  tab.addEventListener('click', () => selectSection(tab.getAttribute('aria-controls')));
+  tab.addEventListener('keydown', event => {
+   const keys = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
+   if (!keys.includes(event.key)) return;
+   event.preventDefault();
+   let target;
+   if (event.key === 'Home') target = 0;
+   else if (event.key === 'End') target = tabs.length - 1;
+   else target = (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+   tabs[target].focus();
+   selectSection(tabs[target].getAttribute('aria-controls'));
+  });
+ });
+ document.querySelectorAll('[data-section-link]').forEach(link => {
+  link.addEventListener('click', event => {
+   event.preventDefault();
+   const id = link.dataset.sectionLink;
+   selectSection(id);
+   document.getElementById(id).focus();
+   document.getElementById(id).scrollIntoView({block: 'start'});
+  });
+ });
+ const syncHash = () => selectSection(location.hash.slice(1) || 'overview', false);
+ selectSection('overview', false);
+ syncHash();
+ window.addEventListener('hashchange', syncHash);
+ const theme = document.getElementById('theme-toggle');
+ theme.addEventListener('click', () => {
+  const dark = document.documentElement.dataset.theme !== 'dark';
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  theme.setAttribute('aria-pressed', String(dark));
+  theme.textContent = dark ? 'Light theme' : 'Dark theme';
+ });
+ async function copyText(value) {
+  if (navigator.clipboard && window.isSecureContext) {
+   try { await navigator.clipboard.writeText(value); return; } catch (_) { /* Try offline fallback. */ }
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  try {
+   textarea.select();
+   if (!document.execCommand('copy')) throw new Error('Copy unavailable');
+  } finally { textarea.remove(); }
+ }
+ document.querySelectorAll('[data-copy]').forEach(button => {
+  button.addEventListener('click', async () => {
+   const status = button.closest('.command').querySelector('.copy-status');
+   try {
+    await copyText(document.getElementById(button.dataset.copy).textContent);
+    status.textContent = 'Copied.';
+   } catch (_) {
+    status.textContent = 'Copy unavailable. Select the command text to copy it manually.';
+   }
+   button.focus();
+  });
+ });
+ const steps = {
+  '1': ['Your request', 'Describe what someone should be able to do and why. Codex can investigate the application and the technical choices.', '“Let me save a recipe and find it later.”'],
+  '2': ['Project brief and roadmap', 'The brief records the goal and boundaries. The roadmap lists useful outcomes, their priority, and anything they need first. Start and onboard prepare these without launching a build.', 'PROJECT.md + ROADMAP.yaml'],
+  '3': ['Select or resume a phase', 'RIFF reads saved progress. It resumes active work or selects the highest-priority phase whose prerequisites are complete. A request for a specific phase still respects those prerequisites.', 'Save recipes before adding recipe search.'],
+  '4': ['Build a usable result', 'Codex reads the relevant project context and implements the phase. Separate tasks can use additional help when their ownership is clear. Ordinary development errors are corrected during this work.', 'Enter a recipe → save it → retrieve it.'],
+  '5': ['Check and review', 'The changed behavior is checked and the actual code gets a fresh functional review. Sensitive changes also require a focused security review. The evidence applies to that exact version.', 'A saved recipe should still be there when you return.'],
+  '6': ['Save code and progress', 'The reviewed changes are saved in a local Git commit. RIFF records completion and writes a short explanation of the verified result for the dashboard.', 'Reviewed code → local history → completed phase'],
+  '7': ['Continue or finish', 'In loop mode, RIFF returns to selection and follows the next ready phase. Guided mode pauses between phases. The cycle ends when the roadmap is complete or a real blocker stops the work.', 'Next ready phase → step 3']
+ };
+ const explanation = document.getElementById('step-explanation');
+ document.querySelectorAll('[data-step]').forEach(button => {
+  button.addEventListener('click', () => {
+   document.querySelectorAll('[data-step]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+   const [heading, text, example] = steps[button.dataset.step];
+   explanation.querySelector('h3').textContent = heading;
+   explanation.querySelector('p').textContent = text;
+   explanation.querySelector('code').textContent = example;
+  });
+ });
+})();
+</script>
 </body>
 </html>
