@@ -5,6 +5,8 @@ description: Shape a new product with repository-aware discovery and a vertical 
 
 # Start RIFF discovery
 
+For production discovery, read `.riff-codex/references/taste.md` and establish the applicable project taste alongside the product artifacts. Reuse existing conventions and confirmed stack references; for a UI product, include the frontend direction and design-skill routing. Keep scratch discovery lightweight.
+
 Use Sol Medium for product judgment. Follow `.riff-codex/references/model-routing.md` only when delegation adds value.
 
 1. Confirm `node .riff-codex/bin/riff.mjs doctor` can read the installation. Read the configured autonomy mode. Inspect the repository, documentation, configuration, and environment for facts before asking the user anything. A Luna Light read-only inventory may extract facts mechanically.

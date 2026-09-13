@@ -10,6 +10,8 @@ This page keeps installation internals and contributor references out of the get
 | --- | --- |
 | `PROJECT.md` | Shared product brief, vocabulary, constraints, and scope. |
 | `ROADMAP.yaml` | Shared phases, explicit priorities, prerequisites, and exclusions. |
+| `taste.md`, `taste/` | Shared project conventions, selective topic loading and frontend direction. |
+| `references/taste/stacks/` | Project-owned, source-backed stack research from `learn-stack`. |
 | `.riff-codex` | Symlink to the permanent checkout's `riff/` directory. |
 | `.agents/skills/riff-codex-*` | Project-local links to RIFF Codex skills. |
 | `.codex/hooks.json` | RIFF hooks merged with existing Codex hooks. |
@@ -65,6 +67,9 @@ Read the [dashboard README](../riff/dashboard/README.md) and [projection contrac
 
 - [Operating contract](../riff/references/operating-contract.md): product sources, selection, reviews, retries, and completion.
 - [Project framing](../riff/references/project-framing.md): when a larger project needs deeper discovery.
+- [Taste](../riff/references/taste.md): selective conventions, learning and Claude coexistence.
+- [Frontend taste](../riff/references/taste/frontend.md): required design skills and rendered acceptance.
+- [NowStack](../riff/references/taste/stacks/nowstack.md): starter conventions and version-aware evidence.
 - [Security](../riff/references/security.md): sensitive boundaries and required review.
 - [Model routing](../riff/references/model-routing.md): when and how to use additional agents.
 - [Start](../riff/skills/start/SKILL.md), [onboard](../riff/skills/onboard/SKILL.md), and [wave](../riff/skills/wave/SKILL.md): core workflows.

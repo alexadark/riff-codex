@@ -102,12 +102,27 @@ In loop mode, ordinary product choices do not require a handoff. A real blocker 
 
 RIFF records the reason rather than declaring the step complete. Check `$riff:status` for the next action. Uploading to GitHub, deploying, and publishing remain subject to your explicit instruction.
 
+## Keep design and engineering conventions
+
+Production discovery records the project's conventions in `taste.md` and relevant `taste/` topics. Existing Claude taste is preserved. RIFF reads only what the current work needs and saves proven lessons without a separate approval queue.
+
+For frontend work, RIFF applies the relevant design skills to layout, typography, colors, components, accessibility and copy, then checks the rendered screen and interactions in the browser. A passing build is not visual acceptance. New screens get a coherent direction based on the product goal; an existing approved design remains authoritative.
+
+NowStack has a dedicated reference, selected only when the project confirms that stack. The actual installed versions and project rules govern implementation.
+
+```text
+$riff:learn-stack NowStack: establish the conventions for this project's
+forms, Convex authorization and frontend components.
+```
+
+`learn-stack` researches the relevant sources and saves version-aware conventions under `references/taste/stacks/`, linked from `taste.md`. Existing rules are merged conservatively. It does not require a source-shortlist approval in loop mode, change dependencies or deploy anything.
+
 ## Find the less frequent tools
 
 | Need | Skill |
 | --- | --- |
 | Understand the existing code | `$riff:map` |
-| Research a specific technology question | `$riff:learn-stack` |
+| Research and save reusable stack conventions | `$riff:learn-stack` |
 | Investigate an active application incident | `$riff:incident` |
 | Request an exhaustive security audit | `$riff:deep-audit` |
 | Explicitly prepare promotion to production | `$riff:promote` |

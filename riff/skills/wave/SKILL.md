@@ -5,6 +5,8 @@ description: Execute or resume RIFF roadmap phases as autonomous vertical waves.
 
 # Run a RIFF wave
 
+Read `.riff-codex/references/taste.md`, the project taste index and only the relevant topics/stack rules. For frontend work, apply `.riff-codex/references/taste/frontend.md`, use the required relevant design skills and obtain rendered browser evidence before visual acceptance. Persist proven reusable conventions before final validation and review; do not create a taste approval queue.
+
 Read `.riff-codex/references/operating-contract.md` and `.riff-codex/references/model-routing.md`. They own autonomy, readiness, review, retry and stop rules. For a large project, load `.riff-codex/references/project-framing.md` and reuse the selected phase's existing stories, criteria, data boundaries, rights, integrations, decisions, and answers before deepening the phase. Load the security reference only for a sensitive phase.
 
 1. Run `node .riff-codex/bin/riff.mjs wave sync`, then `wave resume` or `wave select [phase-id]`; activate the selected phase without bypassing dependencies.

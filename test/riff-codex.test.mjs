@@ -104,6 +104,32 @@ test('installs beside foreign Claude RIFF paths without changing shared artifact
   assert.match(runCli(root, 'doctor'), /0 error\(s\)/);
 });
 
+test('session start exposes portable taste guidance without modifying shared conventions', () => {
+  for (const scope of ['production', 'scratch']) {
+    const root = fixture();
+    const taste = '# Existing Claude taste\n\nPreserve the approved design.\n';
+    writeFileSync(path.join(root, 'taste.md'), taste);
+    runCli(root, 'init', '--project-root', root, '--non-interactive', '--scope', scope);
+    const output = execFileSync(process.execPath, [CLI, 'hook', 'session-start'], {
+      cwd: root,
+      encoding: 'utf8',
+      input: JSON.stringify({ source: 'resume' }),
+    });
+    const hook = JSON.parse(output).hookSpecificOutput;
+    assert.equal(hook.hookEventName, 'SessionStart');
+    assert.match(hook.additionalContext, /read project taste\.md when present/);
+    assert.match(hook.additionalContext, /apply the relevant design skills/);
+    assert.match(hook.additionalContext, /verify the rendered result in the browser/);
+    assert.match(hook.additionalContext, /\$riff:learn-stack/);
+    for (const relative of ['references/taste.md', 'references/taste/frontend.md', 'references/taste/stacks/nowstack.md', 'skills/learn-stack/SKILL.md']) {
+      assert.equal(existsSync(path.join(root, '.riff-codex', relative)), true, relative);
+    }
+    assert.equal(readFileSync(path.join(root, 'taste.md'), 'utf8'), taste);
+    assert.equal(existsSync(path.join(root, 'taste')), false, 'init and session start do not bootstrap project taste');
+    assert.equal(existsSync(path.join(root, 'references')), false, 'hooks do not create research artifacts');
+  }
+});
+
 test('migrates an owned legacy Codex install without losing active state or evidence', () => {
   const root = fixture();
   symlinkSync(PLUGIN_ROOT, path.join(root, '.riff'));

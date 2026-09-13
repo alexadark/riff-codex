@@ -1,4 +1,4 @@
 interface:
   display_name: "RIFF Learn Stack"
-  short_description: "Research one blocking stack question"
-  default_prompt: "Use $learn-stack through $riff:learn-stack for this boundary."
+  short_description: "Research and save verified stack conventions"
+  default_prompt: "Use $learn-stack through $riff:learn-stack to research the relevant stack and save source-backed project taste conventions."

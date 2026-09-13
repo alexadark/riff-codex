@@ -27,6 +27,7 @@ The visual manual is a local HTML page: download or open `riff-documentation.htm
 - **Breaks the work into useful steps.** Each step should produce something you can try.
 - **Builds and checks.** Codex implements a step, checks it, and reviews the result before recording it as complete.
 - **Remembers progress.** You can return later and continue the same project.
+- **Keeps useful conventions.** Project taste and stack research guide implementation; frontend work uses design skills and rendered browser checks. See [taste and learn-stack](docs/usage.md#keep-design-and-engineering-conventions).
 - **Shows where things stand.** A local dashboard displays the plan, completed work, and anything blocked.
 
 RIFF works with Codex. You still need Codex installed and signed in.
