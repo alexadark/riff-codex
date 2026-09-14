@@ -16,4 +16,6 @@ Read `.riff-codex/references/operating-contract.md` and `.riff-codex/references/
 5. Commit the reviewed tree and run `wave complete <phase> --commit HEAD`. Write `EXPLAIN-POST.simple.md` following the dashboard reference.
 6. Continue dependency-ready work in `loop`; pause at the contract's boundaries in `guided`. Report the outcome, commit, checks, blocker and next phase plainly. A PR or collaborator metadata dossier is not required.
 
+Before finishing, perform agent-owned observation triage under `.riff-codex/references/dashboard.md#end-of-work-observation-triage`. Inspect current code and evidence, repair confirmed in-scope problems, and record justified decisions through `observations review`. Do not delegate technical validity judgments to the user or mark unverified findings resolved.
+
 Never invoke nested `codex exec`, create a scheduler, publish GitHub issues without an explicit `$riff:issue` request, or use a public `next` command.

@@ -13,4 +13,6 @@ Follow `.riff-codex/references/learning.md` for selective reuse and deduplicated
 
 For changed user journeys, capture observed browser results and screenshots, then generate the HTML report using `.riff-codex/references/evidence.md` and link it in the result. Nonvisual checks need their observed results, not invented screenshots.
 
+Before finishing, perform agent-owned observation triage under `.riff-codex/references/dashboard.md#end-of-work-observation-triage`. Inspect current code and evidence, repair confirmed in-scope problems, and record justified decisions through `observations review`. Do not delegate technical validity judgments to the user or mark unverified findings resolved.
+
 Create one atomic commit and append a concise event with `node .riff-codex/bin/riff.mjs hook` only through normal hooks. If scope expands or a product decision appears, stop and recommend `$riff:add-phase` instead.
