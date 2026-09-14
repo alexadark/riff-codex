@@ -744,16 +744,37 @@
     if (human) {
       root.appendChild(item("Action required", human.reason || human.summary || "Human input required", "status-warning"));
     }
+    const sections = new Map();
     for (const finding of findings) {
+      const severe = ["HIGH", "CRITICAL"].includes(finding.severity);
+      const code = finding.category === "code";
+      const occurrences = finding.occurrences > 1 ? ` · ${finding.occurrences} occurrences` : "";
       const explanation = [
-        finding.summary,
         finding.what_could_happen && `Could happen: ${finding.what_could_happen}`,
         finding.affected && `Affected: ${finding.affected}`,
         finding.recommended_fix && `Recommended fix: ${finding.recommended_fix}`,
         finding.decision_reason && `RIFF decision: ${finding.decision_reason}`,
+        finding.lastSeen && `Last recorded: ${finding.lastSeen}`,
       ].filter(Boolean).join("\n");
-      const occurrences = finding.occurrences > 1 ? ` · ${finding.occurrences} occurrences` : "";
-      root.appendChild(item(`Security ${finding.severity || "finding"}${occurrences}`, explanation, "status-warning"));
+      if (severe) {
+        root.appendChild(item(`Security ${finding.severity}${occurrences}`, [finding.summary, explanation].join("\n"), "status-warning"));
+        continue;
+      }
+      const key = code ? "code" : "security";
+      if (!sections.has(key)) sections.set(key, []);
+      sections.get(key).push(el("details", { class: "status-observation" }, [
+        el("summary", null, `${finding.summary || "Recorded observation"}${occurrences}`),
+        el("div", { class: "status-value" }, explanation),
+      ]));
+    }
+    for (const [category, observations] of sections) {
+      root.appendChild(el("details", { class: "status-events status-observations", dataset: { category } }, [
+        el("summary", null, category === "code"
+          ? `Code observations · ${observations.length} grouped`
+          : `Security observations to review · ${observations.length} grouped`),
+        el("p", { class: "fg-muted small" }, "Recorded checks, not a current scan. Repeated observations are grouped; details remain available."),
+        ...observations,
+      ]));
     }
     if (events.length) {
       root.appendChild(el("details", { class: "status-events" }, [

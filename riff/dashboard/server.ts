@@ -270,7 +270,7 @@ function codexOperationalState(projectRoot: string): Record<string, unknown> | n
       last_commit: state.lastCommit ?? null,
       last_validation: state.lastValidation ?? null,
       reviews: state.reviews ?? { functional: null, security: null },
-      security_findings: groupFindings(Array.isArray(state.securityFindings) ? state.securityFindings : []).slice(-10).reverse(),
+      security_findings: groupFindings(Array.isArray(state.securityFindings) ? state.securityFindings : []).reverse(),
       human_action: state.humanAction ?? null,
       model: state.model ?? null,
       next_ready: nextReady ? `${nextReady.id} - ${nextReady.title}` : null,

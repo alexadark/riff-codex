@@ -605,3 +605,24 @@ test('legacy smoke requirement uses existing journey evidence instead of accepti
   writeJson(evidence, { version: 1, candidate, steps: [{ name: 'Essential journey', kind: 'browser', status: 'pass', observed: 'Confirmation visible after submitting', url: 'http://localhost:3000' }] });
   assert.match(runCli(root, ...args, '--verification', evidence), /Validation pass/);
 });
+
+test('phase diagnostic scripts do not trigger orphan warnings but still receive secret checks', () => {
+  const root = fixture();
+  const directory = path.join(root, '.planning/phases/140-loading-performance');
+  mkdirSync(directory, { recursive: true });
+  const file = path.join(directory, 'measure-cold.mjs');
+  writeFileSync(file, 'console.log("diagnostic");\n');
+  assert.deepEqual(invokeHook(root, 'post-tool', { command: `*** Update File: ${file}` }, 'apply_patch'), {});
+  writeFileSync(file, 'const credential = "' + 'sk' + '_live_' + 'A'.repeat(32) + '";\n');
+  assert.equal(invokeHook(root, 'post-tool', { command: `*** Update File: ${file}` }, 'apply_patch').decision, 'block');
+});
+
+test('route-shaped test fixtures are not treated as production endpoints', () => {
+  const root = fixture();
+  const file = path.join(root, 'api.test.ts');
+  writeFileSync(file, 'const handler = () => request.json();\n');
+  assert.deepEqual(invokeHook(root, 'post-tool', { command: `*** Update File: ${file}` }, 'apply_patch'), {});
+  const route = path.join(root, 'api.ts');
+  writeFileSync(route, 'const handler = () => request.json();\n');
+  assert.match(invokeHook(root, 'post-tool', { command: `*** Update File: ${route}` }, 'apply_patch').hookSpecificOutput.additionalContext, /without visible schema validation/);
+});

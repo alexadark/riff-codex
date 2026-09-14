@@ -1161,7 +1161,7 @@ function dashboardData(root) {
       functional: functional ? { ...functional, valid: receiptValidity(root, phaseById(state, functional.phase), functional) } : null,
       security: security ? { ...security, valid: receiptValidity(root, phaseById(state, security.phase), security) } : null,
     },
-    securityFindings: groupFindings(state.securityFindings).slice(-10).reverse(),
+    securityFindings: groupFindings(state.securityFindings).reverse(),
     humanAction: state.humanAction,
     events: recentEvents(root),
     model: state.model,
@@ -1323,7 +1323,8 @@ function scanFile(file, text) {
   const findings = [];
   if (SECRET_PATTERNS.some((pattern) => pattern.test(text))) findings.push({ kind: 'secret', severity: 'HIGH', summary: `A likely production secret is present in ${relative}.` });
   if (/migrations?|\.sql$/i.test(file) && /\b(?:DROP\s+(?:TABLE|COLUMN|SCHEMA)|TRUNCATE|DELETE\s+FROM)\b/i.test(text)) findings.push({ kind: 'destructive_migration', severity: 'HIGH', summary: `A destructive database operation is present in ${relative}.` });
-  const isRoute = /(?:route|api|handler|controller)/i.test(file) && /\.(?:[cm]?[jt]sx?|py|go|rs)$/.test(file);
+  const isTest = /\.(?:test|spec)\.[^.]+$|(?:^|[\\/])__tests__[\\/]/i.test(file);
+  const isRoute = !isTest && /(?:route|api|handler|controller)/i.test(file) && /\.(?:[cm]?[jt]sx?|py|go|rs)$/.test(file);
   if (isRoute && /(?:GET|POST|PUT|PATCH|DELETE|handler|router)/.test(text) && !/(?:auth|session|currentUser|userId|public|anonymous)/i.test(text)) findings.push({ kind: 'route_auth', severity: 'MEDIUM', summary: `${relative} looks like a route without an explicit authentication decision.` });
   if (isRoute && /(?:params\.|searchParams|req\.query|request\.json|req\.body)/.test(text) && /(?:findUnique|findFirst|select|where)/.test(text) && !/(?:userId|ownerId|tenantId|session\.user|currentUser)/.test(text)) findings.push({ kind: 'idor', severity: 'MEDIUM', summary: `${relative} uses an external identifier without visible user or tenant scoping.` });
   if (isRoute && /(?:request\.json|formData|req\.body|JSON\.parse)/.test(text) && !/(?:safeParse|\.parse\(|validate\(|Joi\.|valibot|typebox)/.test(text)) findings.push({ kind: 'input_validation', severity: 'MEDIUM', summary: `${relative} reads user input without visible schema validation.` });
@@ -1335,6 +1336,8 @@ function orphanFinding(root, file) {
   const relative = path.relative(root, file).replaceAll(path.sep, '/');
   const base = path.basename(file);
   if (!/\.(?:[cm]?[jt]sx?)$/.test(file)) return null;
+  // Phase evidence and diagnostic scripts are run directly, not application modules.
+  if (/^(?:\.planning|\.riff-codex-state|\.uxtest)\//.test(relative)) return null;
   if (/(?:^|\/)(?:index|routes?|pages?|app|scripts?|migrations?|seeds?|fixtures?|__tests__)(?:\/|\.)|\.(?:test|spec|config|d)\./i.test(relative)) return null;
   let added = false;
   try { added = /^(?:\?\?|A | A)/.test(run('git', ['status', '--short', '--', relative], { cwd: root })); } catch { /* advisory */ }

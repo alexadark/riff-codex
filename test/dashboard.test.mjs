@@ -23,3 +23,12 @@ test('repeated findings merge before display limits without hiding severity or d
   assert.equal(grouped[0].lastSeen, '2026-09-14');
   assert.equal(input[0].occurrences, undefined);
 });
+
+test('code heuristics are observations while security and severe findings remain security findings', () => {
+  const grouped = groupFindings([
+    { kind: 'orphan_file', severity: 'LOW', summary: 'Diagnostic script' },
+    { kind: 'route_auth', severity: 'MEDIUM', summary: 'Authentication decision' },
+    { kind: 'orphan_file', severity: 'HIGH', summary: 'Escalated finding' },
+  ]);
+  assert.deepEqual(grouped.map((finding) => finding.category), ['code', 'security', 'security']);
+});

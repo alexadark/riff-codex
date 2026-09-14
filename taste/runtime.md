@@ -11,3 +11,7 @@ A failed HTTP probe does not prove a port is free: a stalled Bun process may sti
 ## Interrupted delivery
 
 Reuse candidate-bound validation and review evidence only while intact. Recover a committed phase through the normal completion gates; preserve dirty files and never manufacture a second commit to advance state. Evidence: the interrupted-delivery regression in `test/riff-codex.test.mjs`.
+
+## Historical observations
+
+Group nonblocking historical checks behind native disclosure controls; do not present every recorded heuristic as a current security incident. Keep severe findings visible and preserve all grouped history. Phase diagnostic scripts are executed directly, and route-shaped test files are not production endpoints. Exclude them from the corresponding orphan/route heuristics while retaining secret detection. Evidence: `test/dashboard.test.mjs`, the diagnostic and route-fixture hook tests, and the StoryCollector dashboard on 2026-09-14.

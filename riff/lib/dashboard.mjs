@@ -20,5 +20,7 @@ export function groupFindings(findings = []) {
     groups.set(key, { ...finding, severity, occurrences: (previous?.occurrences ?? 0) + 1,
       firstSeen: previous?.firstSeen ?? finding.reviewedAt, lastSeen: finding.reviewedAt });
   }
-  return [...groups.values()];
+  return [...groups.values()].map((finding) => ({ ...finding,
+    category: ['orphan_file', 'todo_without_reference'].includes(finding.kind) && ['INFO', 'LOW'].includes(finding.severity) ? 'code' : 'security',
+  }));
 }

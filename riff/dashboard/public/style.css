@@ -1692,3 +1692,19 @@ button {
   border-color: var(--accent);
   text-decoration: none;
 }
+
+.status-observations > summary,
+.status-observation > summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+
+.status-observation {
+  border-top: 1px solid var(--border);
+}
+
+.status-observation .status-value {
+  padding: 0 0 12px 16px;
+}
