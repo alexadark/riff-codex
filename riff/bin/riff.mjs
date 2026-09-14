@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 import { inside, localPath, phaseId, withLock, withFileLock } from '../lib/safety.mjs';
 import { verificationEvidence, writeReport } from '../lib/report.mjs';
+import { managedHookPolicy } from '../lib/managed-hooks.mjs';
 import { selectReadyPhase } from '../lib/phase-selection.mjs';
 
 const VERSION = '0.1.0';
@@ -204,7 +205,7 @@ function isLegacyCodexHook(command) {
   return command.includes(LEGACY_HOOK_ID) && command.includes(`/${LEGACY_FRAMEWORK_DIR}/bin/riff.mjs`);
 }
 
-function mergeHooks(existing, script = SCRIPT, removeLegacyCodexHooks = false) {
+function mergeHooks(existing, script = SCRIPT, removeLegacyCodexHooks = false, machineManaged = false) {
   const result = existing ?? { description: 'Project-local Codex hooks.' };
   if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('hooks.json root must be an object');
   if (result.hooks !== undefined && (typeof result.hooks !== 'object' || Array.isArray(result.hooks))) throw new Error('hooks.json hooks must be an object');
@@ -221,7 +222,7 @@ function mergeHooks(existing, script = SCRIPT, removeLegacyCodexHooks = false) {
       }))
       .filter((group) => group.hooks.length > 0);
   }
-  for (const [eventName, groups] of Object.entries(desiredHooks(script))) {
+  for (const [eventName, groups] of Object.entries(machineManaged ? {} : desiredHooks(script))) {
     result.hooks[eventName] ??= [];
     result.hooks[eventName].push(...groups);
   }
@@ -469,12 +470,14 @@ function syncManagedUnlocked(root, options) {
   if (!AUTONOMY_MODES.has(config.preferences.autonomy)) throw new Error('autonomy must be loop or guided');
   const existingHooks = readJson(files.hooks, false);
   const projectCli = `$(git rev-parse --show-toplevel)/${FRAMEWORK_DIR}/bin/riff.mjs`;
-  const merged = mergeHooks(existingHooks, projectCli, migration.legacyFrameworkOwned || migration.migratedState);
+  const systemPolicy = managedHookPolicy(root, PLUGIN_ROOT);
+  const merged = mergeHooks(existingHooks, projectCli, migration.legacyFrameworkOwned || migration.migratedState, Boolean(systemPolicy));
   writeJson(files.hooks, merged);
   const currentHash = hooksHash(merged);
   const preservedSkills = exposeSkills(root, migration);
   config.managed = { ...(config.managed ?? {}), version: VERSION, pluginRoot: PLUGIN_ROOT, cli: `${FRAMEWORK_DIR}/bin/riff.mjs`, hooksHash: currentHash, preservedSkills };
   config.hooks ??= { approvedHash: null };
+  config.hooks.source = systemPolicy ? 'system' : 'project';
   if (options.recordApproval || migration.preserveHookApproval) config.hooks.approvedHash = currentHash;
   else if (config.hooks.approvedHash !== currentHash) config.hooks.approvedHash = null;
   if (options.language) config.language = options.language;
@@ -578,7 +581,7 @@ async function cmdInit(tokens) {
     if (result.migration.changes.length) process.stdout.write(`Migrated existing RIFF Codex installation: ${result.migration.changes.join(', ')}.\n`);
   } catch (error) { fail(error.message); }
   const config = readJson(pathsFor(root).config);
-  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${FRAMEWORK_DIR} -> ${PLUGIN_ROOT}\nSkills: namespaced under .agents/skills/riff-codex-*; the native plugin supplies the $riff:* namespace.\nState: project-local in ${STATE_DIR}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\nRequired: open /hooks in Codex, review the local hooks, then run riff-codex doctor --record-hooks-approved.\nClaude RIFF paths and state were not created or replaced.\n`);
+  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${FRAMEWORK_DIR} -> ${PLUGIN_ROOT}\nSkills: namespaced under .agents/skills/riff-codex-*; the native plugin supplies the $riff:* namespace.\nState: project-local in ${STATE_DIR}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\n${config.hooks?.source === 'system' ? 'Hooks use the installed system policy; no per-hook approval is required after configuration reload.' : 'Required: open /hooks in Codex, review the local hooks, then run riff-codex doctor --record-hooks-approved.'}\nClaude RIFF paths and state were not created or replaced.\n`);
 }
 
 function cmdResync(tokens) {
@@ -588,7 +591,7 @@ function cmdResync(tokens) {
   try { result = syncManaged(root, { resync: true, recordApproval: options.record_hooks_approved }); }
   catch (error) { fail(error.message); }
   if (result.migration.changes.length) process.stdout.write(`Migrated existing RIFF Codex installation: ${result.migration.changes.join(', ')}.\n`);
-  process.stdout.write('RIFF managed files repaired. Foreign hook entries and chained Git hooks were preserved.\nRun /hooks if the managed hook hash changed.\n');
+  process.stdout.write(`RIFF managed files repaired. Foreign hook entries and chained Git hooks were preserved.\n${result.config.hooks?.source === 'system' ? 'System policy selected; no duplicate project hooks or manual approval marker.' : 'Run /hooks if the managed hook hash changed.'}\n`);
 }
 
 const PRIORITY_ALIASES = {
@@ -1042,13 +1045,17 @@ function doctor(root, recordApproval = false) {
   try {
     hooks = readJson(files.hooks);
     const count = Object.values(hooks.hooks ?? {}).flat().flatMap((group) => group.hooks ?? []).filter((hook) => String(hook.command ?? '').includes(HOOK_ID)).length;
-    if (count < 6) throw new Error(`only ${count}/6 RIFF hook groups found`);
-    add('ok', 'Codex hooks', `${count} managed groups installed`);
+    const systemPolicy = managedHookPolicy(root, PLUGIN_ROOT);
+    if (!systemPolicy && count < 6) throw new Error(`only ${count}/6 RIFF hook groups found`);
+    if (systemPolicy && count) add('warn', 'Codex hooks', 'system policy and duplicate project hooks; run resync');
+    else add('ok', 'Codex hooks', systemPolicy ? '6 hooks configured by system policy; project duplicates removed' : `${count} managed groups installed`);
   } catch (error) { add('error', 'Codex hooks', error.message); }
   const codexHome = process.env.CODEX_HOME ? path.resolve(process.env.CODEX_HOME) : path.join(homedir(), '.codex');
   const disabledAt = [path.join(root, '.codex', 'config.toml'), path.join(codexHome, 'config.toml')].find(configDisablesHooks);
-  if (disabledAt) add('error', 'hook feature', `disabled in ${disabledAt}`); else add('ok', 'hook feature', 'not disabled in project or user config');
-  if (config && hooks) {
+  if (disabledAt && !managedHookPolicy(root, PLUGIN_ROOT)) add('error', 'hook feature', `disabled in ${disabledAt}`); else add('ok', 'hook feature', managedHookPolicy(root, PLUGIN_ROOT) ? 'enabled by system requirements' : 'not disabled in project or user config');
+  if (config && hooks && managedHookPolicy(root, PLUGIN_ROOT)) {
+    add('ok', 'hook approval', 'trusted by system policy on next configuration load; no user approval marker needed');
+  } else if (config && hooks) {
     const currentHash = hooksHash(hooks);
     if (recordApproval) { config.hooks ??= {}; config.hooks.approvedHash = currentHash; writeJson(files.config, config); }
     if (config.hooks?.approvedHash === currentHash) add('ok', 'hook approval', 'recorded for the current hook hash');

@@ -157,3 +157,7 @@ If the hooks changed, review and approve them again in Codex before recording ap
 | Hook approval is pending | Review and approve in `/hooks`, then record the approval. |
 | Bun is missing | Install Bun, then run `riff-codex doctor` again. |
 | The framework folder cannot be found | Restore it to its original location. See the [technical reference](technical-reference.md) before changing existing links. |
+
+## System-managed hooks on macOS
+
+For an explicitly configured personal machine, [system-managed hooks](managed-hooks.md) allow the desktop runtime to trust the RIFF hook set by policy. Installing the system TOML requires macOS administrator authorization once. RIFF detects a matching installation and removes duplicate project hooks during `init` or `resync`; ordinary project installation remains the fallback.
