@@ -745,11 +745,11 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <h3 class="subhead">How models are chosen</h3>
 <p>RIFF's routing reference matches the work to the required level of reasoning. Model availability depends on the current Codex environment. The table describes the repository's policy, not a claim about which model is running this page or your current conversation.</p>
 <div class="table-wrap"><table><thead><tr><th>Work</th><th>Repository policy</th></tr></thead><tbody>
-<tr><td>Inventory and exact extraction</td><td>Luna with low reasoning effort.</td></tr>
+<tr><td>Inventory and exact extraction</td><td>Luna with XHigh reasoning effort.</td></tr>
 <tr><td>Bounded implementation and repeatable checks</td><td>Luna with XHigh reasoning effort.</td></tr>
-<tr><td>Product decisions, synthesis, and small UI changes</td><td>Sol with Medium reasoning effort.</td></tr>
-<tr><td>Focused visual implementation</td><td>Sol with High reasoning effort.</td></tr>
-<tr><td>Major design work or exceptional architecture decisions</td><td>A bounded Sol XHigh pass; Max is reserved for an exceptional problem still unresolved after XHigh.</td></tr>
+<tr><td>Planning, product decisions, synthesis, and final judgment</td><td>Astra with Medium reasoning effort.</td></tr>
+<tr><td>Visual direction and acceptance</td><td>Astra with Medium reasoning effort.</td></tr>
+<tr><td>Major design work or exceptional architecture decisions</td><td>Astra Medium by default. Escalate to a bounded High pass for a concrete difficulty, then XHigh only if High is insufficient.</td></tr>
 </tbody></table></div>
 <p>Fast is used for Luna when the runtime exposes it. RIFF does not claim that Fast is active when it cannot select it. Read the <a href="riff/references/model-routing.md">model routing reference</a> for the full conditions.</p>
 </section>
