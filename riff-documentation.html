@@ -685,13 +685,15 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <p>Open the application in a fresh Codex session. Initialization adds RIFF entries to the project's skill picker. Choose the RIFF start, onboard, wave, or other skill there.</p>
 <p>The exact <code>$riff:...</code> names in this manual are provided by the native RIFF plugin in the checkout's <code>riff/</code> folder. <code>npm link</code> and <code>riff-codex init</code> do not enable the plugin themselves. If those names are unavailable, select the corresponding installed project skill. See the <a href="docs/installation.md#make-the-skills-available">installation guide</a> for the distinction.</p>
 <h3 class="subhead">5. Approve the automatic checks</h3>
-<p>In Codex, open <code>/hooks</code>, review RIFF's project checks, and approve them. Hooks are checks triggered automatically at certain moments while work happens. After you have actually approved them, record that approval:</p>
+<p>Run <code>riff-codex doctor</code> first. If it reports matching system-managed hooks, reload Codex configuration or restart the app; no individual hook approval is required. Otherwise, open <code>/hooks</code> in Codex, review RIFF's project checks, and approve them. Hooks are checks triggered automatically at certain moments while work happens. After you have actually approved them, record that approval:</p>
 <div class="command"><div class="command-bar"><span>In your project's Terminal</span><button class="copy-button" type="button" data-copy="doctor-code">Copy</button></div><pre id="doctor-code">riff-codex doctor --record-hooks-approved</pre><span class="copy-status" role="status"></span></div>
 <p>This records your approval and checks the setup; it cannot approve the hooks for you. Read any reported error or warning. A roadmap that has not been created yet is normal before your first start or onboard request.</p>
 <p>Now choose start or onboard in Codex, describe your project, and read the resulting plan before using <code>$riff:wave</code>.</p>
 <details><summary>Update RIFF or change preferences</summary><div>
 <p>To revisit the setup choices, run <code>riff-codex init --configure</code> in the application. To update RIFF, finish active work first, check that its permanent folder has no uncommitted edits, then run <code>git pull --ff-only</code> and <code>npm install</code> there. Run <code>riff-codex resync</code> and <code>riff-codex doctor</code> in each application afterward.</p>
-<p>If the hooks changed, review and approve them again before recording approval. All projects connected to that RIFF folder use its updated instructions. The <a href="docs/installation.md">installation guide</a> includes troubleshooting.</p>
+<p><strong>For this release, resync each connected project once.</strong> This refreshes local installation files, including the verification-report exclusion and hook configuration, while preserving its brief, roadmap and preferences.</p>
+<p>Projects linked to the same RIFF folder already read its updated files. They do not need separate Git pulls or reinstalls. Start a fresh Codex session to load the updated skills. For model-routing-only changes, a fresh session is enough when the links are intact. Another checkout, machine or separately installed plugin copy needs its own update.</p>
+<p>If doctor reports matching system-managed hooks, reload Codex configuration; individual approval is not required. Otherwise, review changed project hooks before recording approval. Restart an already-running dashboard process and reload its page to load server changes. The <a href="docs/installation.md#update-riff">update guide</a> explains the steps.</p>
 </div></details>
 </section>
 
@@ -751,6 +753,8 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <tr><td>Visual direction and acceptance</td><td>Astra with Medium reasoning effort.</td></tr>
 <tr><td>Major design work or exceptional architecture decisions</td><td>Astra Medium by default. Escalate to a bounded High pass for a concrete difficulty, then XHigh only if High is insufficient.</td></tr>
 </tbody></table></div>
+<p><strong>Astra decides; Luna executes defined work.</strong> Start with Astra Medium for planning, architecture and final review. Luna X-High handles inventories, extraction, defined code changes and checks. Return unresolved decisions to Astra Medium; escalate to High, then exceptionally X-High, only while the difficult problem needs it. Return to Medium afterward.</p>
+<p>Sol has no default role in this policy. These instructions do not automatically switch the model selected in your current conversation.</p>
 <p>Fast is used for Luna when the runtime exposes it. RIFF does not claim that Fast is active when it cannot select it. Read the <a href="riff/references/model-routing.md">model routing reference</a> for the full conditions.</p>
 </section>
 
@@ -768,6 +772,10 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <h3 class="subhead">What automatic checks do</h3>
 <p>Hooks run at specific points in the workflow. They can flag a concern for review or block a high-confidence destructive or security problem. Warnings about possible access or input issues are not, by themselves, proof of a vulnerability.</p>
 <p>RIFF avoids running a full test suite after every edit. It collects what needs checking and validates the affected behavior at the appropriate point. A credible high or critical security finding stops the phase until corrected.</p>
+<h3 class="subhead">Evidence you can inspect</h3>
+<p>Phase completion requires executed validation for the version being delivered. Required browser and smoke checks need recorded outcomes. RIFF saves local verification reports with the checks and available screenshots; a missing external check stays unverified.</p>
+<h3 class="subhead">Who handles observations</h3>
+<p>The implementing agent reviews technical warnings before finishing. It fixes confirmed issues within scope and records the evidence for resolved items or false positives. Unverified and out-of-scope items stay pending with a reason. You can inspect decisions in the dashboard, expand processed history, and reopen an item. A new occurrence reopens its group automatically. Triage never clears a phase blocker or replaces required checks.</p>
 <h3 class="subhead">If a check fails</h3>
 <ol>
 <li>Codex can correct ordinary errors while building the feature.</li>

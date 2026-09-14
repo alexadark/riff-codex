@@ -75,7 +75,7 @@ If `$riff:wave` is not recognized, use the project skill picker after reopening 
 
 ## Approve the automatic checks
 
-In Codex, open `/hooks`, review the RIFF project hooks, and approve them. “Hooks” are automatic checks that run at certain moments while Codex works.
+Run `riff-codex doctor` first. If it reports matching system-managed hooks, reload Codex configuration or restart the app; individual hook approval is not required. Otherwise, in Codex, open `/hooks`, review the RIFF project hooks, and approve them. “Hooks” are automatic checks that run at certain moments while Codex works.
 
 Only after approving them, run this in your project's Terminal:
 
@@ -137,14 +137,18 @@ git pull --ff-only
 npm install
 ```
 
-Then, in each project using RIFF:
+For this release, run the following once in each project using RIFF. It refreshes local installation files, including the verification-report exclusion and hook configuration, while preserving the project brief, roadmap and preferences:
 
 ```sh
 riff-codex resync
 riff-codex doctor
 ```
 
-If the hooks changed, review and approve them again in Codex before recording approval. If Git reports local edits or refuses the update, keep those edits and resolve the reported issue before continuing.
+Projects linked to that checkout immediately read its updated files. They do not need separate Git pulls or reinstalls. Start a fresh Codex session to load the updated skill instructions; a running conversation may retain earlier instructions. A model-routing-only update needs no resync when the links are intact.
+
+If `doctor` reports matching system-managed hooks, reload Codex configuration or restart the app; no individual approval is required. Otherwise, if the project hooks changed, review and approve them in Codex before recording approval. Restart an already-running dashboard process and reload its page when the update changes the dashboard server.
+
+A different RIFF checkout, another machine, or a separately installed plugin copy needs its own update. Resyncing a project does not update a cached plugin copy. If Git reports local edits or refuses the update, keep those edits and resolve the reported issue before continuing.
 
 ## Common setup problems
 

@@ -57,6 +57,36 @@ The brief is saved as `PROJECT.md`; the steps are saved as `ROADMAP.yaml`. The d
 
 By default, RIFF continues through ready steps automatically. You can choose **guided** mode if you prefer a pause between steps. Uploading code to GitHub or putting an application online still needs your instruction.
 
+## Which model to use
+
+Start with **Astra Medium** to plan the work and make decisions. Use **Luna X-High** for mechanical work once the task and its checks are clear.
+
+| Work | Model and effort |
+| --- | --- |
+| Planning, architecture, product decisions, synthesis and final review | Astra Medium |
+| Inventories, extraction, defined code changes, test execution and browser checks | Luna X-High |
+| A difficult decision that Medium cannot resolve | Astra High for that decision |
+| A problem still unresolved at High | Astra X-High for one bounded pass |
+
+Astra also owns visual direction and acceptance. If Luna encounters an unresolved decision, return it to Astra Medium. Return to Medium after an escalation is resolved. Sol has no default role in this policy. Fast is used for Luna only when the runtime exposes it.
+
+These are routing instructions, not an automatic change to the model selected in your current Codex conversation. See the [canonical model routing policy](riff/references/model-routing.md).
+
+## What the latest update changes
+
+- **Completion needs evidence.** A phase must pass executed checks and the required reviews for the exact version being delivered. Required browser or smoke checks need recorded results. Local verification reports make those results inspectable.
+- **Codex handles technical observations.** The implementing agent checks warnings before finishing, fixes confirmed problems within scope, and records why an item is resolved or a false positive. Unverified or out-of-scope items stay pending. The dashboard preserves the decisions and their history; a new occurrence reopens the group.
+- **Recovery preserves verified work.** Interrupted delivery can reuse evidence that still matches the candidate. Dashboard phase links support both named and numeric identifiers.
+- **System hooks avoid duplicate checks.** On a Mac with RIFF's matching system policy already installed, resync removes duplicate project hooks. Other installations keep the ordinary project-hook approval flow.
+
+## Do existing projects need a refresh?
+
+**For this update, run `riff-codex resync` and `riff-codex doctor` once in each connected project**, after its active work finishes. This updates local installation files, including the verification-report exclusion and hook configuration. It preserves the project brief, roadmap and preferences.
+
+Projects linked to the same RIFF checkout already read its updated files; they do not each need a Git pull or a reinstall. Start a fresh Codex session to load the updated skill instructions. For model-routing-only updates, that fresh session is enough when the links are intact. A separately installed plugin or another checkout must be updated separately.
+
+If a dashboard was already running, restart that dashboard process and reload the page to load server changes. See [Update RIFF](docs/installation.md#update-riff) for commands and hook approval details.
+
 ## Install
 
 You need **Git**, **Node.js 20 or newer** (which includes npm), and **Bun** for the dashboard and the full installation check. The repository is currently private, so your GitHub account needs access. The [installation guide](docs/installation.md) explains each requirement.
@@ -79,7 +109,7 @@ riff-codex init
 
 Choose your languages, how much explanation you want, and whether RIFF should continue automatically. Press Enter to accept the suggested choices.
 
-**3. Open that project in Codex.** Start a fresh Codex session so it can find the installed RIFF skills. Open `/hooks` and review and approve RIFF's automatic checks. Once you have actually approved them, record that in the project's terminal:
+**3. Open that project in Codex.** Start a fresh Codex session so it can find the installed RIFF skills. Run `riff-codex doctor`. If it reports system-managed hooks, reload Codex configuration; no individual hook approval is required. Otherwise, open `/hooks`, review and approve RIFF's automatic checks, then record that approval in the project's terminal:
 
 ```sh
 riff-codex doctor --record-hooks-approved
