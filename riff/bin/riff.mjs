@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import {
   appendFileSync,
+  openSync,
+  closeSync,
   chmodSync,
   copyFileSync,
   existsSync,
@@ -27,6 +29,7 @@ import { inside, localPath, phaseId, withLock, withFileLock } from '../lib/safet
 import { verificationEvidence, writeReport } from '../lib/report.mjs';
 import { managedHookPolicy } from '../lib/managed-hooks.mjs';
 import { selectReadyPhase } from '../lib/phase-selection.mjs';
+import { portAvailable, groupFindings } from '../lib/dashboard.mjs';
 
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -639,7 +642,7 @@ function normalizePhase(id, phase, canonical) {
     blocking_edges: normalizeStringArray(phase.blocking_edges),
     risks,
     sensitive: Boolean(phase.sensitive || SENSITIVE_WORDS.test(`${title} ${outcome} ${risks.join(' ')}`)),
-    verificationRequired: Boolean(phase.verification_required || phase.verification?.required || (Array.isArray(phase.mode) ? phase.mode : [phase.mode]).includes('HITL')),
+    verificationRequired: Boolean(phase.smoke_test === true || phase.verification_required || phase.verification?.required || (Array.isArray(phase.mode) ? phase.mode : [phase.mode]).includes('HITL')),
     status: normalizeRoadmapStatus(phase.status, id),
   };
 }
@@ -908,6 +911,30 @@ function receiptFor(root, phase, type) {
   return readJson(localPath(root, path.join(pathsFor(root).receipts, `${phaseId(phase.id)}-${type}.json`)), false);
 }
 
+function completePhase(root, state, phase, commit) {
+  const id = phase.id;
+  activePhase(state, phase);
+  const commitTree = run('git', ['rev-parse', `${commit}^{tree}`], { cwd: root });
+  if (run('git', ['rev-parse', commit], { cwd: root }) !== run('git', ['rev-parse', 'HEAD'], { cwd: root })) throw new Error('completion must refer to current HEAD');
+  requireValidation(root, phase, commitTree);
+  const functional = receiptFor(root, phase, 'functional');
+  const security = receiptFor(root, phase, 'security');
+  if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree || !evidenceValid(root, functional.evidence)) throw new Error('a passing functional receipt with intact evidence for the exact commit tree is required');
+  if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree || !evidenceValid(root, security.evidence))) throw new Error('a passing security receipt with intact evidence for the exact sensitive commit tree is required');
+  phase.commit = run('git', ['rev-parse', commit], { cwd: root });
+  phase.status = 'completed';
+  phase.reason = null;
+  phase.blockerKind = null;
+  state.lastCommit = phase.commit;
+  state.activeWave = null;
+  state.humanAction = null;
+  state.validationNeeds = [];
+  saveState(root, state);
+  event(root, 'phase_completed', { phase: id, commit: phase.commit });
+  const next = selectPhase(state);
+  process.stdout.write(`${id} completed at ${phase.commit.slice(0, 12)}.\n${next ? `Next ready: ${next.id}\n` : 'No further phase is ready.\n'}`);
+}
+
 function cmdWave(tokens) {
   const root = gitRoot();
   const action = tokens[0] ?? 'select';
@@ -945,6 +972,20 @@ function cmdWave(tokens) {
         const unfinished = state.phases.filter((item) => !TERMINAL_PHASE_STATES.has(item.status));
         process.stdout.write(unfinished.length ? 'No phase is ready. RIFF will follow dependencies automatically; inspect only recorded hard blockers.\n' : 'Roadmap complete.\n');
         return;
+      }
+      if (action === 'resume' && phase.status === 'active') {
+        const headResult = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], { cwd: root, encoding: 'utf8' });
+        const head = headResult.status === 0 ? headResult.stdout.trim() : null;
+        const tree = head ? run('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root }) : null;
+        const clean = !run('git', ['status', '--porcelain'], { cwd: root });
+        if (head && head !== phase.baseCommit && clean && phase.validation?.candidate === tree) {
+          // Complete only through the same validation/review gates as normal delivery.
+          try { completePhase(root, state, phase, 'HEAD'); return; }
+          catch (error) { process.stdout.write(`Recovery needs attention: ${error.message}\n`); }
+        }
+        const candidate = candidateTree(root);
+        const evidenceCurrent = phase.validation?.status === 'pass' && phase.validation.executed && phase.validation.candidate === candidate && evidenceValid(root, phase.validation?.evidence) && evidenceValid(root, phase.validation?.verification);
+        process.stdout.write(`Recovery: preserved working tree and index; ${evidenceCurrent ? 'validation evidence matches the staged candidate' : 'validate the candidate before delivery'}.\n`);
       }
       process.stdout.write(`${JSON.stringify(phase, null, 2)}\n`);
       return;
@@ -986,26 +1027,7 @@ function cmdWave(tokens) {
     } else if (action === 'complete') {
       const commit = optionRequired(options, 'commit');
       if (phase.status === 'completed' && phase.commit === run('git', ['rev-parse', commit], { cwd: root })) { process.stdout.write(`${id} already completed.\n`); return; }
-      activePhase(state, phase);
-      const commitTree = run('git', ['rev-parse', `${commit}^{tree}`], { cwd: root });
-      if (run('git', ['rev-parse', commit], { cwd: root }) !== run('git', ['rev-parse', 'HEAD'], { cwd: root })) throw new Error('completion must refer to current HEAD');
-      requireValidation(root, phase, commitTree);
-      const functional = receiptFor(root, phase, 'functional');
-      const security = receiptFor(root, phase, 'security');
-      if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree || !evidenceValid(root, functional.evidence)) throw new Error('a passing functional receipt with intact evidence for the exact commit tree is required');
-      if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree || !evidenceValid(root, security.evidence))) throw new Error('a passing security receipt with intact evidence for the exact sensitive commit tree is required');
-      phase.commit = run('git', ['rev-parse', commit], { cwd: root });
-      phase.status = 'completed';
-      phase.reason = null;
-      phase.blockerKind = null;
-      state.lastCommit = phase.commit;
-      state.activeWave = null;
-      state.humanAction = null;
-      state.validationNeeds = [];
-      saveState(root, state);
-      event(root, 'phase_completed', { phase: id, commit: phase.commit });
-      const next = selectPhase(state);
-      process.stdout.write(`${id} completed at ${phase.commit.slice(0, 12)}.\n${next ? `Next ready: ${next.id}\n` : 'No further phase is ready.\n'}`);
+      completePhase(root, state, phase, commit);
     } else throw new Error(`unknown wave action: ${action}`);
   } catch (error) { fail(error.message); }
 }
@@ -1139,7 +1161,7 @@ function dashboardData(root) {
       functional: functional ? { ...functional, valid: receiptValidity(root, phaseById(state, functional.phase), functional) } : null,
       security: security ? { ...security, valid: receiptValidity(root, phaseById(state, security.phase), security) } : null,
     },
-    securityFindings: state.securityFindings.slice(-10),
+    securityFindings: groupFindings(state.securityFindings).slice(-10).reverse(),
     humanAction: state.humanAction,
     events: recentEvents(root),
     model: state.model,
@@ -1161,6 +1183,7 @@ async function dashboardIdentity(url) {
       reachable: true,
       frameworkRoot: typeof data.framework_root === 'string' ? path.resolve(data.framework_root) : null,
       instance: typeof data.dashboard_instance === 'string' ? data.dashboard_instance : null,
+      pid: Number.isInteger(data.pid) ? data.pid : null,
     };
   } catch {
     return { reachable: true, frameworkRoot: null, instance: null };
@@ -1178,6 +1201,7 @@ function dashboardFingerprint(dashboardRoot) {
     }
   };
   visit(dashboardRoot);
+  visit(path.join(PLUGIN_ROOT, 'lib'));
   files.sort();
   return sha(files.map((file) => `${path.relative(dashboardRoot, file)}:${sha(readFileSync(file))}`).join('\n'));
 }
@@ -1187,7 +1211,7 @@ async function dashboardTarget(startPort, explicitPort, dashboardInstance) {
     const port = startPort + offset;
     const url = `http://127.0.0.1:${port}`;
     const identity = await dashboardIdentity(url);
-    if (!identity.reachable) return { port, url, reuse: false };
+    if (!identity.reachable && await portAvailable(port)) return { port, url, reuse: false };
     if (identity.frameworkRoot === PLUGIN_ROOT && identity.instance === dashboardInstance) return { port, url, reuse: true };
     if (explicitPort) throw new Error(`dashboard port ${port} is already served by another process`);
   }
@@ -1231,10 +1255,11 @@ async function cmdDashboard(tokens) {
   if (!Number.isInteger(requestedPort) || requestedPort < 1 || requestedPort > 65_535) fail('--port must be a valid TCP port');
   const priorUrl = typeof prior?.url === 'string' ? prior.url : `http://127.0.0.1:${requestedPort}`;
   const priorIdentity = await dashboardIdentity(priorUrl);
-  const recordedCurrentFramework = prior?.frameworkRoot === PLUGIN_ROOT && prior?.url === priorUrl;
   if (
     priorIdentity.reachable &&
-    (priorIdentity.frameworkRoot === PLUGIN_ROOT || recordedCurrentFramework) &&
+    priorIdentity.frameworkRoot === PLUGIN_ROOT &&
+    priorIdentity.instance === prior?.dashboardInstance &&
+    priorIdentity.pid === prior?.pid &&
     prior?.dashboardInstance !== dashboardInstance &&
     Number.isInteger(prior?.pid)
   ) {
@@ -1249,14 +1274,17 @@ async function cmdDashboard(tokens) {
   catch (error) { fail(error.message); }
   const { port, url, reuse } = target;
   if (!reuse) {
+    const logFile = path.join(path.dirname(processFile), 'server.log');
+    const log = openSync(logFile, 'a', 0o600);
     const child = spawn('bun', ['run', 'server.ts'], {
       cwd: dashboardRoot,
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', log, log],
       env: { ...process.env, PORT: String(port), RIFF_DASHBOARD_INSTANCE: dashboardInstance },
     });
+    closeSync(log);
     child.unref();
-    if (!(await waitForDashboard(url, dashboardInstance))) fail(`dashboard failed to start at ${url}`);
+    if (!(await waitForDashboard(url, dashboardInstance))) fail(`dashboard failed to start at ${url}; inspect ${logFile}`);
     writeJson(processFile, { version: 1, pid: child.pid, port, url, dashboardRoot, frameworkRoot: PLUGIN_ROOT, dashboardInstance, startedAt: now() });
   } else if (prior?.url !== url || prior?.frameworkRoot !== PLUGIN_ROOT || prior?.dashboardInstance !== dashboardInstance) {
     writeJson(processFile, { version: 1, pid: prior?.pid ?? null, port, url, dashboardRoot, frameworkRoot: PLUGIN_ROOT, dashboardInstance, startedAt: prior?.startedAt ?? now() });
@@ -1313,7 +1341,7 @@ function orphanFinding(root, file) {
   if (!added) return null;
   const moduleName = base.replace(/\.[^.]+$/, '');
   try {
-    const references = run('git', ['grep', '-l', `from.*${moduleName}`, '--', '*.js', '*.jsx', '*.ts', '*.tsx'], { cwd: root })
+    const references = run('git', ['grep', '-l', '-F', moduleName, '--', '*.js', '*.jsx', '*.ts', '*.tsx', '*.mjs', '*.cjs', '*.mts', '*.cts'], { cwd: root })
       .split('\n').filter((entry) => entry && entry !== relative);
     if (references.length) return null;
   } catch { /* no references */ }

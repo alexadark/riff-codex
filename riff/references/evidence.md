@@ -36,6 +36,8 @@ Use `pass`, `fail` or `unverified` for each observed step. Never fabricate a scr
 
 Existing consumers should run `resync` to install the new local report exclusion; this preserves their project artifacts and preferences.
 
+The shared roadmap flag `smoke_test: true` also requires passing verification evidence. A smoke test exercises the phase's essential user outcome, such as opening a phase, completing a form or reaching a confirmation. Opening a browser alone is insufficient. Reuse an existing observed check when it covers that outcome for the same candidate and target; do not rerun it merely to produce a second label or report. Record the actual target URL and whether remote integrations used real or sandbox services. A local or sandbox success does not establish deployed production behavior. This flag does not install monitoring or force browser checks on unrelated nonvisual phases.
+
 Reports embed the image bytes, remain readable without a server and appear in the dashboard UX runs with screenshot and report links. Completion verifies the saved report hash. Link the actual HTML in the final response. Do not require screenshots for nonvisual unit tests; their command results belong in the same report.
 
 ## Fresh review artifact
@@ -63,3 +65,5 @@ Record it with `wave review phase-1 --type functional --status pass --summary "O
 For a resolved incident, `incident log --evidence FILE` appends once per id to `INCIDENTS.md`. Its JSON fields are `id`, `title`, `severity` (`low`, `medium`, `high`, `critical`), `impact`, `rootCause`, and `prevention`. Record confirmed facts and any still-unknown cause honestly. Review recurring causes directly from this ledger when requested; do not create an automatic audit cadence.
 
 `finish --check` verifies terminal phases, preserved validation and reviews, commits reachable from HEAD, and a clean worktree. It reports readiness for an explicitly authorized Git finalization; it never pushes, merges or deploys.
+
+`wave resume` preserves the worktree and index after interruption. If HEAD already contains the validated candidate, the tree is clean and the same passing review/evidence gates hold, it completes that active phase without another commit or test run. Otherwise it reports what can be reused and leaves the phase active. Changed or missing evidence cannot complete recovery. No commit trailers, PR metadata dossier, reset, stash or automatic publication is required.

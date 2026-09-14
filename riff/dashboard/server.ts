@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { Hono } from "hono";
 import { selectReadyPhase } from "../lib/phase-selection.mjs";
+import { groupFindings } from "../lib/dashboard.mjs";
 import { streamSSE } from "hono/streaming";
 import {
   addProject,
@@ -269,7 +270,7 @@ function codexOperationalState(projectRoot: string): Record<string, unknown> | n
       last_commit: state.lastCommit ?? null,
       last_validation: state.lastValidation ?? null,
       reviews: state.reviews ?? { functional: null, security: null },
-      security_findings: Array.isArray(state.securityFindings) ? state.securityFindings.slice(-10) : [],
+      security_findings: groupFindings(Array.isArray(state.securityFindings) ? state.securityFindings : []).slice(-10).reverse(),
       human_action: state.humanAction ?? null,
       model: state.model ?? null,
       next_ready: nextReady ? `${nextReady.id} - ${nextReady.title}` : null,
@@ -341,6 +342,7 @@ app.get("/api/instance", (c) =>
   c.json({
     framework_root: RESOLVED_FRAMEWORK_ROOT,
     dashboard_instance: DASHBOARD_INSTANCE,
+    pid: process.pid,
   }),
 );
 

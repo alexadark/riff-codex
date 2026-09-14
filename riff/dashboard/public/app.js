@@ -17,6 +17,7 @@
     currentProjectSlug: null,
     currentPhaseId: null,
     currentPhase: null,
+    phaseRequest: 0,
     projectTab: "phases",
     viewLevel: null,             // null → use profile default; else override
     activeTab: "explanation",
@@ -291,14 +292,18 @@
   }
 
   async function loadPhase(slug, id, level) {
+    const request = ++state.phaseRequest;
     state.currentPhase = null;
     renderDetail();
     try {
       const url = level
         ? `/api/projects/${encodeURIComponent(slug)}/phase/${encodeURIComponent(id)}?level=${encodeURIComponent(level)}`
         : `/api/projects/${encodeURIComponent(slug)}/phase/${encodeURIComponent(id)}`;
-      state.currentPhase = await api(url);
+      const phase = await api(url);
+      if (request !== state.phaseRequest || state.currentProjectSlug !== slug || String(state.currentPhaseId) !== String(id)) return;
+      state.currentPhase = phase;
     } catch (e) {
+      if (request !== state.phaseRequest || state.currentProjectSlug !== slug || String(state.currentPhaseId) !== String(id)) return;
       state.currentPhase = { id, error: e.message };
     }
     renderDetail();
@@ -747,7 +752,8 @@
         finding.recommended_fix && `Recommended fix: ${finding.recommended_fix}`,
         finding.decision_reason && `RIFF decision: ${finding.decision_reason}`,
       ].filter(Boolean).join("\n");
-      root.appendChild(item(`Security ${finding.severity || "finding"}`, explanation, "status-warning"));
+      const occurrences = finding.occurrences > 1 ? ` · ${finding.occurrences} occurrences` : "";
+      root.appendChild(item(`Security ${finding.severity || "finding"}${occurrences}`, explanation, "status-warning"));
     }
     if (events.length) {
       root.appendChild(el("details", { class: "status-events" }, [
@@ -1148,6 +1154,15 @@
   }
 
   function renderDetail() {
+    if (state.currentPhase?.error) {
+      $("#detail-title").textContent = "Could not load phase";
+      clear($("#detail-tabs"));
+      clear($("#detail-actions"));
+      clear($("#detail-badges"));
+      clear($("#detail-body"));
+      $("#detail-body").appendChild(el("p", { role: "alert" }, state.currentPhase.error));
+      return;
+    }
     if (!state.currentPhase) {
       $("#detail-title").textContent = "Loading…";
       clear($("#detail-badges"));
@@ -1176,7 +1191,7 @@
       view: "project",
       slug: decodeURIComponent(m[1]),
       projectTab: m[2] ? "uxruns" : "phases",
-      phaseId: m[3] ? Number(decodeURIComponent(m[3])) : null,
+      phaseId: m[3] ? decodeURIComponent(m[3]) : null,
     };
   }
 
@@ -1275,20 +1290,25 @@
       renderProject();
     }
 
-    if (route.phaseId != null && Number.isFinite(route.phaseId)) {
+    if (route.phaseId != null && route.phaseId.length > 0) {
       state.projectTab = "phases";
       state.currentPhaseId = route.phaseId;
       $("#detail-view").classList.remove("hidden");
       document.body.style.overflow = "hidden";
       renderDetail();
+      $("#back-btn").focus();
       loadPhase(state.currentProjectSlug, route.phaseId);
     } else {
+      const closedPhaseId = state.currentPhaseId;
       state.currentPhaseId = null;
       state.currentPhase = null;
       state.viewLevel = null;
       state.activeTab = "explanation";
       $("#detail-view").classList.add("hidden");
       document.body.style.overflow = "";
+      if (closedPhaseId != null) {
+        document.querySelector(`[data-id="${CSS.escape(String(closedPhaseId))}"]`)?.focus();
+      }
     }
   }
 
@@ -1569,6 +1589,13 @@
     });
 
     document.addEventListener("keydown", (e) => {
+      if (e.key === "Tab" && !$("#detail-view").classList.contains("hidden")) {
+        const controls = [...$("#detail-view").querySelectorAll('button:not(:disabled), a[href], [tabindex="0"], summary')].filter((node) => node.getClientRects().length);
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
       if (e.key !== "Escape") return;
       if (!$("#confirm-modal").classList.contains("hidden")) {
         closeConfirm();

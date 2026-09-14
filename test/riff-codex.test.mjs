@@ -565,3 +565,43 @@ test('production promotion requires reviews and incident capture remains append-
   execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Production records'], { cwd: root });
   assert.match(runCli(root, 'finish', '--check'), /Ready for explicit Git finalization/);
 });
+
+test('resume reconciles an interrupted verified commit once and preserves dirty work', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [fixturePhase('recover')]);
+  runCli(root, 'wave', 'activate', 'recover');
+  execFileSync('git', ['add', '--', 'ROADMAP.yaml'], { cwd: root });
+  runCli(root, 'wave', 'validate', 'recover', '--run', '--command', '["node","-e","process.exit(0)"]', '--paths', '["ROADMAP.yaml"]');
+  const candidate = execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
+  runCli(root, 'wave', 'review', 'recover', '--type', 'functional', '--status', 'pass', '--summary', 'Observed fixture', '--evidence', proofFile(root, 'functional', candidate));
+  execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Interrupted delivery'], { cwd: root });
+  const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
+  const readState = () => JSON.parse(readFileSync(path.join(root, '.riff-codex-state/state.json')));
+  writeFileSync(path.join(root, 'README.md'), 'unfinished work\n');
+  assert.match(runCli(root, 'wave', 'resume'), /preserved working tree/);
+  assert.equal(readState().phases[0].status, 'active');
+  assert.equal(readFileSync(path.join(root, 'README.md'), 'utf8'), 'unfinished work\n');
+  writeFileSync(path.join(root, 'README.md'), '# Fixture\n');
+  const report = path.join(root, readState().phases[0].validation.verification.path);
+  const bytes = readFileSync(report);
+  writeFileSync(report, 'tampered');
+  assert.match(runCli(root, 'wave', 'resume'), /report is missing or changed/);
+  assert.equal(readState().phases[0].status, 'active');
+  writeFileSync(report, bytes);
+  assert.match(runCli(root, 'wave', 'resume'), /recover completed/);
+  assert.match(runCli(root, 'wave', 'resume'), /Roadmap complete/);
+  assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }), commit);
+});
+
+test('legacy smoke requirement uses existing journey evidence instead of accepting command-only checks', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [{ ...fixturePhase('smoke'), smoke_test: true }]);
+  runCli(root, 'wave', 'activate', 'smoke');
+  execFileSync('git', ['add', '--', 'ROADMAP.yaml'], { cwd: root });
+  const args = ['wave', 'validate', 'smoke', '--run', '--command', '["node","-e","process.exit(0)"]', '--paths', '["ROADMAP.yaml"]'];
+  assert.match(runCliFailure(root, ...args), /Validation fail/);
+  const candidate = execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
+  const evidence = path.join(root, '.riff-codex-state/smoke.json');
+  writeJson(evidence, { version: 1, candidate, steps: [{ name: 'Essential journey', kind: 'browser', status: 'pass', observed: 'Confirmation visible after submitting', url: 'http://localhost:3000' }] });
+  assert.match(runCli(root, ...args, '--verification', evidence), /Validation pass/);
+});
