@@ -29,7 +29,7 @@ import { inside, localPath, phaseId, withLock, withFileLock } from '../lib/safet
 import { verificationEvidence, writeReport } from '../lib/report.mjs';
 import { managedHookPolicy } from '../lib/managed-hooks.mjs';
 import { selectReadyPhase } from '../lib/phase-selection.mjs';
-import { portAvailable, groupFindings } from '../lib/dashboard.mjs';
+import { portAvailable, observationList, reviewObservation } from '../lib/dashboard.mjs';
 
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -1161,7 +1161,7 @@ function dashboardData(root) {
       functional: functional ? { ...functional, valid: receiptValidity(root, phaseById(state, functional.phase), functional) } : null,
       security: security ? { ...security, valid: receiptValidity(root, phaseById(state, security.phase), security) } : null,
     },
-    securityFindings: groupFindings(state.securityFindings).reverse(),
+    securityFindings: observationList(state),
     humanAction: state.humanAction,
     events: recentEvents(root),
     model: state.model,
@@ -1290,7 +1290,7 @@ async function cmdDashboard(tokens) {
     writeJson(processFile, { version: 1, pid: prior?.pid ?? null, port, url, dashboardRoot, frameworkRoot: PLUGIN_ROOT, dashboardInstance, startedAt: prior?.startedAt ?? now() });
   }
   if (!options.no_open && process.platform === 'darwin') spawnSync('open', [url], { stdio: 'ignore' });
-  process.stdout.write(`RIFF dashboard: ${url}\nShared, read-only, and independent from Codex or Claude.\n`);
+  process.stdout.write(`RIFF dashboard: ${url}\nShared dashboard with observation triage, independent from Codex or Claude.\n`);
 }
 
 function changedFiles(root, payload) {
@@ -1606,7 +1606,7 @@ function cmdIncident(tokens) {
 }
 
 function help() {
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -1621,6 +1621,21 @@ else if (['report', 'promote', 'incident', 'finish'].includes(command)) {
   try {
     const action = () => ({ report: cmdReport, promote: cmdPromote, incident: cmdIncident, finish: cmdFinish })[command](tokens);
     if (command === 'finish') action(); else withLock(gitRoot(), action);
+  } catch (error) { fail(error.message); }
+}
+else if (command === 'observations') {
+  try {
+    const root = gitRoot();
+    if (tokens[0] === 'review') withLock(root, () => {
+      const state = readState(root);
+      const options = parseOptions(tokens.slice(1));
+      const review = reviewObservation(state, options);
+      saveState(root, state);
+      event(root, 'observation_reviewed', review);
+      process.stdout.write(JSON.stringify(review) + '\n');
+    });
+    else if (!tokens.length || tokens[0] === 'list') process.stdout.write(JSON.stringify(observationList(readState(root))) + '\n');
+    else throw new Error('Use observations list or observations review --id ID --revision REV --status pending|resolved|false_positive --note REASON');
   } catch (error) { fail(error.message); }
 }
 else if (command === 'wave') {

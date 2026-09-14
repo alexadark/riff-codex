@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { Hono } from "hono";
 import { selectReadyPhase } from "../lib/phase-selection.mjs";
-import { groupFindings } from "../lib/dashboard.mjs";
+import { observationList } from "../lib/dashboard.mjs";
 import { streamSSE } from "hono/streaming";
 import {
   addProject,
@@ -270,7 +271,7 @@ function codexOperationalState(projectRoot: string): Record<string, unknown> | n
       last_commit: state.lastCommit ?? null,
       last_validation: state.lastValidation ?? null,
       reviews: state.reviews ?? { functional: null, security: null },
-      security_findings: groupFindings(Array.isArray(state.securityFindings) ? state.securityFindings : []).reverse(),
+      security_findings: observationList(state),
       human_action: state.humanAction ?? null,
       model: state.model ?? null,
       next_ready: nextReady ? `${nextReady.id} - ${nextReady.title}` : null,
@@ -533,6 +534,25 @@ app.get("/api/projects/:slug/uxruns/:runId/artifact", (c) => {
     return c.text("not found", 404);
   }
   return new Response(Bun.file(candidate));
+});
+
+/** Observation triage is the only project-state write exposed by the dashboard. */
+app.post("/api/projects/:slug/observations/:id", async (c) => {
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(new URL(c.req.url).hostname) || c.req.header("origin") !== new URL(c.req.url).origin || !c.req.header("content-type")?.startsWith("application/json")) {
+    return c.json({ error: "Same-origin JSON request required" }, 403);
+  }
+  const ctx = contexts.get(c.req.param("slug"));
+  if (!ctx || !existsSync(join(ctx.root, ".riff-codex-state", "state.json"))) return c.json({ error: "RIFF Codex project not found" }, 404);
+  try {
+    const body = await c.req.json();
+    if (![body.status, body.revision, body.note].every((value) => typeof value === "string")) return c.json({ error: "Status, revision and reason are required" }, 400);
+    const result = execFileSync("node", [join(RESOLVED_FRAMEWORK_ROOT, "bin", "riff.mjs"), "observations", "review",
+      "--id", c.req.param("id"), "--revision", body.revision, "--status", body.status, "--note", body.note],
+      { cwd: ctx.root, encoding: "utf8", timeout: 10000, maxBuffer: 65536 });
+    return c.json(JSON.parse(result));
+  } catch (error: any) {
+    return c.json({ error: String(error.stderr || error.message).trim() }, 400);
+  }
 });
 
 /** GET /api/projects/:slug/phase/:id — full detail for one phase. */

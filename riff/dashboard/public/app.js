@@ -707,6 +707,37 @@
     }
   }
 
+  function observationForm(finding) {
+    const slug = state.currentProjectSlug;
+    const status = el("select", { id: `status-${finding.id}` }, [
+      el("option", { value: "pending" }, "To review"),
+      el("option", { value: "resolved" }, "Resolved"),
+      el("option", { value: "false_positive" }, "False positive"),
+    ]);
+    status.value = finding.status;
+    const note = el("textarea", { id: `note-${finding.id}`, required: true, minlength: "3", maxlength: "2000", rows: "2", placeholder: "Why is it resolved or a false positive?" });
+    note.value = finding.review?.note || "";
+    const button = el("button", { type: "submit", class: "btn" }, "Save decision");
+    const message = el("p", { role: "status" });
+    const form = el("form", { class: "observation-form", onSubmit: async (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      message.textContent = "Saving…";
+      try {
+        await api(`/api/projects/${encodeURIComponent(slug)}/observations/${finding.id}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: status.value, note: note.value, revision: finding.revision }),
+        });
+        await loadProject(slug);
+      } catch (error) { message.textContent = error.message; button.disabled = false; }
+    } }, [
+      finding.review ? el("p", { class: "small" }, `${finding.reopened ? "New occurrence since the previous decision. " : ""}Previous decision: ${({ pending: "To review", resolved: "Resolved", false_positive: "False positive" })[finding.review.status]} · ${finding.review.at} · ${finding.review.note}`) : null,
+      el("label", { for: status.id }, "Status"), status,
+      el("label", { for: note.id }, "Reason / verification"), note, button, message,
+    ]);
+    return form;
+  }
+
   function renderOperationalSummary() {
     const root = $("#project-status");
     clear(root);
@@ -746,7 +777,8 @@
     }
     const sections = new Map();
     for (const finding of findings) {
-      const severe = ["HIGH", "CRITICAL"].includes(finding.severity);
+      const treated = finding.status !== "pending";
+      const severe = !treated && ["HIGH", "CRITICAL"].includes(finding.severity);
       const code = finding.category === "code";
       const occurrences = finding.occurrences > 1 ? ` · ${finding.occurrences} occurrences` : "";
       const explanation = [
@@ -757,20 +789,23 @@
         finding.lastSeen && `Last recorded: ${finding.lastSeen}`,
       ].filter(Boolean).join("\n");
       if (severe) {
-        root.appendChild(item(`Security ${finding.severity}${occurrences}`, [finding.summary, explanation].join("\n"), "status-warning"));
+        const alert = item(`Security ${finding.severity}${occurrences}`, [finding.summary, explanation].join("\n"), "status-warning");
+        alert.appendChild(observationForm(finding));
+        root.appendChild(alert);
         continue;
       }
-      const key = code ? "code" : "security";
+      const key = treated ? "history" : code ? "code" : "security";
       if (!sections.has(key)) sections.set(key, []);
       sections.get(key).push(el("details", { class: "status-observation" }, [
         el("summary", null, `${finding.summary || "Recorded observation"}${occurrences}`),
         el("div", { class: "status-value" }, explanation),
+        observationForm(finding),
       ]));
     }
     for (const [category, observations] of sections) {
       root.appendChild(el("details", { class: "status-events status-observations", dataset: { category } }, [
-        el("summary", null, category === "code"
-          ? `Code observations · ${observations.length} grouped`
+        el("summary", null, category === "history" ? `Processed observations · ${observations.length}` : category === "code"
+          ? `Code observations to review · ${observations.length} grouped`
           : `Security observations to review · ${observations.length} grouped`),
         el("p", { class: "fg-muted small" }, "Recorded checks, not a current scan. Repeated observations are grouped; details remain available."),
         ...observations,

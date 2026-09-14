@@ -626,3 +626,24 @@ test('route-shaped test fixtures are not treated as production endpoints', () =>
   writeFileSync(route, 'const handler = () => request.json();\n');
   assert.match(invokeHook(root, 'post-tool', { command: `*** Update File: ${route}` }, 'apply_patch').hookSpecificOutput.additionalContext, /without visible schema validation/);
 });
+
+test('observation decisions persist, reject stale reviews and reopen on a new occurrence without changing gates', () => {
+  const root = lifecycleFixture();
+  const stateFile = path.join(root, '.riff-codex-state/state.json');
+  const state = JSON.parse(readFileSync(stateFile));
+  state.securityFindings = [{ kind: 'orphan_file', severity: 'LOW', summary: 'Diagnostic', reviewedAt: '2026-09-14' }];
+  state.humanAction = { reason: 'Unrelated blocker' };
+  writeJson(stateFile, state);
+  const finding = JSON.parse(runCli(root, 'observations', 'list'))[0];
+  const args = ['observations', 'review', '--id', finding.id, '--revision', finding.revision];
+  assert.match(runCliFailure(root, ...args, '--status', 'resolved', '--note', ''), /reason/);
+  runCli(root, ...args, '--status', 'false_positive', '--note', 'Executed diagnostic, not an application module');
+  assert.equal(JSON.parse(runCli(root, 'observations', 'list'))[0].status, 'false_positive');
+  const saved = JSON.parse(readFileSync(stateFile));
+  assert.deepEqual(saved.humanAction, state.humanAction);
+  assert.equal(saved.observationHistory.length, 1);
+  saved.securityFindings.push({ ...state.securityFindings[0], reviewedAt: '2026-09-15' });
+  writeJson(stateFile, saved);
+  assert.equal(JSON.parse(runCli(root, 'observations', 'list'))[0].status, 'pending');
+  assert.match(runCliFailure(root, ...args, '--status', 'resolved', '--note', 'Old review'), /changed; reload/);
+});

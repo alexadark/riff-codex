@@ -1708,3 +1708,7 @@ button {
 .status-observation .status-value {
   padding: 0 0 12px 16px;
 }
+
+.observation-form { display: grid; gap: 8px; padding: 12px 0; }
+.observation-form select, .observation-form textarea { width: 100%; min-height: 44px; padding: 8px; color: var(--fg); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px; font: inherit; }
+.observation-form button { justify-self: start; min-height: 44px; }
