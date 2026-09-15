@@ -1,4 +1,4 @@
 interface:
   display_name: "RIFF Start"
-  short_description: "Shape a product and vertical roadmap"
+  short_description: "Shape a product and discovery dossier"
   default_prompt: "Use $start through $riff:start to shape this product."

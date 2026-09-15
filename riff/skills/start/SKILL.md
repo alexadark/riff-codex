@@ -1,25 +1,42 @@
 ---
 name: start
-description: Shape a new product with repository-aware discovery and a vertical RIFF roadmap. Use when the user invokes $riff:start or asks RIFF to define a new project before building.
+description: Shape a new product with repository-aware discovery and a vertical RIFF roadmap. Use when the user invokes $riff:start or asks RIFF to define a project before building.
 ---
 
 # Start RIFF discovery
 
-For production discovery, read `.riff-codex/references/taste.md` and establish the applicable project taste alongside the product artifacts. Reuse existing conventions and confirmed stack references; for a UI product, include the frontend direction and design-skill routing. Keep scratch discovery lightweight.
+Use [the discovery contract](../../references/discovery.md) for scope, dossier, design handoff, readiness, review, and stop rules. Use [project framing](../../references/project-framing.md) for the product synthesis that belongs in `PROJECT.md`.
 
-Use Astra Medium for planning and product judgment. Follow `.riff-codex/references/model-routing.md` for execution and escalation; delegate only when it adds value.
+## Scope first
 
-1. Confirm `node .riff-codex/bin/riff.mjs doctor` can read the installation. Read the configured autonomy mode. Inspect the repository, documentation, configuration, and environment for facts before asking the user anything. A Luna XHigh read-only inventory may extract facts mechanically.
-2. Classify the scope before choosing the depth of discovery. For a project with several dependent outcomes, multiple user roles or system boundaries, a multi-system integration, or an explicit large-project request, also read `.riff-codex/references/project-framing.md`. Keep a small application with one clear outcome and bounded APEX or quick work on the existing concise path.
-3. Maintain four distinct sets: verified facts, user preferences, explicit hypotheses, and open questions. Establish a small shared product vocabulary. For a large project, capture user stories with observable criteria, the relevant entities, relationships, constraints and rights, architecture and integrations with motivated decisions, and a phase map connecting outcomes to stories. Reuse existing answers and project documents; do not repeat a resolved interview branch.
-4. In default `loop` mode, answer currently decidable product and technical questions with the smallest reversible option consistent with the request, repository evidence, existing behavior, data preservation, least privilege, and minimal external effects. Record each assumption and continue without asking. In `guided` mode, ask only a small group of currently decidable product questions and give one clear recommendation with its reason for every question.
-5. Do not ask for technical details Codex can determine. Stop interviewing once remaining uncertainty belongs to later phases.
-6. Propose product outcomes and the simplest fitting architecture. Define only real blocking edges. Build a roadmap of demonstrable vertical tracer bullets, explicit P0-P3 priorities, dependencies, risks, sensitive boundaries, and explicit exclusions. Justify priority from urgency and consequence; do not assign the same default to every phase.
-7. In `loop`, freeze the conservative discovery summary without a confirmation round. In `guided`, present it and ask the user to confirm or correct it.
-8. Write `PROJECT.md` and `ROADMAP.yaml` after the mode-specific boundary above. For a new roadmap, use the Codex schema in `.riff-codex/references/operating-contract.md`. If either shared artifact already exists, preserve its content and preserve the roadmap's representation, comments, key order, and unknown fields with targeted edits only. Do not predict exact files, exhaustive tests, or detailed phase plans.
-9. Run `node .riff-codex/bin/riff.mjs wave sync`, check that both artifacts parse, then write each phase's `EXPLAIN.simple.md` projection using `.riff-codex/references/dashboard.md`.
-10. Stop. Do not start implementation unless the user separately invokes `$riff:wave`. Do not publish GitHub issues unless the user separately invokes `$riff:issue`.
+Classify the request before choosing the depth of discovery:
 
-If a complex decision remains unresolved at Astra Medium, escalate to a bounded Astra High review, then Astra XHigh only if High is insufficient. Record the concrete reason.
+- An explicit request to plan a full application, or a new application intended for production, requires a complete scoped-version dossier.
+- Scratch work, a bounded spike, an existing small application with one clear outcome, and `$riff:quick` remain on the light path unless the user explicitly asks for a full application plan.
+- A risk probe may use a small isolated prototype. It must not become product implementation or a hidden phase.
 
-In `loop`, stop only for missing credentials or external access, impossible third-party verification, an unidentifiable destructive target, or failed RIFF validation. Never create `awaiting_human` for a product or technical decision. `guided` retains its confirmation behavior.
+Run `node .riff-codex/bin/riff.mjs doctor`. Inspect the configured autonomy mode, the repository, existing `PROJECT.md` and `ROADMAP.yaml`, relevant documentation, and project taste before asking anything. For a production or complete dossier, read `.riff-codex/references/taste.md` and establish or conservatively merge the project-owned `taste.md`; for a UI product, include the applicable frontend direction and design-skill routing. Scratch and light work reads existing taste without bootstrapping a production file set. Read only the taste and stack topics that apply. Inspect existing supporting specifications and preserve them. Determine technical details from the repository, approved template, taste, and user stack; follow the mode boundary below for product questions.
+
+Respect the configured mode. In `loop`, resolve ordinary product and technical ambiguity with the smallest reversible choice, record assumptions, and freeze the conservative summary without a confirmation round. In `guided`, present the summary and ask the user to confirm or correct it before freezing shared artifacts. Loop mode never creates `awaiting_human` for a product or technical decision; only the hard blockers in the discovery and operating contracts may stop it.
+
+## Full dossier
+
+For the complete path, produce the whole version plan before any implementation wave. `PROJECT.md` is the product synthesis and index. `ROADMAP.yaml` is the canonical phase list. Supporting `docs/specs/`, `docs/diagrams/`, or existing project paths may hold detail and must be linked rather than duplicated. The dossier must include:
+
+- numbered stories and observable criteria with stable IDs, and a mapping from stories and criteria to phases;
+- journeys, screens, states, responsive ASCII wireframes, and error, empty, recovery, privacy, authorization, and audit behavior where applicable;
+- the data model with fields, types, keys, constraints, index reasons, relationships, lifecycle, rights, and tenancy boundaries;
+- the smallest architecture and each API or integration contract, with decisions justified by repository, template, stack, taste, and user precedence;
+- risks and bounded probes, verification evidence, explicit exclusions, assumptions, and later fog of war;
+- real Mermaid `.mmd` source files for architecture, the ER model when data exists, critical-path sequences, and state diagrams when applicable;
+- a design handoff package, or a declared external design dependency, mapped to screens, tokens, stories, and criteria.
+
+Every area either has useful linked files or an explicit `not_applicable` reason. Never fill a section with placeholders. If an external reference is promised but not available, continue independent product planning, record the missing artifact as an external dependency, and do not invent or silently substitute a design. Create native RIFF design only when the user authorizes it.
+
+## Freeze and hand off
+
+Both paths write or conservatively update `PROJECT.md` and `ROADMAP.yaml` after the applicable mode boundary. Run `node .riff-codex/bin/riff.mjs wave sync`, check that both artifacts parse, and write each phase's `EXPLAIN.simple.md` projection using `.riff-codex/references/dashboard.md`. Only the complete path creates `docs/specs/readiness.json` with the version 1 area manifest described in the discovery reference, runs the discovery snapshot, obtains an independent review of the complete dossier, applies corrections automatically, and runs the discovery check again. Review evidence is an attestation of the review, not proof that its claims are true.
+
+The complete path stops after the dossier and readiness check. The light path stops after its shared-artifact sync and projections. Neither path activates or starts a wave from `start`; the user must separately invoke `$riff:wave`. Do not publish issues or external artifacts unless separately requested.
+
+Use Astra Medium for product judgment and final acceptance, following `.riff-codex/references/model-routing.md`. Luna XHigh may perform a bounded mechanical inventory or validation with a clear contract. Keep native compaction, do not invoke nested `codex exec`, and preserve unrelated changes.

@@ -13,7 +13,11 @@ $riff:start I want a recipe app for myself. I need to save a recipe,
 find it later, and see the ingredients when I cook.
 ```
 
-RIFF prepares two documents: `PROJECT.md` describes the product, and `ROADMAP.yaml` lists small useful steps. A step is also called a “phase.” For example, “Save a recipe and find it again” is a step you can actually try.
+For a production application, RIFF prepares the committed version in depth. `PROJECT.md` indexes the product dossier: stories and acceptance criteria, journeys, ASCII wireframes, detailed data model and rights, architecture/integrations, Mermaid source files, decisions grounded in project taste and stack, risk probes and the verification strategy. `ROADMAP.yaml` links small useful phases to the stories they deliver. Future versions remain less detailed. Scratch exploration and small independent changes stay lightweight.
+
+You can provide a stack, a template repository and design references. RIFF uses those sources and existing conventions to make technical decisions. If another model will produce the design, RIFF prepares a handoff from the wireframes, then integrates the actual reference and tokens before implementation. It can create the design itself when you authorize that role. No implementation phase begins while a required external design is missing. Nonvisual applications explain why the visual sections do not apply.
+
+An independent reviewer checks the finished dossier and RIFF corrects defects before calling it ready. Its manifest, `docs/specs/readiness.json`, binds the declared files to that review. The agent handles the mechanical checks. Existing applications are not enrolled just by refreshing RIFF.
 
 In default loop mode, RIFF makes conservative choices and records its assumptions. In guided mode, it asks about the current product decisions. Starting a project prepares the plan; it does not launch implementation.
 
@@ -35,6 +39,8 @@ RIFF inspects the app before planning changes. It uses any existing project brie
 ## Let it work, then see what changed
 
 A wave chooses work whose prerequisites are complete. Codex builds it, checks it, gets a review, and saves a local Git commit before recording completion.
+
+There is one active phase at a time. Substantial independent work inside it may run in parallel, with separate worktrees for writers. Codex checks the integrated result, preserves existing behavior and reuses suitable components. It handles dashboard observations at each phase and performs whole-version verification after the last phase. You do not need to act as the tester or approve every phase in loop mode.
 
 - **Loop**, the default: continue to the next ready step automatically.
 - **Guided**: pause between steps so you can direct what happens next.
@@ -70,6 +76,8 @@ $riff:wave
 ```
 
 RIFF uses the saved progress to resume active work or select the next ready step. A recorded access or verification blocker must be resolved first. You do not need to rewrite the plan or mark progress yourself.
+
+Each phase keeps a checkpoint with decisions, evidence pointers and the next action. Codex continues with its native compaction; RIFF does not create a new session per phase or run an external relaunch loop. If Codex itself stops, return with `$riff:wave`. A checkpoint is checked against current files before its evidence is reused.
 
 ## Make a small change
 

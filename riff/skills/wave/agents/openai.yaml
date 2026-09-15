@@ -1,4 +1,4 @@
 interface:
   display_name: "RIFF Wave"
-  short_description: "Build the next vertical roadmap outcome"
+  short_description: "Execute, review and verify autonomous phases"
   default_prompt: "Use $wave through $riff:wave to continue the roadmap."

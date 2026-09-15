@@ -30,6 +30,7 @@ import { verificationEvidence, writeReport } from '../lib/report.mjs';
 import { managedHookPolicy } from '../lib/managed-hooks.mjs';
 import { selectReadyPhase } from '../lib/phase-selection.mjs';
 import { portAvailable, observationList, reviewObservation } from '../lib/dashboard.mjs';
+import { DISCOVERY_MANIFEST, discoverySnapshot } from '../lib/delivery-contract.mjs';
 
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -131,6 +132,8 @@ function baseState() {
     humanAction: null,
     validationNeeds: [],
     model: null,
+    discovery: null,
+    deliveryReview: null,
     updatedAt: null,
   };
 }
@@ -783,6 +786,40 @@ function evidenceValid(root, evidence) {
   catch { return false; }
 }
 
+function discoveryEnrolled(root, state) {
+  if (state.discovery) return true;
+  try { return existsSync(localPath(root, DISCOVERY_MANIFEST)); }
+  catch { return true; }
+}
+
+function storedReviewValid(root, receipt, type, candidate) {
+  if (!receipt || receipt.candidate !== candidate || receipt.status !== 'pass' || receipt.type !== type || !evidenceValid(root, receipt.evidence)) return false;
+  try {
+    const artifact = JSON.parse(readFileSync(localPath(root, receipt.evidence.path), 'utf8'));
+    return artifact.version === 1 && artifact.candidate === candidate && artifact.type === type && artifact.status === 'pass'
+      && typeof artifact.reviewer?.id === 'string' && artifact.reviewer.id.trim() && artifact.reviewer.independent === true
+      && Array.isArray(artifact.evidence) && artifact.evidence.length > 0 && artifact.evidence.every((item) => typeof item === 'string' && item.trim())
+      && Array.isArray(artifact.findings) && !artifact.findings.some((finding) => ['HIGH', 'CRITICAL'].includes(String(finding.severity).toUpperCase()));
+  } catch { return false; }
+}
+
+function discoveryGate(root, state) {
+  if (!discoveryEnrolled(root, state)) return null;
+  let snapshot;
+  try { snapshot = discoverySnapshot(root); }
+  catch (error) { throw new Error(`enrolled project discovery is invalid: ${error.message}`); }
+  if (!state.discovery) throw new Error('enrolled project requires discovery snapshot and independent review before activation');
+  if (state.discovery.manifest !== DISCOVERY_MANIFEST || state.discovery.digest !== snapshot.digest) throw new Error('discovery snapshot is stale; run discovery snapshot and obtain a fresh review');
+  if (!storedReviewValid(root, state.discovery.review, 'discovery', snapshot.digest)) throw new Error('enrolled project requires an intact passing discovery review');
+  return snapshot;
+}
+
+function currentDiscovery(root, state) {
+  if (!discoveryEnrolled(root, state)) return null;
+  const snapshot = discoverySnapshot(root);
+  return { snapshot, stale: !state.discovery || state.discovery.digest !== snapshot.digest || !storedReviewValid(root, state.discovery?.review, 'discovery', snapshot.digest) };
+}
+
 function requireValidation(root, phase, candidate) {
   const validation = phase.validation;
   if (!validation || validation.status !== 'pass' || !validation.executed || validation.candidate !== candidate || !evidenceValid(root, validation.evidence)) throw new Error('a successful executed validation for this exact candidate is required');
@@ -791,9 +828,73 @@ function requireValidation(root, phase, candidate) {
   return validation;
 }
 
+function pendingObservationError(state, phase) {
+  const observations = observationList(state).filter((finding) => finding.status === 'pending');
+  const nonTerminal = new Set(state.phases.filter((item) => !TERMINAL_PHASE_STATES.has(item.status) && item.id !== phase.id).map((item) => item.id));
+  for (const finding of observations) {
+    const severity = String(finding.severity ?? 'INFO').toUpperCase();
+    if (['HIGH', 'CRITICAL'].includes(severity)) return `pending ${severity} observation ${finding.id} blocks completion`;
+    const note = finding.review?.note?.trim() ?? '';
+    const noteTokens = note.split(/[^A-Za-z0-9._-]+/).filter(Boolean);
+    const followUp = [...nonTerminal].find((id) => noteTokens.includes(id));
+    if (!finding.review || finding.review.revision !== finding.revision || !followUp || note.length < 3) {
+      return `pending observation ${finding.id} needs a current triage note naming a non-terminal follow-up phase and reason`;
+    }
+  }
+  return null;
+}
+
+function requireEnrolledCompletionGates(root, state, phase, candidate) {
+  if (!discoveryEnrolled(root, state)) return;
+  discoveryGate(root, state);
+  const observationError = pendingObservationError(state, phase);
+  if (observationError) throw new Error(observationError);
+  const checkpoint = phase.checkpoint;
+  if (!checkpoint || checkpoint.candidate !== candidate || typeof checkpoint.summary !== 'string' || !checkpoint.summary.trim() || typeof checkpoint.next !== 'string' || !checkpoint.next.trim()) {
+    throw new Error('enrolled phase requires an explicit checkpoint for the exact candidate with summary and next step');
+  }
+}
+
+function checkpointPhase(root, state, phase, options) {
+  activePhase(state, phase);
+  const summary = optionRequired(options, 'summary').trim();
+  const next = optionRequired(options, 'next').trim();
+  const candidate = candidateTree(root);
+  const head = spawnSync('git', ['rev-parse', '--verify', 'HEAD'], { cwd: root, encoding: 'utf8' });
+  let references = ['PROJECT.md', 'ROADMAP.yaml', 'taste.md'];
+  if (state.discovery?.files?.length) references = [...new Set([...references, ...state.discovery.files])];
+  phase.checkpoint = {
+    version: 1,
+    phase: phase.id,
+    head: head.status === 0 ? head.stdout.trim() : null,
+    candidate,
+    summary,
+    next,
+    references,
+    validation: phase.validation ? { candidate: phase.validation.candidate, status: phase.validation.status, evidence: phase.validation.evidence ?? null } : null,
+    reviews: Object.fromEntries(['functional', 'security'].map((type) => [type, receiptFor(root, phase, type) ? { candidate: receiptFor(root, phase, type).candidate, status: receiptFor(root, phase, type).status, evidence: receiptFor(root, phase, type).evidence ?? null } : null])),
+    at: now(),
+  };
+  state.activeWave = { ...(state.activeWave ?? {}), phase: phase.id, checkpointAt: now() };
+  saveState(root, state);
+  event(root, 'phase_checkpoint', { phase: phase.id, candidate, references });
+  process.stdout.write(`Checkpoint saved for ${phase.id} at ${candidate}.\n`);
+}
+
 function validateCandidate(root, state, phase, options) {
   const command = optionRequired(options, 'command');
   const candidate = candidateTree(root);
+  if (discoveryEnrolled(root, state) && phase.validation?.status === 'fail') {
+    if (phase.validation.candidate === candidate) {
+      throw new Error('failed validation on the unchanged candidate; a different command or declaration is not a correction');
+    }
+    if (options.run !== true || phase.retryCandidate !== phase.validation.candidate) {
+      throw new Error('failed validation requires wave retry and an executed check of the corrected candidate; the formal failure is preserved');
+    }
+  }
+  if (discoveryEnrolled(root, state) && phase.retryCandidate && phase.retryCandidate === candidate) {
+    throw new Error('targeted correction did not change the candidate; validation remains unchanged');
+  }
   if (options.run !== true) {
     if (!['pass', 'fail'].includes(options.status)) throw new Error('--status must be pass or fail');
     state.lastValidation = { phase: phase.id, status: optionRequired(options, 'status'), command, summary: optionRequired(options, 'summary'), candidate, executed: false, at: now() };
@@ -828,6 +929,7 @@ function validateCandidate(root, state, phase, options) {
   validation.evidence = storeEvidence(root, 'validation', Buffer.from(JSON.stringify(validation)));
   phase.allowedPaths = paths;
   phase.validation = validation;
+  if (discoveryEnrolled(root, state)) phase.retryCandidate = null;
   state.lastValidation = validation;
   saveState(root, state);
   event(root, 'validation', { phase: phase.id, status: validation.status, candidate, report: validation.verification.path });
@@ -867,6 +969,10 @@ function recordReview(root, state, phase, options) {
   const severity = type === 'security' ? parseSeverity(options.severity) : null;
   const candidate = candidateTree(root);
   if (options.candidate && options.candidate !== candidate) throw new Error('review candidate differs from the current staged tree');
+  const previous = receiptFor(root, phase, type);
+  if (discoveryEnrolled(root, state) && previous?.status === 'fail' && previous.candidate === candidate) {
+    throw new Error(`repeated ${type} review after a failure on the unchanged candidate; record one targeted correction before retrying`);
+  }
   if (status === 'pass') requireValidation(root, phase, candidate);
   const proof = reviewArtifact(root, optionRequired(options, 'evidence'), candidate, type, status);
   const receipt = {
@@ -921,6 +1027,7 @@ function completePhase(root, state, phase, commit) {
   const security = receiptFor(root, phase, 'security');
   if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree || !evidenceValid(root, functional.evidence)) throw new Error('a passing functional receipt with intact evidence for the exact commit tree is required');
   if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree || !evidenceValid(root, security.evidence))) throw new Error('a passing security receipt with intact evidence for the exact sensitive commit tree is required');
+  requireEnrolledCompletionGates(root, state, phase, commitTree);
   phase.commit = run('git', ['rev-parse', commit], { cwd: root });
   phase.status = 'completed';
   phase.reason = null;
@@ -933,6 +1040,81 @@ function completePhase(root, state, phase, commit) {
   event(root, 'phase_completed', { phase: id, commit: phase.commit });
   const next = selectPhase(state);
   process.stdout.write(`${id} completed at ${phase.commit.slice(0, 12)}.\n${next ? `Next ready: ${next.id}\n` : 'No further phase is ready.\n'}`);
+}
+
+function cmdDiscovery(tokens) {
+  const root = gitRoot();
+  const action = tokens[0] ?? 'check';
+  const options = parseOptions(tokens.slice(1));
+  const state = readState(root);
+  if (!['snapshot', 'check', 'review'].includes(action)) throw new Error('use discovery snapshot, discovery check, or discovery review --evidence FILE');
+  if (action === 'snapshot') {
+    const snapshot = discoverySnapshot(root);
+    const prior = state.discovery;
+    const same = prior?.digest === snapshot.digest;
+    state.discovery = {
+      ...snapshot,
+      snapshotAt: same ? prior.snapshotAt : now(),
+      review: same ? prior.review ?? null : null,
+      ...(same && prior.lastReviewAttempt ? { lastReviewAttempt: prior.lastReviewAttempt } : {}),
+    };
+    saveState(root, state);
+    event(root, 'discovery_snapshot', snapshot);
+    process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
+    return;
+  }
+  const snapshot = discoverySnapshot(root);
+  if (!state.discovery || state.discovery.manifest !== DISCOVERY_MANIFEST) throw new Error('discovery snapshot is required before checking or reviewing the dossier');
+  if (state.discovery.digest !== snapshot.digest) throw new Error('discovery snapshot is stale; run discovery snapshot before checking or reviewing');
+  if (action === 'check') {
+    if (!storedReviewValid(root, state.discovery.review, 'discovery', snapshot.digest)) throw new Error('discovery dossier lacks an intact passing independent review');
+    process.stdout.write(`${JSON.stringify({ ...snapshot, reviewed: true }, null, 2)}\n`);
+    return;
+  }
+  const evidence = optionRequired(options, 'evidence');
+  const supplied = readJson(localPath(root, evidence));
+  const status = supplied?.status;
+  if (!['pass', 'fail'].includes(status)) throw new Error('discovery review status must be pass or fail');
+  if (state.discovery.review?.status === 'fail' && state.discovery.review.candidate === snapshot.digest) {
+    throw new Error('repeated discovery review after a failure on the unchanged candidate; revise the dossier before retrying');
+  }
+  const proof = reviewArtifact(root, evidence, snapshot.digest, 'discovery', status);
+  state.discovery.review = {
+    version: 1,
+    type: 'discovery',
+    status,
+    candidate: snapshot.digest,
+    reviewer: proof.artifact.reviewer,
+    evidence: storeEvidence(root, 'discovery', proof.bytes),
+    reviewedAt: now(),
+  };
+  saveState(root, state);
+  event(root, 'discovery_review', { candidate: snapshot.digest, status, evidence: state.discovery.review.evidence });
+  process.stdout.write(`Discovery review ${status} recorded at ${snapshot.digest}.\n`);
+}
+
+function cmdContext(tokens) {
+  const root = gitRoot();
+  const state = readState(root);
+  const requested = tokens[0];
+  const phase = requested ? phaseById(state, requested) : state.phases.find((item) => item.status === 'active') ?? selectReadyPhase(state.phases);
+  const candidate = candidateTree(root);
+  const generated = /^(?:\.riff-codex$|\.riff-codex-state(?:\/|$)|\.agents(?:\/|$)|\.codex(?:\/|$)|\.uxtest(?:\/|$))/;
+  const dirty = run('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root })
+    .split('\n').filter(Boolean).some((line) => {
+      const relative = line.slice(3).replace(/^\"|\"$/g, '');
+      return !generated.test(relative) && (line.startsWith('??') || line[1] !== ' ');
+    });
+  const checkpoint = phase?.checkpoint ?? null;
+  const discovery = currentDiscovery(root, state);
+  process.stdout.write(`${JSON.stringify({
+    phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome } : null,
+    checkpoint,
+    candidate,
+    checkpointStale: Boolean(checkpoint && (checkpoint.candidate !== candidate || dirty)),
+    discovery: discovery ? { digest: discovery.snapshot.digest, stale: discovery.stale, files: discovery.snapshot.files } : null,
+    references: checkpoint?.references ?? discovery?.snapshot.files ?? [],
+  }, null, 2)}\n`);
 }
 
 function cmdWave(tokens) {
@@ -950,12 +1132,14 @@ function cmdWave(tokens) {
     }
     if (action === 'select' || action === 'resume') {
       const requested = options._[0];
+      if (action === 'resume') discoveryGate(root, state);
       if (action === 'resume' && requested) {
         const resumable = phaseById(state, requested);
         if (['parked', 'blocked', 'awaiting_human'].includes(resumable.status)) {
           const active = state.phases.find((item) => item.status === 'active');
           if (active && active.id !== resumable.id) throw new Error(`phase ${active.id} is active; resume or park it first`);
           const reason = optionRequired(options, 'reason');
+          discoveryGate(root, state);
           resumable.attempts = 0;
           resumable.baseCommit ??= baseline(root);
           markPhase(root, state, resumable, 'active', reason);
@@ -995,6 +1179,7 @@ function cmdWave(tokens) {
     const phase = phaseById(state, id);
     if (action === 'activate') {
       const selected = selectPhase(state, id);
+      discoveryGate(root, state);
       selected.baseCommit ??= baseline(root);
       markPhase(root, state, selected, 'active');
       process.stdout.write(`Activated ${id}.\n`);
@@ -1012,9 +1197,12 @@ function cmdWave(tokens) {
       }
       if ((phase.attempts ?? 0) >= 1) throw new Error('the single targeted correction has already been used; park the phase');
       phase.attempts = 1;
+      if (discoveryEnrolled(root, state)) phase.retryCandidate = state.lastValidation.candidate;
       saveState(root, state);
       event(root, 'targeted_retry', { phase: id, reason });
       process.stdout.write(`Recorded the one targeted correction for ${id}.\n`);
+    } else if (action === 'checkpoint') {
+      checkpointPhase(root, state, phase, options);
     } else if (action === 'validate') {
       activePhase(state, phase);
       const validation = validateCandidate(root, state, phase, options);
@@ -1540,11 +1728,7 @@ function cmdReport(tokens) {
   process.stdout.write(`${path.join(root, report.path)}\n${report.verdict}\n`);
 }
 
-function cmdFinish(tokens) {
-  const options = parseOptions(tokens);
-  if (!options.check) throw new Error('finish currently requires --check; Git publication remains an explicit separate action');
-  const root = gitRoot();
-  const state = readState(root);
+function checkTerminalPhaseEvidence(root, state) {
   if (state.phases.some((phase) => !TERMINAL_PHASE_STATES.has(phase.status))) throw new Error('unfinished phases remain');
   for (const phase of state.phases.filter((phase) => phase.status === 'completed')) {
     const tree = run('git', ['rev-parse', `${phase.commit}^{tree}`], { cwd: root });
@@ -1554,6 +1738,51 @@ function cmdFinish(tokens) {
       if (receipt?.status !== 'pass' || receipt.candidate !== tree || !evidenceValid(root, receipt.evidence)) throw new Error(`phase ${phase.id} lacks intact ${type} evidence`);
     }
     run('git', ['merge-base', '--is-ancestor', phase.commit, 'HEAD'], { cwd: root });
+  }
+}
+
+function cmdFinish(tokens) {
+  const options = parseOptions(tokens);
+  const root = gitRoot();
+  const state = readState(root);
+  if (discoveryEnrolled(root, state)) {
+    const observationError = pendingObservationError(state, { id: null });
+    if (observationError) throw new Error(observationError);
+  }
+  if (options.review) {
+    checkTerminalPhaseEvidence(root, state);
+    if (discoveryEnrolled(root, state)) discoveryGate(root, state);
+    const candidate = candidateTree(root);
+    if (state.deliveryReview?.status === 'fail' && state.deliveryReview.candidate === candidate) {
+      throw new Error('repeated final delivery review after a failure on the unchanged candidate; revise the delivery or add a correction phase');
+    }
+    const headTree = run('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root });
+    if (candidate !== headTree) throw new Error('final delivery review must bind the current HEAD candidate tree');
+    if (run('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: root })) throw new Error('final delivery review requires a clean tracked candidate');
+    let deliveryStatus;
+    try { deliveryStatus = readJson(localPath(root, options.review)).status; } catch (error) { throw error; }
+    if (!['pass', 'fail'].includes(deliveryStatus)) throw new Error('delivery review status must be pass or fail');
+    const proof = reviewArtifact(root, options.review, candidate, 'delivery', deliveryStatus);
+    state.deliveryReview = {
+      version: 1,
+      type: 'delivery',
+      status: deliveryStatus,
+      candidate,
+      reviewer: proof.artifact.reviewer,
+      evidence: storeEvidence(root, 'delivery', proof.bytes),
+      reviewedAt: now(),
+    };
+    saveState(root, state);
+    event(root, 'delivery_review', { candidate, evidence: state.deliveryReview.evidence });
+    process.stdout.write(`Final delivery review ${deliveryStatus} recorded at ${candidate}.\n`);
+    return;
+  }
+  if (!options.check) throw new Error('finish requires --check or --review FILE; Git publication remains an explicit separate action');
+  checkTerminalPhaseEvidence(root, state);
+  if (discoveryEnrolled(root, state)) {
+    discoveryGate(root, state);
+    const candidate = run('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root });
+    if (!storedReviewValid(root, state.deliveryReview, 'delivery', candidate)) throw new Error('enrolled project requires an intact passing final delivery review for the current candidate');
   }
   if (run('git', ['status', '--porcelain'], { cwd: root })) throw new Error('commit or preserve pending project changes before finishing');
   process.stdout.write(`Ready for explicit Git finalization at ${run('git', ['rev-parse', 'HEAD'], { cwd: root })}.\nNo push, merge or deployment performed.\n`);
@@ -1606,7 +1835,8 @@ function cmdIncident(tokens) {
 }
 
 function help() {
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex discovery [snapshot|check|review --evidence FILE]\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave context [phase-id]\n  riff-codex wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --review FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -1617,10 +1847,14 @@ else if (command === 'resync') cmdResync(tokens);
 else if (command === 'doctor') cmdDoctor(tokens);
 else if (command === 'dashboard') await cmdDashboard(tokens);
 else if (command === 'status') cmdStatus();
+else if (command === 'discovery') {
+  try { withLock(gitRoot(), () => cmdDiscovery(tokens)); } catch (error) { fail(error.message); }
+}
 else if (['report', 'promote', 'incident', 'finish'].includes(command)) {
   try {
     const action = () => ({ report: cmdReport, promote: cmdPromote, incident: cmdIncident, finish: cmdFinish })[command](tokens);
-    if (command === 'finish') action(); else withLock(gitRoot(), action);
+    if (command === 'finish' && !parseOptions(tokens).review) action();
+    else withLock(gitRoot(), action);
   } catch (error) { fail(error.message); }
 }
 else if (command === 'observations') {
@@ -1639,7 +1873,11 @@ else if (command === 'observations') {
   } catch (error) { fail(error.message); }
 }
 else if (command === 'wave') {
-  try { if (tokens[0] === 'select') cmdWave(tokens); else withLock(gitRoot(), () => cmdWave(tokens)); } catch (error) { fail(error.message); }
+  try {
+    if (tokens[0] === 'select') cmdWave(tokens);
+    else if (tokens[0] === 'context') cmdContext(tokens.slice(1));
+    else withLock(gitRoot(), () => cmdWave(tokens));
+  } catch (error) { fail(error.message); }
 }
 else if (command === 'hook') {
   try { if (['post-tool', 'pre-compact'].includes(tokens[0])) withLock(gitRoot(), () => cmdHook(tokens)); else cmdHook(tokens); } catch (error) { fail(error.message); }

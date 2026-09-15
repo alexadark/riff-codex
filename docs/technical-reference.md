@@ -9,6 +9,8 @@ This page keeps installation internals and contributor references out of the get
 | Path in an application | Purpose |
 | --- | --- |
 | `PROJECT.md` | Shared product brief, vocabulary, constraints, and scope. |
+| `docs/specs/readiness.json` | Explicit complete-discovery enrollment, artifact coverage and content digest inputs. |
+| Dossier paths indexed by `PROJECT.md` | Stories, ASCII wireframes, design/tokens, data/architecture, Mermaid sources, risks and verification contracts. |
 | `ROADMAP.yaml` | Shared phases, explicit priorities, prerequisites, and exclusions. |
 | `taste.md`, `taste/` | Shared project conventions, selective topic loading and frontend direction. |
 | `references/taste/stacks/` | Project-owned, source-backed stack research from `learn-stack`. |
@@ -47,6 +49,13 @@ Run these from an initialized application, unless noted otherwise.
 | `riff-codex doctor` | Check installation, configuration, hooks, dependencies, and state. |
 | `riff-codex doctor --record-hooks-approved` | Record actual prior approval of the current hooks, then check setup. |
 | `riff-codex status` | Print saved project progress. |
+| `riff-codex discovery snapshot` | Inspect dossier coverage and its content digest. |
+| `riff-codex discovery review --evidence FILE` | Record an independent discovery review for that digest. |
+| `riff-codex discovery check` | Verify current dossier and review integrity. |
+| `riff-codex wave context [phase-id]` | Read phase references, checkpoint and candidate freshness. |
+| `riff-codex wave checkpoint phase-id --summary TEXT --next TEXT` | Persist a phase recovery checkpoint through the CLI. |
+| `riff-codex finish --review FILE` | Record the independent review of whole-version verification. |
+| `riff-codex finish --check` | Verify local completion and, for enrolled projects, final delivery evidence. |
 | `riff-codex dashboard` | Start or attach to the shared local dashboard. |
 | `riff-codex dashboard --snapshot` | Print a dashboard data snapshot. |
 | `riff-codex --help` | List mechanical commands, including internal wave operations. |
@@ -77,6 +86,8 @@ Read the [dashboard README](../riff/dashboard/README.md) and [projection contrac
 
 - [Operating contract](../riff/references/operating-contract.md): product sources, selection, reviews, retries, and completion.
 - [Project framing](../riff/references/project-framing.md): when a larger project needs deeper discovery.
+- [Discovery](../riff/references/discovery.md): complete application dossier, external design handoff and independent readiness review.
+- [Execution](../riff/references/execution.md): phase context, worktrees, no-progress handling and final verification.
 - [Taste](../riff/references/taste.md): selective conventions, learning and Claude coexistence.
 - [Frontend taste](../riff/references/taste/frontend.md): required design skills and rendered acceptance.
 - [NowStack](../riff/references/taste/stacks/nowstack.md): starter conventions and version-aware evidence.

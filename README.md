@@ -23,7 +23,7 @@ The visual manual is a local HTML page: download or open `riff-documentation.htm
 
 ## What RIFF does for you
 
-- **Keeps the goal clear.** A short project brief says what you are building and what matters.
+- **Plans the committed version.** A product brief indexes stories, journeys, data and architecture contracts, wireframes, design references, risk checks and acceptance criteria.
 - **Breaks the work into useful steps.** Each step should produce something you can try.
 - **Builds and checks.** Codex implements a step, checks it, and reviews the result before recording it as complete.
 - **Remembers progress.** You can return later and continue the same project.
@@ -36,8 +36,8 @@ RIFF works with Codex. You still need Codex installed and signed in.
 
 ```mermaid
 flowchart TD
-    You[You describe what you want] --> Brief[Project brief: what we are building]
-    Brief --> Plan[Roadmap: small useful steps]
+    You[You describe what you want] --> Brief[Complete version dossier and design]
+    Brief --> Plan[Roadmap and independent planning review]
     Plan --> Pick[Choose the next ready step]
     Pick --> Build[Codex builds it]
     Build --> Check[Check and review the result]
@@ -47,13 +47,16 @@ flowchart TD
     CheckAgain -->|Pass| Save
     CheckAgain -->|Still fails| Stop[Record the blocker]
     Save -->|More ready work| Pick
-    Save -->|Everything complete| Done[Ready for you to try]
+    Save -->|All phases complete| Final[Whole-version checks and independent review]
+    Final -->|Pass| Done[Verified local result]
+    Final -->|Defect| Correction[Plan an in-scope correction phase]
+    Correction --> Plan
     Plan -.-> View[Dashboard: view progress]
     Save -.-> View
     Stop -.-> View
 ```
 
-The brief is saved as `PROJECT.md`; the steps are saved as `ROADMAP.yaml`. The dashboard reads progress. You start the work in Codex.
+The brief is saved as `PROJECT.md`; the steps are saved as `ROADMAP.yaml`. For production applications, `start` prepares the complete version dossier and an independent planning review before implementation. ASCII wireframes can be handed to another design model; its returned reference and tokens become part of the dossier. The dashboard reads progress. You start the work in Codex.
 
 By default, RIFF continues through ready steps automatically. You can choose **guided** mode if you prefer a pause between steps. Uploading code to GitHub or putting an application online still needs your instruction.
 
@@ -74,8 +77,12 @@ These are routing instructions, not an automatic change to the model selected in
 
 ## What the latest update changes
 
+- **Planning has a readiness gate.** New production application plans include a manifest of their contracts, diagrams and design references. A content-bound independent review must match that dossier before implementation begins. Existing projects aren't silently enrolled.
+- **Phases keep a durable checkpoint.** Native Codex compaction remains in use; RIFF does not relaunch Codex or claim to reset a conversation. Checkpoints and targeted reference loading support recovery without the previous chat.
+- **Parallel work has boundaries.** Independent implementation packages use separate worktrees inside one active phase. The primary agent integrates and verifies the assembled result. Independent reviews can run in parallel on a frozen candidate.
+- **The whole version is checked.** After per-phase verification, Codex exercises the connected journeys and obtains an independent delivery review. Corrections follow the normal phase gates.
 - **Completion needs evidence.** A phase must pass executed checks and the required reviews for the exact version being delivered. Required browser or smoke checks need recorded results. Local verification reports make those results inspectable.
-- **Codex handles technical observations.** The implementing agent checks warnings before finishing, fixes confirmed problems within scope, and records why an item is resolved or a false positive. Unverified or out-of-scope items stay pending. The dashboard preserves the decisions and their history; a new occurrence reopens the group.
+- **Codex handles observations every phase.** It fixes confirmed problems within scope and records verified dispositions. Enrolled projects require explicit follow-up phases for nonblocking pending items; HIGH and CRITICAL findings cannot be deferred through completion. The dashboard preserves decisions and reopens new occurrences.
 - **Recovery preserves verified work.** Interrupted delivery can reuse evidence that still matches the candidate. Dashboard phase links support both named and numeric identifiers.
 - **System hooks avoid duplicate checks.** On a Mac with RIFF's matching system policy already installed, resync removes duplicate project hooks. Other installations keep the ordinary project-hook approval flow.
 
@@ -133,7 +140,7 @@ $riff:start I want a simple app where I can save and find my recipes.
 $riff:onboard Understand this app and make a plan for improving it.
 ```
 
-These prepare the project brief and roadmap. Read them, then start building:
+Production `start` prepares and reviews the complete dossier, including design before building. `onboard` preserves the existing application's documents and behavior. Once preparation is complete, start building:
 
 ```text
 $riff:wave

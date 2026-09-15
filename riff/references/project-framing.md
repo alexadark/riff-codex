@@ -1,52 +1,55 @@
-# Large-project framing
+# Project framing
 
-Use this reference only for a substantial RIFF project. The trigger is a project with several dependent outcomes, multiple user roles or system boundaries, a multi-system integration, or an explicit request for a large-project frame. A small application with one clear outcome, a bounded feature, `$riff:quick`, and independent APEX work keep their existing lightweight flow.
+Use this reference for a complete scoped-version dossier. The trigger is either an explicit request to plan a full application or a new application intended for production. Scratch work, a bounded risk probe, a small existing application with one clear outcome, and `$riff:quick` stay lightweight unless the user explicitly asks for the full application plan. The [discovery contract](discovery.md) owns the readiness manifest and review lifecycle.
 
-RIFF remains the owner of phases, dependencies, validation, review, and completion gates. This framing adds product clarity; it does not create a second orchestrator, a second state system, or a mandatory interview. Reuse answers, repository documents, and prior phase decisions already available in the project. Ask only when an unresolved choice can change the product boundary, a user-visible behavior, a data or permission contract, an external integration, or an authority boundary.
+RIFF owns phases, dependencies, validation, review, and completion gates. Project framing adds product clarity; it does not create another orchestrator, another state system, or a mandatory technical interview. Reuse user answers, repository documents, existing specifications, approved templates, project taste, and prior phase decisions. Ask only a product, user-visible, data, permission, integration, or authority question that can change the committed boundary and cannot be inferred.
 
-## Initial frame
+## Product synthesis in `PROJECT.md`
 
-For a large project, shape the initial `PROJECT.md` around these connected views. Keep verified facts, user preferences, explicit hypotheses, and open questions distinct.
+`PROJECT.md` is the concise product synthesis and index. Keep detailed supporting material in existing project paths or under `docs/specs/` and `docs/diagrams/`, then link it from the relevant section. Preserve useful existing prose and links with targeted edits. Do not turn `PROJECT.md` into a second roadmap or a file-by-file implementation plan.
 
-### Product and user stories
+Use stable IDs throughout the dossier:
 
-- State the product outcome, users, shared vocabulary, and measurable signals of value.
-- Capture the meaningful user journeys as numbered stories: `As a <actor>, I want <capability>, so that <benefit>`.
-- Give each important story observable acceptance criteria. Cover the normal journey and the relevant empty, error, recovery, privacy, authorization, and audit cases.
-- Link stories to one or more product outcomes or phases so that the roadmap explains which user value each phase delivers.
+- outcomes: `O-###`;
+- user stories: `S-###`, written as `As a <actor>, I want <capability>, so that <benefit>`;
+- observable acceptance criteria: `AC-###`, each testable and linked to one or more stories;
+- journeys, screens, data entities, decisions, risks, and phases: `J-###`, `UI-###`, `D-###`, `DEC-###`, `R-###`, and `P-###` as applicable.
 
-### Data, relationships, and rights
+The synthesis should link these views when they exist:
 
-- Name the entities and the ownership of each source of truth.
-- Describe important fields or identifiers only where they affect behavior, identity, retention, or integration.
-- Record relationships and cardinality, lifecycle and state transitions, invariants, uniqueness, tenancy boundaries, and migration or rollback constraints.
-- Describe who can read, create, change, export, publish, or delete each sensitive entity. Make least privilege, masking, auditability, retention, and deletion behavior explicit where they matter.
+### Product and users
+
+State the outcome, users, vocabulary, value signal, included version, explicit exclusions, assumptions, facts, preferences, and later fog of war. Describe the important journeys and map each story and criterion to the phase that delivers or unlocks it. Include normal, empty, error, recovery, privacy, authorization, and audit behavior when relevant.
+
+### Data and rights
+
+For each entity that affects behavior, identity, retention, authorization, or integration, document its owner and source of truth. List fields with their types, required or nullable status, defaults, keys, uniqueness, foreign keys, constraints, and the reason for each non-obvious index. State relationships and cardinality, lifecycle and state transitions, invariants, tenancy isolation, migration and rollback constraints, retention, masking, export, and deletion behavior. Map who may read, create, change, export, publish, or delete sensitive records. If the product has no durable or sensitive data, say why and link the relevant verification boundary.
 
 ### Architecture and integrations
 
-- Describe the smallest architecture that can deliver the outcomes: boundaries, responsibilities, persistence, and user-visible entry points.
-- For each external system, record the purpose, direction of data flow, contract or event boundary, identity mapping, idempotency, retry/failure behavior, and the evidence needed to verify it.
-- Record material decisions with the chosen option, reason, rejected alternatives, reversibility, and the condition that would make the decision worth revisiting. Do not turn ordinary reversible choices into a human handoff.
+Describe the smallest architecture that delivers the committed outcomes: boundaries, responsibilities, persistence, entry points, and failure handling. For each API or external integration, record purpose, direction of data flow, identity mapping, request and response or event contract, idempotency, retry and failure behavior, secret or permission boundary, and verification evidence. Record material decisions with the chosen option, reason, rejected alternatives, reversibility, and the condition that would reopen the decision.
 
-### Scope and phases
+### Experience and design handoff
 
-- Define included outcomes, explicit exclusions, and the fog of war that belongs to later discovery.
-- Break the work into vertical, demonstrable phases. Each phase must connect to the stories and criteria it advances, name real dependencies and blocking edges, and carry a justified P0-P3 priority.
-- Keep the initial frame at outcome and contract level. Do not invent a file-by-file implementation plan, exhaustive future test list, or phase detail that the current evidence cannot support.
+List screens and states, responsive journeys, and ASCII wireframes that show hierarchy and the primary action. Map each screen and state to the stories and criteria it serves. Record the design provenance: an approved external reference, an available but not yet received reference, or RIFF-native design explicitly authorized by the user. The handoff includes the reference or source path, returned tokens, component and interaction rules, responsive behavior, content and state rules, and mappings to `UI-###`, `S-###`, and `AC-###`. A missing promised external reference is an external dependency, not permission to replace it or a human technical approval state.
 
-Recommended headings are `Product outcome`, `Users and stories`, `Acceptance criteria`, `Data model and rights`, `Architecture and integrations`, `Decisions`, `Scope and exclusions`, `Facts`, `Preferences`, `Assumptions`, `Open questions`, and `Phase map`. Omit a heading when it has no useful content rather than filling a template mechanically.
+### Diagrams and verification
 
-## Deepen a phase when useful
+Link actual Mermaid source files, not only rendered images. Include architecture, an ER diagram when the data model is non-empty, sequence diagrams for critical paths, and state diagrams for meaningful lifecycle or UI state machines. Verify syntax with an available renderer when possible. If no renderer is available, record the exact unverified check and do not claim syntax proof. Define the evidence needed for each important criterion and distinguish executed evidence, external evidence, and attestation.
 
-When `$riff:add-phase` or `$riff:wave` needs more detail, extend the existing frame instead of starting a new interview. Reuse the relevant story IDs, criteria, entities, relationships, rights, integrations, decisions, and answers already recorded. Add only what the selected phase needs:
+Include the applicable security, privacy, accessibility, performance, observability, backup and recovery requirements. Make consequential targets observable and connect them to acceptance criteria, the test environment and a verification method. Keep requirements proportional to the committed product and record reasons for inapplicable areas.
 
-- the user-visible outcome and the stories it completes or unlocks;
-- phase-specific acceptance criteria, including failure and permission behavior;
-- the data and ownership boundaries touched;
-- integration contracts, verification evidence, and rollback or recovery behavior;
-- the dependency, risk, sensitivity, and exclusion that explain its order.
+### Scope and phase map
 
-Keep the roadmap phase itself concise enough to remain a demonstrable tracer bullet. Put extended rationale in the existing project or phase documentation chosen by the repository; never replace the shared roadmap with a parallel planning system. A phase may be deepened during execution, but new scope still follows `$riff:add-phase` and active phases retain RIFF's validation, review, receipt, and completion gates.
+`ROADMAP.yaml` remains the canonical phase list. Each vertical phase keeps its existing stable identifier or receives a stable ID such as `P-###` when it is new, plus a demonstrable user outcome, a justified `P0` to `P3` priority, dependencies, blocking edges, risks, and mappings to the stories and criteria it advances. Keep phase descriptions at outcome and contract level. Do not invent exact files, exhaustive future tests, or implementation detail unsupported by current evidence. The roadmap must cover the committed version; future versions remain indicative and clearly separated.
+
+## Before implementation
+
+Complete the whole committed-version dossier before any implementation wave. A UI product needs its actual design reference and tokens; a recorded but unresolved external-design dependency keeps the dossier incomplete. Bounded isolated risk probes may inform a decision, but are not product implementation. An independent reviewer reviews the full dossier, not a subset. Apply corrections automatically, refresh the candidate manifest, and obtain a review tied to the new digest. Evidence records what was attested or observed; it does not prove the underlying product claims.
+
+## Light path
+
+For scratch work and bounded changes, capture only the product outcome, affected behavior, facts, assumptions, scope, and the smallest useful roadmap entry. Reuse existing `PROJECT.md`, `ROADMAP.yaml`, specifications, and taste. Do not manufacture stories, data models, diagrams, design packages, or readiness areas that have no bearing on the bounded request. A later explicit full-app or production request promotes the work to the complete dossier path.
 
 ## GitHub issue projection
 
