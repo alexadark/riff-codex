@@ -645,10 +645,10 @@ details>div{padding-top:18px}
 </div>
 <p>For a recipe app, a useful first phase is “save a recipe and find it again.” A later phase might add search. Each phase should deliver a usable result, rather than leaving you with several disconnected pieces of an unfinished feature.</p>
 <h3 class="subhead">Your first conversation</h3>
-<p>For a new idea, choose <code>$riff:start</code>. For an existing application, choose <code>$riff:onboard</code>. Describe the result you want in ordinary language.</p>
+<p>For a new idea, choose <code>$riff:start</code>. For an existing application, install RIFF, use <code>$riff:map</code>, then <code>$riff:onboard</code>. Once onboarded, use <code>$riff:evolve</code> to plan a product change. Describe the result you want in ordinary language.</p>
 <div class="command"><div class="command-bar"><span>In Codex</span><button class="copy-button" type="button" data-copy="first-request">Copy</button></div><pre id="first-request">$riff:start I want a recipe app where I can save a recipe,
 find it later, and read the ingredients while cooking.</pre><span class="copy-status" role="status"></span></div>
-<p>RIFF prepares the brief and roadmap. Read them and correct anything that does not match your intent. Then use <code>$riff:wave</code> to start building. A wave works through the next ready phases; starting or onboarding alone does not begin implementation.</p>
+<p>For a production application, start prepares the complete version dossier: stories and success criteria, journeys, data and access rules, architecture, diagrams, and design. An independent review must pass before building. Scratch work stays lightweight. Use <code>$riff:wave</code> separately to begin implementation; start, onboard, and evolve stop after planning.</p>
 <h3 class="subhead">How much you direct</h3>
 <div class="table-wrap"><table><thead><tr><th>Mode</th><th>What happens</th></tr></thead><tbody>
 <tr><td>Loop, the default</td><td>RIFF makes conservative choices, records assumptions, and continues through ready work. It preserves existing behavior and data and avoids adding speculative scope.</td></tr>
@@ -688,10 +688,10 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <p>Run <code>riff-codex doctor</code> first. If it reports matching system-managed hooks, reload Codex configuration or restart the app; no individual hook approval is required. Otherwise, open <code>/hooks</code> in Codex, review RIFF's project checks, and approve them. Hooks are checks triggered automatically at certain moments while work happens. After you have actually approved them, record that approval:</p>
 <div class="command"><div class="command-bar"><span>In your project's Terminal</span><button class="copy-button" type="button" data-copy="doctor-code">Copy</button></div><pre id="doctor-code">riff-codex doctor --record-hooks-approved</pre><span class="copy-status" role="status"></span></div>
 <p>This records your approval and checks the setup; it cannot approve the hooks for you. Read any reported error or warning. A roadmap that has not been created yet is normal before your first start or onboard request.</p>
-<p>Now choose start or onboard in Codex, describe your project, and read the resulting plan before using <code>$riff:wave</code>.</p>
+<p>Now choose start for a new product, or map then onboard for an existing application. Evolve prepares subsequent product changes. Use <code>$riff:wave</code> when the plan is ready.</p>
 <details><summary>Update RIFF or change preferences</summary><div>
 <p>To revisit the setup choices, run <code>riff-codex init --configure</code> in the application. To update RIFF, finish active work first, check that its permanent folder has no uncommitted edits, then run <code>git pull --ff-only</code> and <code>npm install</code> there. Run <code>riff-codex resync</code> and <code>riff-codex doctor</code> in each application afterward.</p>
-<p><strong>For this release, resync each connected project once.</strong> This refreshes local installation files, including the verification-report exclusion and hook configuration, while preserving its brief, roadmap and preferences.</p>
+<p><strong>For this release, resync each connected project once.</strong> This refreshes local installation files, including newly available skills such as evolve and the hook configuration, while preserving its brief, roadmap and preferences.</p>
 <p>Projects linked to the same RIFF folder already read its updated files. They do not need separate Git pulls or reinstalls. Start a fresh Codex session to load the updated skills. For model-routing-only changes, a fresh session is enough when the links are intact. Another checkout, machine or separately installed plugin copy needs its own update.</p>
 <p>If doctor reports matching system-managed hooks, reload Codex configuration; individual approval is not required. Otherwise, review changed project hooks before recording approval. Restart an already-running dashboard process and reload its page to load server changes. The <a href="docs/installation.md#update-riff">update guide</a> explains the steps.</p>
 </div></details>
@@ -704,12 +704,12 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <div class="flow-layout">
 <ol class="flow-path">
 <li><button type="button" data-step="1" aria-pressed="true" aria-controls="step-explanation"><span>1</span><span><strong>Your request</strong>Describe the result you want.</span></button></li>
-<li><button type="button" data-step="2" aria-pressed="false" aria-controls="step-explanation"><span>2</span><span><strong>Project brief + roadmap</strong>Agree what to build and in what order.</span></button></li>
+<li><button type="button" data-step="2" aria-pressed="false" aria-controls="step-explanation"><span>2</span><span><strong>Prepare and review the plan</strong>Define the version, design, and success criteria.</span></button></li>
 <li><button type="button" data-step="3" aria-pressed="false" aria-controls="step-explanation"><span>3</span><span><strong>Select or resume a phase</strong>Choose work whose earlier steps are complete.</span></button></li>
 <li><button type="button" data-step="4" aria-pressed="false" aria-controls="step-explanation"><span>4</span><span><strong>Codex builds</strong>Implement one usable result.</span></button></li>
 <li><button type="button" data-step="5" aria-pressed="false" aria-controls="step-explanation"><span>5</span><span><strong>Check and review</strong>Verify the changed behavior.</span></button></li>
-<li><button type="button" data-step="6" aria-pressed="false" aria-controls="step-explanation"><span>6</span><span><strong>Save code and progress</strong>Record the reviewed result as complete.</span></button></li>
-<li><button type="button" data-step="7" aria-pressed="false" aria-controls="step-explanation"><span>7</span><span><strong>Continue or finish</strong>Return to step 3 while ready work remains.</span></button></li>
+<li><button type="button" data-step="6" aria-pressed="false" aria-controls="step-explanation"><span>6</span><span><strong>Commit and update the PR</strong>Publish validated progress when authorized.</span></button></li>
+<li><button type="button" data-step="7" aria-pressed="false" aria-controls="step-explanation"><span>7</span><span><strong>Continue, then verify the version</strong>Check connected journeys before final delivery.</span></button></li>
 </ol>
 <div id="step-explanation" class="flow-info card" aria-live="polite" aria-atomic="true">
 <h3 class="subhead">Your request</h3><p>Describe what someone should be able to do and why. Codex can investigate the application and the technical choices.</p><code>“Let me save a recipe and find it later.”</code>
@@ -717,7 +717,7 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 </div>
 <div class="flow-connections">
 <div><h3 class="subhead">5 fails → correction → check again</h3><p>A formal failed check permits a focused correction and one repeat. If it still fails, RIFF records a blocker instead of completing the phase.</p></div>
-<div><h3 class="subhead">7 → 3: the work loop</h3><p>Loop mode selects the next ready phase. Guided mode pauses between phases. When the roadmap is complete, work ends.</p></div>
+<div><h3 class="subhead">7 → 3: the work loop</h3><p>Loop mode selects the next ready phase, even after updating a draft PR. Guided mode pauses between phases. After the last phase, RIFF verifies the connected whole version and completes the final review.</p></div>
 <div class="display-path"><h3 class="subhead">Brief + roadmap + progress ⇢ dashboard</h3><p>The dashboard reads the planned work, saved state, and short explanations of intended and verified results. Completed phases and blockers both appear there.</p><p>This is a one-way display path. The dashboard does not start Codex, run a phase, or change the plan.</p></div>
 </div>
 </div>
@@ -725,8 +725,21 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <p>Each phase lists earlier work it needs. Search may need saved recipes first. RIFF does not bypass that requirement because search has a higher priority. Among phases that are ready, it chooses the highest priority; roadmap order breaks a tie.</p>
 <p>Priorities run from P0, an immediate critical blocker, through P1, a high-priority outcome, to P2, normal planned work, and P3, optional work. A blocked phase can leave independent work free to continue.</p>
 <h3 class="subhead">How much planning happens first</h3>
-<p>A small app gets a concise brief and roadmap. A larger product may need the important user journeys, what success looks like, who can access which data, and how outside services connect. RIFF records those in the shared project documents and adds detail when a phase needs it.</p>
-<p>The roadmap describes useful outcomes. It does not need to predict every future file, test, or implementation decision. Use <code>$riff:add-phase</code> to add a larger improvement and <code>$riff:quick</code> for a small separate change.</p>
+<p>A new production application or an explicit complete-version request gets a complete scoped dossier before building. <code>PROJECT.md</code> indexes the stories and observable criteria, journeys, responsive ASCII wireframes, design references and tokens, data model and permissions, integration contracts, Mermaid diagrams, risks, and verification strategy. <code>ROADMAP.yaml</code> maps useful outcomes to those criteria.</p>
+<p>You can hand the wireframes to another design model. Its returned design and tokens join the dossier before implementation. A promised reference that has not arrived keeps the plan incomplete; RIFF does not invent a substitute. An independent review checks the complete dossier, and <code>discovery check</code> verifies that the review matches its current content.</p>
+<p>Scratch work and bounded changes can stay light. Existing projects are not silently enrolled in complete discovery. Once enrolled, a changed dossier needs a fresh review. The plan covers the committed version, not every possible future feature or file.</p>
+<h3 class="subhead">Evolve an existing application</h3>
+<div class="command"><div class="command-bar"><span>After installation, in Codex</span><button class="copy-button" type="button" data-copy="evolve-path">Copy</button></div><pre id="evolve-path">$riff:map Understand the existing application and save its map.
+$riff:onboard Reuse the map and establish the current product baseline.
+$riff:evolve Plan team invitations while preserving individual accounts.
+$riff:wave</pre><span class="copy-status" role="status"></span></div>
+<p>Run these as separate requests. Map records the existing system; onboard reuses it without inventing historical phases. Evolve challenges the need, checks the current code and consequences, and revises the affected phases. It never installs or onboards a project automatically and never starts a wave.</p>
+<p>For team invitations, the plan explains who can invite, what members can access, how removal works, and how existing private data stays private. Related suggestions, such as shared billing, are evaluated rather than automatically accepted. An exploratory discussion can end without changing the roadmap.</p>
+<p>Completed history and active phase contracts stay intact. If a change conflicts with active work, its proposal stays outside the live dossier until a safe boundary. Future phases can be revised or replaced with an explicit mapping and updated dependencies. A bounded legacy evolution stays light; an enrolled dossier needs a new planning review.</p>
+<p>Use <code>$riff:add-phase</code> for one already-understood independent outcome, and <code>$riff:quick</code> for a small separate implementation.</p>
+<h3 class="subhead">One change, one branch, one pull request</h3>
+<p>Wave establishes one integration branch and one PR for the coherent evolution or initial version. After the first validated phase, it opens a draft PR when publication is authorized. Later phases update the same PR. Creating or updating a draft does not pause loop mode.</p>
+<p>After whole-version verification, independent delivery review, and the applicable <code>finish --check</code> gates, RIFF marks the PR ready for review and returns its verified URL. A standalone quick change uses its own branch and PR with bounded checks. Without publication authorization, RIFF completes local work and prepares the PR description first. Merge and deployment require their own authorization.</p>
 </section>
 
 <section id="roles" class="panel" role="tabpanel" aria-labelledby="tab-roles" tabindex="0">
@@ -791,21 +804,22 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 </ul>
 <p>Ordinary product or technical choices are handled conservatively in loop mode. Guided mode also pauses for the requested decisions. A missing service check is recorded as missing evidence, not reported as a successful result.</p>
 <h3 class="subhead">Local completion and publication</h3>
-<p>A local commit is a saved point in your project's history. It does not upload the code, merge a pull request, deploy the app, or prove the live service works. Those actions need your instruction and their own checks when they are part of the requested outcome.</p>
+<p>A local commit saves reviewed work. With publication authorization, wave pushes that completed phase and creates or updates the same draft PR while continuing ready work. Final verification makes the PR ready for review; an open PR is not a merge or a deployment. RIFF verifies GitHub status separately from local checks and does not infer merge or deployment authorization from permission to open a PR.</p>
 </section>
 
 <section id="commands" class="panel" role="tabpanel" aria-labelledby="tab-commands" tabindex="0">
 <div class="section-head"><span class="section-num">№ 06</span><h2 class="section-title">Commands</h2></div>
 <p>Use the <code>$riff:...</code> commands in a Codex conversation, or select their corresponding project skills. Add the result you want in your own words. Terminal commands are listed separately below.</p>
 <div class="table-wrap"><table><thead><tr><th>In Codex</th><th>When to use it</th><th>What it does</th></tr></thead><tbody>
-<tr><td><code>$riff:start</code></td><td>A new product idea</td><td>Prepares a project brief and roadmap. Does not start building.</td></tr>
-<tr><td><code>$riff:onboard</code></td><td>An existing application</td><td>Inspects what is there and prepares or extends the shared plan.</td></tr>
-<tr><td><code>$riff:wave</code></td><td>Ready to build or continue</td><td>Resumes active work or chooses the next ready phase, checks it, and saves progress.</td></tr>
+<tr><td><code>$riff:start</code></td><td>A new product idea</td><td>Prepares the scoped plan; production applications get a complete dossier and independent readiness review. Stops before building.</td></tr>
+<tr><td><code>$riff:onboard</code></td><td>An existing application</td><td>Reuses the map to establish the existing product baseline without inventing past phases.</td></tr>
+<tr><td><code>$riff:evolve</code></td><td>A change to an onboarded product</td><td>Challenges the request, analyzes impacts, and revises the affected plan. Stops before implementation.</td></tr>
+<tr><td><code>$riff:wave</code></td><td>Ready to build or continue</td><td>Builds and verifies ready phases, maintains the authorized evolution PR, then verifies the whole version.</td></tr>
 <tr><td><code>$riff:status</code></td><td>You need an update</td><td>Reports current progress, blockers, and the next action.</td></tr>
 <tr><td><code>$riff:dashboard</code></td><td>You want a visual overview</td><td>Opens the local progress dashboard.</td></tr>
 <tr><td><code>$riff:quick</code></td><td>A small separate change</td><td>Builds, checks, reviews, and commits a change that does not need a new roadmap phase.</td></tr>
 <tr><td><code>$riff:debug</code></td><td>Something is broken</td><td>Investigates the failure and aims for a focused correction.</td></tr>
-<tr><td><code>$riff:add-phase</code></td><td>A larger new improvement</td><td>Adds a justified phase to the roadmap.</td></tr>
+<tr><td><code>$riff:add-phase</code></td><td>One clear independent outcome</td><td>Adds one justified phase without broader replanning.</td></tr>
 <tr><td><code>$riff:map</code></td><td>You need to understand existing code</td><td>Maps application behavior, structure, and boundaries.</td></tr>
 <tr><td><code>$riff:learn-stack</code></td><td>Reusable stack conventions need evidence</td><td>Researches version-aware rules and merges them into project taste. NowStack has a dedicated baseline; frontend work uses design skills and rendered browser checks. <a href="docs/usage.md#keep-design-and-engineering-conventions">Taste and stack research</a>.</td></tr>
 <tr><td><code>$riff:incident</code></td><td>An application incident is active</td><td>Contains and investigates the incident within project boundaries.</td></tr>
@@ -815,7 +829,7 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 </tbody></table></div>
 <div class="command"><div class="command-bar"><span>Fix a specific problem in Codex</span><button class="copy-button" type="button" data-copy="debug-example">Copy</button></div><pre id="debug-example">$riff:debug I click Save after entering a recipe, but it never
 appears in the list. I expected to see it immediately.</pre><span class="copy-status" role="status"></span></div>
-<p>For a small change, try <code>$riff:quick Make the empty list explain how to add a recipe.</code> For a larger addition, try <code>$riff:add-phase Let me share a recipe with a friend.</code></p>
+<p>For a small change, try <code>$riff:quick Make the empty list explain how to add a recipe.</code> For one clear outcome, try <code>$riff:add-phase Let me share a recipe with a friend.</code></p>
 <h3 class="subhead">In Terminal</h3>
 <div class="table-wrap"><table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody>
 <tr><td><code>riff-codex init</code></td><td>Connect the current Git project to RIFF.</td></tr>
@@ -848,6 +862,8 @@ appears in the list. I expected to see it immediately.</pre><span class="copy-st
 <h3 class="subhead">What the dashboard reads</h3>
 <p>The shared dashboard is a local Bun application. It reads registered projects, their plans, and saved progress. It also shows explanations written before a phase and updated with verified results after completion. It does not call Codex or Claude, use an AI API, or execute a wave.</p>
 <p>The usual address is <code>http://127.0.0.1:4000</code>. This documentation page is a separate manual; it is not the live project dashboard.</p>
+<h3 class="subhead">Resume the same delivery</h3>
+<p>Wave checkpoints preserve the phase context, next action, and references. On resume, RIFF reconciles the actual branch, remote head, and PR identity before continuing. It reuses the same open PR for the same change and never automatically reopens a closed PR. A completed local phase does not imply its PR was merged.</p>
 <h3 class="subhead">What is saved where</h3>
 <p><code>PROJECT.md</code> and <code>ROADMAP.yaml</code> live with the application. Progress, review records, events, and dashboard explanations live in <code>.riff-codex-state/</code>. That local folder is excluded from Git.</p>
 <p>Returning to the same working folder preserves that local context. A clone on another computer does not automatically contain those progress records. Do not treat the dashboard as a backup, or edit the saved state to mark work complete.</p>
@@ -860,6 +876,9 @@ appears in the list. I expected to see it immediately.</pre><span class="copy-st
 <div class="section-head"><span class="section-num">№ 08</span><h2 class="section-title">Reference</h2></div>
 <p>These files contain the detailed instructions behind the behavior described here. The project brief and roadmap remain the shared product sources; this manual is an explanation of how RIFF uses them.</p>
 <ul class="sources">
+<li><a href="riff/references/discovery.md">Discovery and readiness</a><span>Complete version planning, design handoff, and independent review.</span></li>
+<li><a href="riff/references/evolution.md">Product evolution</a><span>Brownfield prerequisites, impact analysis, and roadmap preservation.</span></li>
+<li><a href="riff/references/git-delivery.md">Branches and pull requests</a><span>One PR across waves, publication, resume, and final readiness.</span></li>
 <li><a href="docs/installation.md">Installation guide</a><span>Prerequisites, skills, hook approval, updates, and setup problems.</span></li>
 <li><a href="docs/usage.md">Everyday use</a><span>Examples for new ideas, existing applications, small changes, and fixes.</span></li>
 <li><a href="docs/how-it-works.md">How it works</a><span>The project flow, who does what, and what completion means.</span></li>
@@ -969,12 +988,12 @@ appears in the list. I expected to see it immediately.</pre><span class="copy-st
  });
  const steps = {
   '1': ['Your request', 'Describe what someone should be able to do and why. Codex can investigate the application and the technical choices.', '“Let me save a recipe and find it later.”'],
-  '2': ['Project brief and roadmap', 'The brief records the goal and boundaries. The roadmap lists useful outcomes, their priority, and anything they need first. Start and onboard prepare these without launching a build.', 'PROJECT.md + ROADMAP.yaml'],
+  '2': ['Prepare and review the plan', 'Start prepares the complete production version, including design and independent review. Map and onboard establish an existing baseline; evolve plans its changes. Light work stays scoped. Planning never launches a build.', 'Product dossier → readiness review → separate wave request'],
   '3': ['Select or resume a phase', 'RIFF reads saved progress. It resumes active work or selects the highest-priority phase whose prerequisites are complete. A request for a specific phase still respects those prerequisites.', 'Save recipes before adding recipe search.'],
   '4': ['Build a usable result', 'Codex reads the relevant project context and implements the phase. Separate tasks can use additional help when their ownership is clear. Ordinary development errors are corrected during this work.', 'Enter a recipe → save it → retrieve it.'],
   '5': ['Check and review', 'The changed behavior is checked and the actual code gets a fresh functional review. Sensitive changes also require a focused security review. The evidence applies to that exact version.', 'A saved recipe should still be there when you return.'],
-  '6': ['Save code and progress', 'The reviewed changes are saved in a local Git commit. RIFF records completion and writes a short explanation of the verified result for the dashboard.', 'Reviewed code → local history → completed phase'],
-  '7': ['Continue or finish', 'In loop mode, RIFF returns to selection and follows the next ready phase. Guided mode pauses between phases. The cycle ends when the roadmap is complete or a real blocker stops the work.', 'Next ready phase → step 3']
+  '6': ['Commit and update the PR', 'RIFF records the verified phase and its local commit. With publication authorization, it opens or updates the same draft PR for this evolution. Without it, local work continues and the PR description is prepared.', 'Validated phase → commit → same authorized PR'],
+  '7': ['Verify the whole version', 'Loop follows the next ready phase without stopping at a draft PR. After the last phase, RIFF checks connected journeys, gets an independent delivery review, and marks the authorized PR ready after final gates. Merge and deployment remain separate.', 'Next phase → step 3; final verification → PR ready']
  };
  const explanation = document.getElementById('step-explanation');
  document.querySelectorAll('[data-step]').forEach(button => {
