@@ -10,3 +10,5 @@ Read existing project taste under `.riff-codex/references/taste.md` and distingu
 Use Astra Medium for synthesis and judgment, following `.riff-codex/references/model-routing.md`. Inspect the repository with a read-only Luna XHigh inventory when useful. Map user-visible flows to entry points, data boundaries, external systems, and sensitive surfaces. Distinguish verified facts from inference.
 
 Write a concise `.riff-codex-state/MAP.md` only when the map will be reused. Do not create a speculative target architecture, implementation plan, or exhaustive file inventory.
+
+For the explicit install → map → onboard → evolve → wave path, save the reusable map with the inspected revision or working-tree context, source references, and remaining uncertainties. Map does not onboard the project or invent a roadmap. Point to `$riff:onboard`, which reuses these findings after checking relevant drift.

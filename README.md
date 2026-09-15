@@ -83,6 +83,7 @@ These are routing instructions, not an automatic change to the model selected in
 - **The whole version is checked.** After per-phase verification, Codex exercises the connected journeys and obtains an independent delivery review. Corrections follow the normal phase gates.
 - **Completion needs evidence.** A phase must pass executed checks and the required reviews for the exact version being delivered. Required browser or smoke checks need recorded results. Local verification reports make those results inspectable.
 - **Codex handles observations every phase.** It fixes confirmed problems within scope and records verified dispositions. Enrolled projects require explicit follow-up phases for nonblocking pending items; HIGH and CRITICAL findings cannot be deferred through completion. The dashboard preserves decisions and reopens new occurrences.
+- **Existing products can evolve deliberately.** `$riff:evolve` challenges a requested change against the current application, updates only the affected plan, and stops at planning readiness. `$riff:wave` remains the separate implementation step.
 - **Recovery preserves verified work.** Interrupted delivery can reuse evidence that still matches the candidate. Dashboard phase links support both named and numeric identifiers.
 - **System hooks avoid duplicate checks.** On a Mac with RIFF's matching system policy already installed, resync removes duplicate project hooks. Other installations keep the ordinary project-hook approval flow.
 
@@ -91,6 +92,8 @@ These are routing instructions, not an automatic change to the model selected in
 **For this update, run `riff-codex resync` and `riff-codex doctor` once in each connected project**, after its active work finishes. This updates local installation files, including the verification-report exclusion and hook configuration. It preserves the project brief, roadmap and preferences.
 
 Projects linked to the same RIFF checkout already read its updated files; they do not each need a Git pull or a reinstall. Start a fresh Codex session to load the updated skill instructions. For model-routing-only updates, that fresh session is enough when the links are intact. A separately installed plugin or another checkout must be updated separately.
+
+The normal `riff-codex init` or `riff-codex resync` path exposes newly registered skills such as `evolve`. There is no separate consumer migration. An existing Codex session needs a fresh session to load the new skill instructions.
 
 If a dashboard was already running, restart that dashboard process and reload the page to load server changes. See [Update RIFF](docs/installation.md#update-riff) for commands and hook approval details.
 
@@ -137,7 +140,9 @@ $riff:start I want a simple app where I can save and find my recipes.
 **For an application that already exists:**
 
 ```text
-$riff:onboard Understand this app and make a plan for improving it.
+$riff:map Understand the current application.
+$riff:onboard Establish its existing behavior as the RIFF baseline.
+$riff:evolve Plan how to make finding a recipe easier.
 ```
 
 Production `start` prepares and reviews the complete dossier, including design before building. `onboard` preserves the existing application's documents and behavior. Once preparation is complete, start building:
@@ -148,6 +153,18 @@ $riff:wave
 
 A “wave” means working through the next ready steps. Run the same command when you return to continue unfinished work. If RIFF has recorded a blocker, it needs to be resolved before that work can resume.
 
+For an existing application that is not connected to RIFF, the complete path is explicit:
+
+```text
+riff-codex init                 # Terminal, once for this project
+$riff:map                       # Codex: understand the current system
+$riff:onboard                   # Codex: establish the RIFF baseline
+$riff:evolve Add team invitations while preserving individual accounts.
+$riff:wave                      # Codex: implement the reviewed plan
+```
+
+`map` inspects the current system without changing product or code. In this preparation path it saves a reusable `.riff-codex-state/MAP.md` for `onboard` to reuse. `onboard` reuses that map and records the existing behavior as a baseline; it does not invent historical delivery phases. If the application is already onboarded, use `$riff:evolve` directly for a product change that needs reconsideration or affects more than one future phase. Evolve analyzes the current code, data and access boundaries, preserves completed and active phase contracts, and ends at planning readiness. It never starts a wave itself.
+
 ## What to ask next
 
 | You want to… | Use in Codex |
@@ -156,7 +173,8 @@ A “wave” means working through the next ready steps. Run the same command wh
 | Open the dashboard | `$riff:dashboard` |
 | Make a small, separate change | `$riff:quick Make the empty screen easier to understand.` |
 | Fix something that is broken | `$riff:debug The save button does nothing.` |
-| Add a larger improvement to the plan | `$riff:add-phase Let people share a recipe.` |
+| Add one already-clear outcome | `$riff:add-phase Let people share a recipe.` |
+| Reconsider an existing product change | `$riff:evolve Let recipe owners invite teammates.` |
 | Continue building | `$riff:wave` |
 
 You can also open the dashboard from Terminal with `riff-codex dashboard`. It normally opens at `http://127.0.0.1:4000` on your computer.

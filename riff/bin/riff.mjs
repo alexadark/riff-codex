@@ -650,6 +650,74 @@ function normalizePhase(id, phase, canonical) {
   };
 }
 
+const NORMALIZED_PLAN_FIELDS = [
+  'title',
+  'outcome',
+  'demo',
+  'priority',
+  'depends_on',
+  'blocking_edges',
+  'risks',
+  'sensitive',
+  'verificationRequired',
+];
+
+function normalizedPlan(phase, knownIds) {
+  const normalized = normalizePhase(phase.id, phase, false);
+  if (Object.hasOwn(phase, 'verificationRequired')) normalized.verificationRequired = Boolean(phase.verificationRequired);
+  normalized.depends_on = normalizeStringArray(normalized.depends_on).map((dependency) => {
+    if (knownIds.has(dependency)) return dependency;
+    const unprefixed = dependency.replace(/^phase-/i, '');
+    if (knownIds.has(unprefixed)) return unprefixed;
+    const prefixed = `phase-${dependency}`;
+    return knownIds.has(prefixed) ? prefixed : dependency;
+  });
+  return normalized;
+}
+
+function normalizeStoredPlanField(field, normalized) {
+  if (field === 'depends_on') {
+    return normalizeStringArray(normalized[field]);
+  }
+  if (field === 'blocking_edges' || field === 'risks') return normalizeStringArray(normalized[field]);
+  if (field === 'sensitive' || field === 'verificationRequired') return Boolean(normalized[field]);
+  return normalized[field];
+}
+
+function changedPlanFields(prior, incoming, knownIds) {
+  const priorPlan = normalizedPlan(prior, knownIds);
+  const incomingPlan = normalizedPlan(incoming, knownIds);
+  return NORMALIZED_PLAN_FIELDS.filter((field) => {
+    const priorValue = normalizeStoredPlanField(field, priorPlan);
+    const incomingValue = normalizeStoredPlanField(field, incomingPlan);
+    return JSON.stringify(priorValue) !== JSON.stringify(incomingValue);
+  });
+}
+
+function phaseIsReferenced(state, id) {
+  const records = [
+    state.activeWave,
+    state.humanAction,
+    state.lastValidation,
+    state.reviews?.functional,
+    state.reviews?.security,
+    ...(Array.isArray(state.securityFindings) ? state.securityFindings : []),
+  ];
+  return records.some((record) => record?.phase === id);
+}
+
+function phaseHasReceipt(root, id) {
+  return ['functional', 'security'].some((type) => existsSync(localPath(root, path.join(pathsFor(root).receipts, `${phaseId(id)}-${type}.json`))));
+}
+
+function phaseHasExecutionHistory(root, state, phase) {
+  return phase.status !== 'ready'
+    || Number(phase.attempts ?? 0) > 0
+    || Boolean(phase.commit || phase.baseCommit || phase.checkpoint || phase.validation || phase.retryCandidate)
+    || phaseIsReferenced(state, phase.id)
+    || phaseHasReceipt(root, phase.id);
+}
+
 function readRoadmap(root) {
   const file = pathsFor(root).roadmap;
   let roadmap;
@@ -691,20 +759,33 @@ function syncRoadmap(root) {
   const old = new Map(state.phases.map((phase) => [phase.id, phase]));
   const incoming = new Set(roadmap.phases.map((phase) => phase.id));
   for (const prior of state.phases) {
-    if (!incoming.has(prior.id) && (prior.status !== 'ready' || prior.commit || state.reviews.functional?.phase === prior.id || state.reviews.security?.phase === prior.id || state.lastValidation?.phase === prior.id)) throw new Error(`cannot remove referenced phase ${prior.id}; preserve its history in the roadmap`);
+    if (!incoming.has(prior.id) && phaseHasExecutionHistory(root, state, prior)) throw new Error(`cannot remove referenced phase ${prior.id}; preserve its history in the roadmap`);
   }
-  state.project = { name: roadmap.project.name ?? null, objective: roadmap.project.objective ?? null };
-  state.roadmap = { source: 'ROADMAP.yaml', format: roadmap.format, out_of_scope: roadmap.out_of_scope ?? [] };
-  state.phases = roadmap.phases.map((phase) => {
+  const knownIds = new Set(roadmap.phases.map((phase) => phase.id));
+  for (const phase of roadmap.phases) {
     const prior = old.get(phase.id);
-    return prior
-      ? { ...prior, ...phase, status: prior.status, commit: prior.commit ?? null, attempts: prior.attempts ?? 0, reason: prior.reason ?? null, blockerKind: prior.blockerKind ?? null }
-      : { ...phase, commit: null, attempts: 0, reason: null, blockerKind: null };
+    if (prior && ['active', ...TERMINAL_PHASE_STATES].includes(prior.status)) {
+      const changed = changedPlanFields(prior, phase, knownIds);
+      if (changed.length) throw new Error(`cannot change normalized plan fields for ${prior.status} phase ${prior.id}: ${changed.join(', ')}`);
+    }
+  }
+  const phases = roadmap.phases.map((phase) => {
+    const prior = old.get(phase.id);
+    if (!prior) return { ...phase, commit: null, attempts: 0, reason: null, blockerKind: null };
+    const protectedPlan = ['active', ...TERMINAL_PHASE_STATES].includes(prior.status);
+    const merged = protectedPlan ? { ...prior } : { ...prior, ...phase };
+    return { ...merged, status: prior.status, commit: prior.commit ?? null, attempts: prior.attempts ?? 0, reason: prior.reason ?? null, blockerKind: prior.blockerKind ?? null };
   });
-  validateState(state);
-  saveState(root, state);
-  event(root, 'roadmap_synced', { phases: state.phases.length });
-  return state;
+  const nextState = {
+    ...state,
+    project: { name: roadmap.project.name ?? null, objective: roadmap.project.objective ?? null },
+    roadmap: { source: 'ROADMAP.yaml', format: roadmap.format, out_of_scope: roadmap.out_of_scope ?? [] },
+    phases,
+  };
+  validateState(nextState);
+  saveState(root, nextState);
+  event(root, 'roadmap_synced', { phases: nextState.phases.length });
+  return nextState;
 }
 
 function dependenciesComplete(state, phase) {

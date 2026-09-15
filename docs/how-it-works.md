@@ -17,6 +17,8 @@ Imagine you ask for an app that saves recipes.
 7. **Continue.** Loop mode moves to the next ready step. Guided mode pauses between steps.
 8. **Verify the whole version.** Codex checks connected journeys on the integrated result and obtains an independent final review. Any remaining in-scope correction follows the phase validation path.
 
+For an existing application, the path is explicit: install RIFF, map the current system, onboard the baseline, evolve a requested product change when it needs reconsideration, then wave the reviewed plan. `map` provides reusable current-system context. `onboard` reuses that context and describes existing capabilities without inventing retrospective phases. `evolve` checks the current code, data and access boundaries, challenges the need, supports related requests, and revises only affected future contracts. It preserves completed and active phase contracts and stops at planning readiness; it never activates a wave.
+
 ## Where information goes
 
 ```mermaid
@@ -24,6 +26,11 @@ flowchart TD
     Request[Your request] --> Shape[Start a new idea or onboard an existing app]
     Shape --> Brief[PROJECT.md: product brief]
     Shape --> Roadmap[ROADMAP.yaml: steps and prerequisites]
+    Existing[Existing app not yet onboarded] --> Map[Map current system]
+    Map --> Onboard[Onboard baseline and reuse map]
+    Onboard --> Brief
+    Onboard --> Evolve[Challenge request and revise affected plan]
+    Evolve --> Brief
     Brief --> Ready[Complete dossier and independent readiness review]
     Ready --> Wave[Wave: select or resume ready work]
     Roadmap --> Wave
@@ -62,6 +69,14 @@ Solid arrows show the working cycle. Dotted arrows show information being displa
 The original “band of six” slogan is RIFF's signature. RIFF Codex does not require a fixed team of six agents on every request.
 
 The primary agent can delegate independent packages within a phase. Concurrent writers use separate worktrees and return changes for integration. Reviews can run in parallel on the same frozen candidate. A single owner coordinates phase state, architecture and final acceptance.
+
+## How product changes are replanned
+
+`$riff:evolve` is a planning boundary for an existing product. It reads the current baseline and relevant evidence, then compares the requested outcome with what the application actually does. The analysis covers affected journeys, screens and states, data and migrations, permissions and tenancy, integrations, and operational behavior. It records what existing users retain and what changes.
+
+One evolve request may contain several related requests. RIFF identifies shared outcomes and conflicts before changing the plan. It updates affected specifications and future roadmap phases only, preserves completed history and active contracts, and repoints dependencies before synchronization. A pending replacement may remove only an unreferenced phase that has never started; the plan records the old-to-new mapping. Work beyond the version remains in existing exclusions with a reason.
+
+Evolve checks readiness according to the project's enrollment. A legacy onboarded project may receive a bounded evolution without silent enrollment. A complete-version request uses the full discovery dossier and independent review. An enrolled project's changed dossier needs a fresh review and discovery check. Evolve ends at planning readiness, so a separate `$riff:wave` request is required to activate implementation.
 
 ## What “done” means
 

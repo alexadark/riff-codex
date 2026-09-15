@@ -1,0 +1,4 @@
+interface:
+  display_name: "RIFF Evolve"
+  short_description: "Plan product changes against the existing app"
+  default_prompt: "Use $evolve through $riff:evolve to assess this change and revise the existing product plan."

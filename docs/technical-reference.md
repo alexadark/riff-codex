@@ -27,6 +27,8 @@ Initialization excludes `.riff-codex-state/` and generated `.uxtest/runs/` throu
 
 The native plugin definition lives at [`riff/.codex-plugin/plugin.json`](../riff/.codex-plugin/plugin.json). It exposes `$riff:*` skills; it is not a separate execution engine.
 
+Newly registered skills are exposed through the normal `riff-codex init` and `riff-codex resync` paths. Existing Codex sessions keep the instructions loaded when they opened, so a newly exposed skill requires a fresh session. There is no separate consumer migration step.
+
 ## Hook safeguards
 
 RIFF keeps six Codex event handlers and two chained Git hooks. Post-tool hooks collect focused warnings and validation needs; they don't run tests or typechecks after every edit. Validation and candidate-bound review remain workflow checkpoints.
@@ -70,6 +72,8 @@ Ready work is selected by priority after its prerequisites are complete. Review 
 
 `loop` is the default. `guided` retains planning confirmations and pauses between phases. Loop mode records conservative assumptions and continues rather than stopping for ordinary product decisions. Its blocker kinds are `credentials-or-access`, `third-party-verification`, `destructive-target`, and `validation-failure`. External publication still follows the user's explicit authorization.
 
+`$riff:evolve` is the conversation skill for product changes that need a current-system impact analysis or several interacting roadmap changes. It checks the installed and onboarded prerequisites, reuses map findings while checking affected areas for drift, challenges the need, and updates only affected specifications and future phases. It preserves completed and active phase contracts, repoints dependencies before synchronization, and ends at planning readiness. It never activates a wave. A legacy bounded evolution does not silently enroll an existing project; a complete-version request follows the full discovery contract, and an enrolled changed dossier needs a fresh discovery review and check. Use only supported lifecycle states when replacing or deferring pending work.
+
 ## Using RIFF with Claude Code
 
 Both frameworks may share `PROJECT.md` and `ROADMAP.yaml` in an application. Claude owns `.riff` and `.riff-state/`; Codex owns `.riff-codex` and `.riff-codex-state/`. Only one runtime should execute a given phase at a time.
@@ -95,7 +99,7 @@ Read the [dashboard README](../riff/dashboard/README.md) and [projection contrac
 - [Model routing](../riff/references/model-routing.md): when and how to use additional agents.
 - [Start](../riff/skills/start/SKILL.md), [onboard](../riff/skills/onboard/SKILL.md), and [wave](../riff/skills/wave/SKILL.md): core workflows.
 - [Quick](../riff/skills/quick/SKILL.md), [debug](../riff/skills/debug/SKILL.md), and [add phase](../riff/skills/add-phase/SKILL.md): everyday changes.
-- [Map](../riff/skills/map/SKILL.md), [learn stack](../riff/skills/learn-stack/SKILL.md), [incident](../riff/skills/incident/SKILL.md), [deep audit](../riff/skills/deep-audit/SKILL.md), and [promote](../riff/skills/promote/SKILL.md): less frequent workflows.
+- [Map](../riff/skills/map/SKILL.md), [evolve](../riff/skills/evolve/SKILL.md), [learn stack](../riff/skills/learn-stack/SKILL.md), [incident](../riff/skills/incident/SKILL.md), [deep audit](../riff/skills/deep-audit/SKILL.md), and [promote](../riff/skills/promote/SKILL.md): less frequent workflows.
 
 For framework code changes, the existing test command is `npm test` from the RIFF Codex checkout. Documentation changes need link, content, and rendering checks rather than a full application test run.
 

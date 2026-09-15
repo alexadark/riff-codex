@@ -30,11 +30,75 @@ $riff:wave
 ## Start with an existing app
 
 ```text
-$riff:onboard Understand this recipe app. Preserve what already works
-and plan how to make finding a recipe easier.
+$riff:map Understand this recipe app and save its current-system map.
+$riff:onboard Reuse the map and establish the existing product baseline.
+$riff:evolve Plan how to make finding a recipe easier while preserving what works.
 ```
 
 RIFF inspects the app before planning changes. It uses any existing project brief and roadmap instead of replacing them just to change their format. Once the plan is ready, use `$riff:wave` to begin work.
+
+## Prepare an existing application
+
+If the application is not connected to RIFF yet, use this sequence. Installation happens in Terminal; the rest is in the Codex conversation:
+
+```text
+riff-codex init
+$riff:map
+$riff:onboard
+$riff:evolve I want to invite teammates while preserving individual accounts.
+$riff:wave
+```
+
+`map` inspects the current system without changing product or code. In this preparation path it saves a reusable `.riff-codex-state/MAP.md` for `onboard` to reuse. `onboard` reuses relevant map findings, checks the affected areas for drift, and establishes a baseline of existing behavior. That baseline is not a retrospective list of delivery phases. If the project is already onboarded, start at `$riff:evolve`.
+
+The normal `riff-codex init` and `riff-codex resync` paths expose newly registered skills. A running Codex session keeps the instructions it loaded earlier, so open a fresh session before using a newly exposed skill. No separate consumer migration is needed.
+
+## Evolve an existing product
+
+Use `$riff:evolve` when a requested change needs product questioning or can affect several interacting phases, specifications, or user boundaries. Use `$riff:add-phase` when the outcome is already clear and one bounded vertical phase is enough. Evolve can accept one request or several related requests from a meeting or collaborator; suggestions are input to evaluate, not automatic product commitments.
+
+Evolve checks that the project is installed and onboarded. It does not install RIFF, run `map`, run `onboard`, or manufacture missing project context. For an application without RIFF, follow the explicit install → map → onboard → evolve → wave path above. A bounded evolve on a legacy onboarded project does not silently enroll it in the complete discovery contract. A request to plan a complete version follows full discovery and its independent review. An enrolled project whose dossier changes needs a fresh discovery review and check before further activation.
+
+The planning pass:
+
+1. Challenges the need, users, desired observable outcome, scope and exclusions.
+2. Reuses the map and checks current code, data, permissions, tenancy, integrations and operational behavior for drift.
+3. Explains the current-to-target impact, including what existing users must retain and what must change.
+4. Updates only affected specifications and future roadmap phases, with stable story and criterion IDs and real dependencies. Completed phase IDs, historical outcomes, receipts and active phase contracts remain intact. Dependencies are repointed before the roadmap is synchronized.
+5. Stops at a planning-ready handoff. Evolve never activates a wave; use `$riff:wave` separately.
+
+If a pending phase must be replaced, remove only a never-started, unreferenced `ready` phase and document the old-to-new mapping. Work deferred beyond the version belongs in the existing exclusions with a reason. Do not invent a lifecycle status or use a fake low-priority phase to represent deferral. An active phase is never silently retargeted; evolve records the conflict and keeps dependent planning from activating until the supported handoff is established.
+
+### Worked example: team invitations
+
+Suppose the application currently gives each person an individual account. A useful evolve request makes the product question and the preservation rules concrete:
+
+```text
+$riff:evolve
+We have individual accounts today. I want account owners to invite teammates
+to a shared workspace, revoke an invitation, and remove a member later.
+Keep each person's existing account and personal data. Only an owner or
+authorized admin may invite or revoke; members may see shared workspace
+projects but must not gain access to another workspace. Please challenge
+whether this is the smallest useful outcome, inspect the current auth,
+workspace and project boundaries, and update only the affected roadmap and
+specifications. Leave completed and active phase contracts intact and stop
+with a planning-ready result. Do not start implementation.
+```
+
+The resulting plan should make the new behavior observable: an invitation has a lifecycle, authorized users can manage it, an accepted member can reach the shared workspace, personal data remains private, and revoked or cross-workspace access is denied. It should also show the affected data, permissions, screens, recovery behavior and dependencies. `$riff:wave` is the next request only after that revised plan is ready.
+
+Related requests can be evaluated together when they share the same boundary:
+
+```text
+$riff:evolve
+Please evaluate these related requests from the team meeting: workspace
+invitations, member removal, and a member activity history. Identify the
+shared outcome and conflicts, preserve current individual-account behavior,
+and revise only the future phases and contracts that are actually affected.
+```
+
+Use `$riff:start` for a new product, and `$riff:add-phase` when an already-understood outcome fits one bounded phase. An exploratory suggestion can remain a discussion with options and consequences, without changing project artifacts. Requests to create an unsupported roadmap status or to silently enroll an old project also belong outside this command's contract.
 
 ## Let it work, then see what changed
 

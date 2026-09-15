@@ -2,6 +2,8 @@
 
 This is the canonical reference for `$riff:start` when it produces a complete scoped-version dossier. It complements [project framing](project-framing.md), which defines the product content in `PROJECT.md` and the phase map in `ROADMAP.yaml`.
 
+`$riff:evolve` reuses this contract for an enrolled dossier or an explicitly requested complete next-version plan. Its [evolution contract](evolution.md) defines scoped brownfield analysis and the light path for bounded changes to legacy onboarded applications; it does not duplicate this manifest or review lifecycle.
+
 ## Scope and boundary
 
 Use the complete path when the user explicitly asks for a full application plan or asks to plan a new application for production. Use the light path for scratch work, bounded risk probes, and `$riff:quick`. A small existing application with one clear outcome may remain light. An explicit full-app request takes precedence over a convenient light interpretation.
