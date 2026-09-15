@@ -1,16 +1,16 @@
 # Restore pull request delivery
 
-Status: planned; implement after the concurrent evolve work is complete and verified.
+Status: implemented in the shared Git delivery reference and wave/quick skill instructions after evolve commit `3d8fa13`. GitHub publication is performed by the agent; CLI verification remains local. Live publication is not part of this implementation request.
 
 ## Confirmed gap
 
-RIFF Codex currently requires reviewed local commits but explicitly excludes PR creation from completion requirements in `riff/references/operating-contract.md` and `riff/skills/wave/SKILL.md`. `finish --check` checks local readiness and performs no GitHub publication. The user wants PR delivery restored, as remembered from Claude RIFF. Exact historical Claude behavior has not yet been inspected.
+RIFF Codex currently requires reviewed local commits but explicitly excludes PR creation from completion requirements in `riff/references/operating-contract.md` and `riff/skills/wave/SKILL.md`. `finish --check` checks local readiness and performs no GitHub publication. The user wants PR delivery restored, as remembered from Claude RIFF. Read-only inspection of Claude RIFF confirmed stacked per-phase PRs in `protocols/GIT-DELIVERY.md`; the user chose one PR per coherent evolution for Codex instead.
 
 ## Intended outcome
 
 Restore a coherent branch, reviewed commits, and pull request workflow for deliverable changes. Preserve local validation and review gates. A local commit must not be reported as a published PR.
 
-Before implementation, inspect the original Claude RIFF delivery contract read-only and reconcile it with the final evolve implementation. Resolve PR granularity from that evidence and the current wave model; avoid automatically creating one PR per internal phase.
+Before implementation, inspect the original Claude RIFF delivery contract read-only and reconcile it with the final evolve implementation. The agreed granularity is one PR per coherent evolution across successive waves, with an authorized draft after the first validated phase. PR creation does not pause loop mode; guided retains its existing pauses.
 
 - Prepare changes on a scoped branch, preserving unrelated work and concurrent tasks.
 - When delivery is authorized, push the verified branch and create or update its PR. Reuse an existing matching PR on resume rather than creating duplicates.
@@ -27,4 +27,12 @@ Use the narrowest relevant checks for the implemented behavior, covering authori
 
 ## Concurrency boundary
 
-This task records the delivery gap and intended restoration only. It does not modify evolve, shared runtime contracts, skills, or RIFF state, and does not push or open a PR. Recheck the completed evolve diff before implementing shared delivery changes.
+Evolve was committed before delivery implementation began. The implementation updates the shared delivery instructions and wave/quick entry points without changing evolve or RIFF state. Unrelated handoff edits remain untouched. No push, live PR creation, merge or deployment is authorized by this implementation task.
+
+## Implementation verification
+
+- `doctor`: zero errors or warnings before the instruction changes; runtime and installation files are unchanged.
+- Direct YAML, UI metadata, canonical symlink and affected Markdown-link checks passed for wave and quick. The personal skill validator reports `excluded path` for these framework paths, so it did not validate them.
+- Existing `test/delivery-cli.test.mjs`: four passing tests covering discovery, phase completion, final delivery evidence and retry integrity. No CLI behavior was changed.
+- Instruction walkthroughs: an authorized loop opens a draft and continues on the same branch; an authorized standalone quick change creates its bounded PR after review; local-only implementation stays local; an evolve planning request never enters this publication workflow. Resume checks the existing PR identity before creation. These are contract reviews, not live agent or GitHub executions.
+- No live push, PR creation, merge or deployment was exercised. Final diff checked for unrelated changes and whitespace errors.

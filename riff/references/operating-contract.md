@@ -30,7 +30,7 @@ In `loop`, `awaiting_human`, `blocked`, and `parked` are never used for a produc
 - `destructive-target`: a destructive operation is authorized in principle but its exact target cannot be identified safely.
 - `validation-failure`: a RIFF validation or review failed and its permitted correction did not produce acceptable evidence.
 
-Waiting for Claude RIFF to release the shared roadmap is scheduling, not a decision handoff, and must not create `awaiting_human`. Completing the roadmap is a successful terminal condition.
+Waiting for Claude RIFF to release the shared roadmap is scheduling, not a decision handoff, and must not create `awaiting_human`. Completing the roadmap is a successful terminal condition. Publication and merge scheduling follow [Git delivery](git-delivery.md): a draft PR never pauses a loop, and missing publication authorization does not stop independent local work. Work requiring an actual base-branch integration waits for that integration without inventing a phase status.
 
 If the user supplies design through another model, finish independent planning while awaiting that actual external artifact. An unavailable promised reference is an external access dependency: report the missing input and keep discovery incomplete before phase activation. Do not invent receipt of the design, create a product-decision approval queue, or substitute RIFF design unless authorized. A non-UI project can justify visual areas as not applicable.
 
@@ -53,7 +53,7 @@ The dashboard presents those operational states using the fixed columns `Todo`, 
 
 In `loop`, RIFF automatically resumes a legacy parked, blocked, or awaiting-human phase whose reason is only a product or technical decision, recording the conservative choice. A permitted hard blocker resumes only after it is cleared. In `guided`, explicit user instruction may resume the phase. Resumption records the reason, activates the phase, and starts a fresh formal retry budget without bypassing validation or review gates.
 
-Use [candidate evidence](evidence.md) for executed validation, independent review artifacts and generated screenshot reports. Before explicitly authorized final Git delivery, use `finish --check`; this does not itself publish anything.
+Use [candidate evidence](evidence.md) for executed validation, independent review artifacts and generated screenshot reports. Follow [Git delivery](git-delivery.md) for one scoped branch and PR per coherent evolution across successive waves. Authorized draft publication follows completed phase evidence; final PR readiness requires `finish --check`, which does not itself publish anything.
 
 Checkpoints, compaction and recovery of active work preserve correction counts and evidence; they are not new attempts. Do not re-run a failed check or review on an unchanged candidate to obtain a favorable result. A resumed hard blocker needs a genuine corrected condition, not merely a different model or session. See [execution](execution.md) for durable context and no-progress handling.
 
@@ -63,7 +63,7 @@ Receipts are valid only for their recorded Git tree hash. Any candidate change r
 
 Use direct work for a tiny correction, explicit APEX for an independent bounded feature, and RIFF for dependent phases requiring persistent progress. Before APEX runs inside a RIFF project, inspect the roadmap and current phase. Work belonging to an active phase retains RIFF receipts and completion gates; an independent change need not create a phase or a second state system.
 
-Review both whether the result satisfies the user's request and whether it follows relevant repository standards. Require observable evidence appropriate to the promised behavior; a build alone does not prove a live workflow. Keep receipts internal. The user-facing report gives the outcome, commit, checks, blocker and next phase. GitHub issues are optional projections created only by an explicit `$riff:issue` request, grouped by useful outcomes without microtasks or historical PR metadata. PR creation, extensive PR metadata and collaborator-specific delivery dossiers are not completion requirements. Follow explicit publication instructions separately.
+Review both whether the result satisfies the user's request and whether it follows relevant repository standards. Require observable evidence appropriate to the promised behavior; a build alone does not prove a live workflow. Keep receipts internal. The user-facing report gives the outcome, commit, checks, blocker and next phase. GitHub issues are optional projections created only by an explicit `$riff:issue` request, grouped by useful outcomes without microtasks or historical PR metadata. Authorized Git delivery includes creating or updating the change's PR under [Git delivery](git-delivery.md). Report the verified PR URL and actual delivery status, or explicitly report a local-only result when publication is not authorized. Extensive PR metadata and collaborator-specific delivery dossiers are not required. Merge and deployment retain their explicit authorization boundaries.
 
 ## Observation ownership at completion
 

@@ -153,6 +153,12 @@ $riff:wave
 
 A “wave” means working through the next ready steps. Run the same command when you return to continue unfinished work. If RIFF has recorded a blocker, it needs to be resolved before that work can resume.
 
+### Branches and pull requests
+
+RIFF keeps one branch and one PR for a coherent evolution or initial version across successive waves. When you authorize publication, it opens a draft after the first validated phase and updates that same PR as later phases complete. In `loop`, creating a PR does not pause work; `guided` keeps its existing between-phase pauses. After whole-version verification and `finish --check`, RIFF marks the PR ready for review and returns its verified URL. Merge and deployment require their own authorization.
+
+Without publication authorization, RIFF completes local work and prepares the PR description before requesting delivery. A standalone `quick` change follows the same branch/PR workflow with its bounded checks. The skills perform Git and GitHub operations; the CLI verification commands do not push or create PRs themselves. See the [Git delivery contract](riff/references/git-delivery.md) for resume and concurrent-work rules.
+
 For an existing application that is not connected to RIFF, the complete path is explicit:
 
 ```text
