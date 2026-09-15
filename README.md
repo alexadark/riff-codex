@@ -17,9 +17,9 @@ You describe what you want. RIFF helps Codex keep a clear plan, build it in usef
 
 The slogan comes from the original RIFF for Claude Code. Here, Codex coordinates the work and brings in extra help when it is useful.
 
-[Visual field manual](riff-documentation.html) · [Installation](docs/installation.md) · [Everyday use](docs/usage.md) · [How it works](docs/how-it-works.md)
+[Visual field manual](https://riff-codex-doc.vercel.app) · [Installation](docs/installation.md) · [Everyday use](docs/usage.md) · [How it works](docs/how-it-works.md)
 
-The visual manual is a local HTML page: download or open `riff-documentation.html` in your browser. GitHub shows its source rather than a live preview.
+The visual manual is available online at [riff-codex-doc.vercel.app](https://riff-codex-doc.vercel.app).
 
 ## What RIFF does for you
 
@@ -189,7 +189,7 @@ You can also open the dashboard from Terminal with `riff-codex dashboard`. It no
 
 | Guide | What it answers |
 | --- | --- |
-| [Visual field manual](riff-documentation.html) | See the whole workflow, explore the diagram, and copy starter commands. |
+| [Visual field manual](https://riff-codex-doc.vercel.app) | See the whole workflow, explore the diagram, and copy starter commands. |
 | [Installation](docs/installation.md) | What do I need? How do I connect a project, update RIFF, or fix setup problems? |
 | [Everyday use](docs/usage.md) | What should I type for a new project, existing app, fix, or interruption? |
 | [How it works](docs/how-it-works.md) | Who does what? Where does the plan live? How do checks and progress connect? |
