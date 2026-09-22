@@ -123,6 +123,8 @@ when the normal RIFF gates allow it.
 
 The default `local` mode means the current Codex agent applies RIFF's profile catalogue. It does not mean on-device inference. A project can explicitly opt into Jev advice through OpenRouter; only a curated decision summary is eligible to be sent, never an automatic repository scan. RIFF reuses matching advice at the same phase and policy version, so ordinary file changes do not cause another request.
 
+After settling a wave's work packages, the agent obtains a role plan for the primary agent and any useful authorized subagents, unless advice is off. With Jev enabled, roles needing advice share one request; unchanged roles are reused. Verified subagent profiles are applied through native launch tools where supported. The primary model stays unchanged. For one wave, say: “Use Jev for this wave's model allocation, including its planned subagents, and continue.” To make this recurring within a project, explicitly enable that project's Jev mode.
+
 Luna suits bounded work, Sol suits well-scoped work with several connected steps, and Astra suits planning or dependent long runs. High and XHigh need a concrete reasoning difficulty. A recommendation is not proof of which model is running, and returned probabilities are not success rates.
 
 See [optional model advice](model-advice.md) for privacy controls, modes, failure behavior, and the advanced CLI.

@@ -74,10 +74,10 @@ export function eligibleProfiles(input, catalog) {
     && (p.provider !== 'ollama' || (c.deepseek?.available === true && c.deepseek?.dataAllowed === true)));
 }
 
-function fingerprint(input, catalog, mode) {
+function fingerprint(input, catalog, mode, context = null) {
   // Do not tie advice to Git edits, current model, prose justification or secrets.
   const { localAdvice, effectiveModel, ...decision } = input;
-  return createHash('sha256').update(JSON.stringify({ decision, catalog, mode })).digest('hex');
+  return createHash('sha256').update(JSON.stringify({ decision, catalog, mode, ...(context === null ? {} : { context }) })).digest('hex');
 }
 
 export function jevRequest(input, profiles, catalog) {
@@ -93,7 +93,7 @@ export function jevRequest(input, profiles, catalog) {
   };
 }
 
-function parseJev(raw, profiles) {
+export function parseJev(raw, profiles) {
   const answer = raw?.answers?.recommended_profile;
   const ids = profiles.map((p) => p.id);
   const validProbability = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
@@ -108,7 +108,7 @@ function parseJev(raw, profiles) {
   return { profile: answer.choice, model: raw.model, probabilities: answer.probabilities, confidence: answer.confidence ?? null, cost };
 }
 
-async function callJev(input, profiles, catalog, { apiKey, fetchImpl, timeoutMs }) {
+export async function requestJev(payload, { apiKey, fetchImpl = fetch, timeoutMs = 15000 }) {
   if (!apiKey?.trim()) throw new Error('missing-key');
   const signal = AbortSignal.timeout(timeoutMs);
   let response;
@@ -116,7 +116,7 @@ async function callJev(input, profiles, catalog, { apiKey, fetchImpl, timeoutMs 
     response = await fetchImpl(ENDPOINT, {
       method: 'POST', redirect: 'error', signal,
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(jevRequest(input, profiles, catalog)),
+      body: JSON.stringify(payload),
     });
   } catch { throw new Error(signal.aborted ? 'timeout' : 'network-error'); }
   if (!response.ok) throw new Error(`http-${response.status}`);
@@ -132,7 +132,11 @@ async function callJev(input, profiles, catalog, { apiKey, fetchImpl, timeoutMs 
     }
     raw = JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch { throw new Error(signal.aborted ? 'timeout' : 'invalid-response'); }
-  return parseJev(raw, profiles);
+  return raw;
+}
+
+async function callJev(input, profiles, catalog, options) {
+  return parseJev(await requestJev(jevRequest(input, profiles, catalog), options), profiles);
 }
 
 function cachedFields(previous, profiles, mode) {
@@ -164,12 +168,12 @@ function cachedFields(previous, profiles, mode) {
   } catch { return null; }
 }
 
-export async function recommend(raw, { catalog = loadCatalog(), mode = 'local', allowJev = false, previous = null, reason = null, apiKey = process.env.OPENROUTER_API_KEY, fetchImpl = fetch, timeoutMs = 15000 } = {}) {
+export async function recommend(raw, { catalog = loadCatalog(), mode = 'local', allowJev = false, previous = null, reason = null, apiKey = process.env.OPENROUTER_API_KEY, fetchImpl = fetch, timeoutMs = 15000, decide = callJev, context = null } = {}) {
   if (!MODES.includes(mode)) throw new Error('invalid advice mode');
   if (reason !== null) reason = text(reason, 'reevaluation reason', 240);
   const input = normalizeInput(raw, catalog);
   const profiles = eligibleProfiles(input, catalog);
-  const key = fingerprint(input, catalog, mode);
+  const key = fingerprint(input, catalog, mode, context);
   const base = { policyVersion: catalog.version, fingerprint: key, phase: input.phase, requestedMode: mode, effectiveModel: input.effectiveModel, availability: input.constraints.availableProfiles ? 'declared' : 'unknown', reused: false, reevaluationReason: reason };
   if (mode === 'off') return { ...base, status: 'disabled', origin: 'none', providerStatus: 'not-called' };
   if (!profiles.length) return { ...base, status: 'no-eligible-profile', origin: 'none', providerStatus: 'not-called' };
@@ -193,7 +197,7 @@ export async function recommend(raw, { catalog = loadCatalog(), mode = 'local', 
   if (mode === 'local') return fallback('not-called');
   if (!consent) return fallback('consent-required');
   try {
-    const result = await callJev(input, profiles, catalog, { apiKey, fetchImpl, timeoutMs });
+    const result = await decide(input, profiles, catalog, { apiKey, fetchImpl, timeoutMs });
     return { ...base, ...chosen(result.profile), status: 'recommended', origin: 'jev', providerStatus: 'ok', jev: result };
   } catch (error) {
     const status = /^(missing-key|timeout|network-error|invalid-response|http-\d{3})$/.test(error.message) ? error.message : 'invalid-response';

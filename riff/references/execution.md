@@ -30,6 +30,8 @@ Planning may identify independent work packages within a phase. Confirm independ
 
 Before substantial delegation, apply the available `efficient-delegation` instructions and RIFF model routing. The primary agent keeps product decisions, architecture, immediate blockers, integration and final judgment. Give each worker the outcome, repository/worktree path, owned files or module, contracts, explicit exclusions, acceptance criteria, available commands and required evidence. Send the smallest sufficient context; do not copy the entire conversation when a bounded handoff suffices.
 
+Before dispatching the planned wave roles, obtain or reuse the [wave role model plan](model-routing.md#wave-role-plan-and-native-dispatch). Apply a verified `ready` subagent profile using native launch parameters, respecting explicit model assignments and runtime availability. Advice does not authorize additional agents, prove a model ran, or relaunch existing workers after recovery. When advice is off, keep the ordinary delegation policy.
+
 ### Worktree ownership
 
 Use a separate Git worktree and branch for each concurrent implementation writer. Read-only reviewers can share the integration checkout while its candidate remains frozen. Sequential work by one writer needs no extra worktree.

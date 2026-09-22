@@ -2,7 +2,7 @@
 
 [Back to the README](../README.md) · [Everyday use](usage.md) · [Installation](installation.md)
 
-RIFF can recommend a model profile and reasoning effort before work begins or when the decision context materially changes. The recommendation is advice only. It never changes the model selected in Codex, starts the task, creates a worker, or proves which model is actually running.
+RIFF can recommend a model profile and reasoning effort before work begins or when the decision context materially changes. It can also allocate profiles to the primary agent and already planned subagents in a wave. The CLI never changes the model selected in Codex, starts a task, creates a worker, or proves which model is actually running. During authorized execution, the coordinating agent applies eligible subagent profiles through native launch tools.
 
 ## Ask in ordinary language
 
@@ -42,6 +42,26 @@ The versioned [profile catalogue](../riff/references/model-profiles.json) is the
 Use High or XHigh only when a concrete reasoning difficulty justifies it. A long task, large phase, or redesign does not justify higher effort by itself. DeepSeek profiles are conditional: they require explicit Ollama Cloud availability, data permission, and a stated quota or validated-quality benefit. They are not local models and are not included in the Codex subscription.
 
 The catalogue is a decision policy, not a performance leaderboard. Any probabilities returned by Jev describe its decision distribution for the supplied summary. They are not success rates, reliability measurements, or promises of savings.
+
+## One consultation for a wave's roles
+
+Once the coordinating agent has settled the wave's work packages, the wave workflow requests a role plan unless advice is off. You do not have to ask separately for each worker. The default still uses the current agent; to consult Jev for this wave, say:
+
+```text
+$riff:wave Use Jev to advise the model and effort for the primary agent and the
+useful subagents already planned for this phase. Apply available profiles to
+authorized subagents, keep my primary model unchanged, and continue the wave.
+```
+
+To do this on future waves in one project without naming Jev each time, explicitly enable that project's persistent Jev mode as shown below. No global setting or existing project is changed merely by updating RIFF.
+
+The sequence is: settle work packages, obtain/reuse model advice, check native capabilities, dispatch authorized roles, verify the integrated outcome. Jev decides only model and effort, not which work is authorized or how many agents should exist. A solo wave has only a primary role; independent reviewers can be included when actually planned.
+
+All roles needing new Jev advice share one HTTP request with a question per role. Unchanged roles reuse their decisions. For example, if the documentation brief changes, only that role is reevaluated; update other briefs only if their dependencies also changed. A new shared objective or phase reevaluates all roles. No per-message consultation, extra hook or background scheduler is involved.
+
+The result distinguishes the recommended profile, the proposed native launch profile, and the effective model (unknown without evidence). Subagent selection requires actual tool support, verified model/effort availability and existing delegation authorization. If any is missing, RIFF reports the limitation; it never silently claims a model switch. Explicit user assignments take precedence. The main model remains manually selected. On recovery, a saved launch profile does not mean an existing worker should be launched again.
+
+The agent uses `model-advice plan --input -`; you do not prepare JSON. Advanced users can read the [role-plan input contract](../riff/references/model-advice-input.md#wave-role-plan). Plans are stored separately from primary-only advice and appear as `plan` in `model-advice show`. A strict-local role prevents the entire Jev plan call; use local advice instead. Provider failures remain visible and may use supplied local fallbacks. They are not retried automatically. One batch cost is counted once, not once per role.
 
 ## Choose a mode
 
@@ -96,7 +116,7 @@ riff-codex model-advice recommend --input advice.json --mode jev --allow-jev-sum
 riff-codex model-advice show
 ```
 
-`show` prints `{ "preference": ..., "advice": ... }` for the project preference and its last advice. Command-line mode overrides are one-off. Unknown options are rejected.
+`show` prints `{ "preference": ..., "advice": ..., "plan": ... }` for the project preference, last primary-only advice and last role plan. Command-line mode overrides are one-off. Unknown options are rejected.
 
 The smallest useful input contains the six required decision summaries and a recommendation made by the current agent:
 

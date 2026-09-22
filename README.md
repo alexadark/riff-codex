@@ -69,7 +69,7 @@ Before you start this RIFF phase, advise which model and reasoning effort fit it
 Do not begin the work or change models.
 ```
 
-Advice is not execution routing. RIFF does not change the model selected in Codex, start the requested work, create a worker, or pause a loop just because the recommendation changes. The model actually used remains `unknown` unless the runtime or the user supplies evidence.
+RIFF leaves the primary model selected in Codex unchanged. During a wave it also advises profiles for the already planned subagents; the coordinating agent applies verified profiles through native launch tools when delegation is authorized. A plan does not itself start work, create workers, or pause a loop. The model actually used remains `unknown` unless the runtime or the user supplies evidence.
 
 The default `local` mode means the current Codex agent applies RIFF's portable profile catalogue. It does not mean on-device inference. Optional `jev` mode sends only a curated decision summary to Jev through OpenRouter and requires an explicit project opt-in. OpenAI models continue to use the Codex subscription; conditional DeepSeek profiles use Ollama Cloud and are a separate form of consumption.
 
