@@ -119,6 +119,20 @@ riff-codex init --configure
 
 Choose the conversation language, document language, explanation level, scope, and autonomy again. Your existing product brief and roadmap are preserved.
 
+Model advice has a separate per-project preference. It defaults to advice from the current Codex agent using RIFF's catalogue:
+
+```sh
+riff-codex model-advice configure --mode local
+```
+
+To allow Jev through OpenRouter for this project, explicitly permit curated decision summaries:
+
+```sh
+riff-codex model-advice configure --mode jev --allow-jev-summary
+```
+
+Use `--mode off` to disable advice. Switching to `local` or `off` revokes the persistent Jev-summary permission. Credentials stay in the environment; RIFF does not store them in project state. Configuring advice does not switch the active Codex model, call the provider immediately, resync another project, or activate the setting globally. See [optional model advice](model-advice.md) for the data boundary and one-off commands.
+
 ## Update RIFF
 
 Because your projects use the same RIFF folder, an update can affect all of them. Finish active work before updating.

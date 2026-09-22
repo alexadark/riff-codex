@@ -17,7 +17,7 @@ You describe what you want. RIFF helps Codex keep a clear plan, build it in usef
 
 The slogan comes from the original RIFF for Claude Code. Here, Codex coordinates the work and brings in extra help when it is useful.
 
-[Visual field manual](https://riff-codex-doc.vercel.app) · [Installation](docs/installation.md) · [Everyday use](docs/usage.md) · [How it works](docs/how-it-works.md)
+[Visual field manual](https://riff-codex-doc.vercel.app) · [Installation](docs/installation.md) · [Everyday use](docs/usage.md) · [Model advice](docs/model-advice.md) · [How it works](docs/how-it-works.md)
 
 The visual manual is available online at [riff-codex-doc.vercel.app](https://riff-codex-doc.vercel.app).
 
@@ -60,20 +60,20 @@ The brief is saved as `PROJECT.md`; the steps are saved as `ROADMAP.yaml`. For p
 
 By default, RIFF continues through ready steps automatically. You can choose **guided** mode if you prefer a pause between steps. Uploading code to GitHub or putting an application online still needs your instruction.
 
-## Which model to use
+## Optional model advice
 
-Start with **Astra Medium** to plan the work and make decisions. Use **Luna X-High** for mechanical work once the task and its checks are clear.
+RIFF can advise which available model and reasoning effort fit a task. Ask in ordinary language before a RIFF request or phase:
 
-| Work | Model and effort |
-| --- | --- |
-| Planning, architecture, product decisions, synthesis and final review | Astra Medium |
-| Inventories, extraction, defined code changes, test execution and browser checks | Luna X-High |
-| A difficult decision that Medium cannot resolve | Astra High for that decision |
-| A problem still unresolved at High | Astra X-High for one bounded pass |
+```text
+Before you start this RIFF phase, advise which model and reasoning effort fit it.
+Do not begin the work or change models.
+```
 
-Astra also owns visual direction and acceptance. If Luna encounters an unresolved decision, return it to Astra Medium. Return to Medium after an escalation is resolved. Sol has no default role in this policy. Fast is used for Luna only when the runtime exposes it.
+Advice is not execution routing. RIFF does not change the model selected in Codex, start the requested work, create a worker, or pause a loop just because the recommendation changes. The model actually used remains `unknown` unless the runtime or the user supplies evidence.
 
-These are routing instructions, not an automatic change to the model selected in your current Codex conversation. See the [canonical model routing policy](riff/references/model-routing.md).
+The default `local` mode means the current Codex agent applies RIFF's portable profile catalogue. It does not mean on-device inference. Optional `jev` mode sends only a curated decision summary to Jev through OpenRouter and requires an explicit project opt-in. OpenAI models continue to use the Codex subscription; conditional DeepSeek profiles use Ollama Cloud and are a separate form of consumption.
+
+As a guide, Luna fits bounded work, Sol fits well-scoped work with several connected steps, and Astra fits planning or long runs with costly dependencies. High and XHigh reasoning are for a concrete difficulty, not task length alone. These are decision hypotheses, not measured success rates. See [model advice](docs/model-advice.md) for modes, privacy controls, natural-language examples, and the advanced CLI.
 
 ## What the latest update changes
 
@@ -192,6 +192,7 @@ You can also open the dashboard from Terminal with `riff-codex dashboard`. It no
 | [Visual field manual](https://riff-codex-doc.vercel.app) | See the whole workflow, explore the diagram, and copy starter commands. |
 | [Installation](docs/installation.md) | What do I need? How do I connect a project, update RIFF, or fix setup problems? |
 | [Everyday use](docs/usage.md) | What should I type for a new project, existing app, fix, or interruption? |
+| [Model advice](docs/model-advice.md) | How do I ask for advice, choose a mode, and understand what was actually selected? |
 | [How it works](docs/how-it-works.md) | Who does what? Where does the plan live? How do checks and progress connect? |
 | [Technical reference](docs/technical-reference.md) | Which files, checks, and internal rules power RIFF? |
 

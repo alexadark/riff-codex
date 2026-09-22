@@ -691,6 +691,7 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <p>Now choose start for a new product, or map then onboard for an existing application. Evolve prepares subsequent product changes. Use <code>$riff:wave</code> when the plan is ready.</p>
 <details><summary>Update RIFF or change preferences</summary><div>
 <p>To revisit the setup choices, run <code>riff-codex init --configure</code> in the application. To update RIFF, finish active work first, check that its permanent folder has no uncommitted edits, then run <code>git pull --ff-only</code> and <code>npm install</code> there. Run <code>riff-codex resync</code> and <code>riff-codex doctor</code> in each application afterward.</p>
+<p>Model advice has a separate project preference and defaults to <code>local</code>, which means advice written by the current Codex agent from RIFF's catalogue. It is not on-device inference. Use <code>riff-codex model-advice configure --mode jev --allow-jev-summary</code> to permit curated decision summaries to reach Jev through OpenRouter, or choose <code>local</code> or <code>off</code> to revoke that persistent permission. Configuration does not call a provider or change the active model.</p>
 <p><strong>For this release, resync each connected project once.</strong> This refreshes local installation files, including newly available skills such as evolve and the hook configuration, while preserving its brief, roadmap and preferences.</p>
 <p>Projects linked to the same RIFF folder already read its updated files. They do not need separate Git pulls or reinstalls. Start a fresh Codex session to load the updated skills. For model-routing-only changes, a fresh session is enough when the links are intact. Another checkout, machine or separately installed plugin copy needs its own update.</p>
 <p>If doctor reports matching system-managed hooks, reload Codex configuration; individual approval is not required. Otherwise, review changed project hooks before recording approval. Restart an already-running dashboard process and reload its page to load server changes. The <a href="docs/installation.md#update-riff">update guide</a> explains the steps.</p>
@@ -757,18 +758,17 @@ $riff:wave</pre><span class="copy-status" role="status"></span></div>
 <p>RIFF's automatic checks and dashboard are software tools, not extra AI teammates. The original “band of six” slogan is retained as RIFF's signature; it does not prescribe an agent count in RIFF Codex.</p>
 <h3 class="subhead">When work can happen in parallel</h3>
 <p>Separate research or review tasks may run alongside implementation when useful. Editing assignments need explicit, separate ownership so two agents do not overwrite the same work. The coordinating task still owns integration and the final judgment. Parallel work is optional, not a quota.</p>
-<h3 class="subhead">How models are chosen</h3>
-<p>RIFF's routing reference matches the work to the required level of reasoning. Model availability depends on the current Codex environment. The table describes the repository's policy, not a claim about which model is running this page or your current conversation.</p>
-<div class="table-wrap"><table><thead><tr><th>Work</th><th>Repository policy</th></tr></thead><tbody>
-<tr><td>Inventory and exact extraction</td><td>Luna with XHigh reasoning effort.</td></tr>
-<tr><td>Bounded implementation and repeatable checks</td><td>Luna with XHigh reasoning effort.</td></tr>
-<tr><td>Planning, product decisions, synthesis, and final judgment</td><td>Astra with Medium reasoning effort.</td></tr>
-<tr><td>Visual direction and acceptance</td><td>Astra with Medium reasoning effort.</td></tr>
-<tr><td>Major design work or exceptional architecture decisions</td><td>Astra Medium by default. Escalate to a bounded High pass for a concrete difficulty, then XHigh only if High is insufficient.</td></tr>
+<h3 class="subhead">Optional model advice</h3>
+<p>Ask for advice in ordinary language through the RIFF workflow you already use: “Before continuing this phase, advise which model and reasoning effort fit it. Report the advice separately, do not change models, and continue when the normal RIFF gates allow it.” No new skill is required.</p>
+<div class="table-wrap"><table><thead><tr><th>Profile family</th><th>When it tends to fit</th></tr></thead><tbody>
+<tr><td>Luna</td><td>Bounded work with clear inputs and observable checks.</td></tr>
+<tr><td>Sol</td><td>Well-scoped work with several connected steps and controlled dependencies.</td></tr>
+<tr><td>Astra</td><td>Planning, coordination, architecture, or long runs where later steps depend heavily on earlier judgment.</td></tr>
 </tbody></table></div>
-<p><strong>Astra decides; Luna executes defined work.</strong> Start with Astra Medium for planning, architecture and final review. Luna X-High handles inventories, extraction, defined code changes and checks. Return unresolved decisions to Astra Medium; escalate to High, then exceptionally X-High, only while the difficult problem needs it. Return to Medium afterward.</p>
-<p>Sol has no default role in this policy. These instructions do not automatically switch the model selected in your current conversation.</p>
-<p>Fast is used for Luna when the runtime exposes it. RIFF does not claim that Fast is active when it cannot select it. Read the <a href="riff/references/model-routing.md">model routing reference</a> for the full conditions.</p>
+<p>High and XHigh reasoning are reserved for a concrete difficulty, not task length alone. The versioned profile catalogue is a decision policy, not a performance leaderboard. Probabilities returned by Jev are a distribution over the supplied choices, not success rates.</p>
+<p><strong>Advice is not execution routing.</strong> RIFF does not change the model selected in Codex, start work, create a worker, or add a mandatory loop pause because the recommendation changes. The model actually used remains unknown unless the runtime or the user supplies evidence.</p>
+<p>The default <code>local</code> mode means the current Codex agent applies the portable catalogue; it does not mean local inference. Optional <code>jev</code> mode sends a curated summary to Jev through OpenRouter only after explicit consent. OpenAI use remains on the Codex subscription. Conditional DeepSeek profiles use Ollama Cloud, require separate availability and data permission, and are never represented as local.</p>
+<p>RIFF reuses unchanged results, including provider failures, when the phase, structured constraints, and policy version are unchanged. Ordinary file edits do not trigger a new consultation. Provider failures stay explicit, with no paid automatic retry or silent provider switch; a material change requires a stated reevaluation reason. Read the <a href="docs/model-advice.md">model advice guide</a> for modes, privacy controls, natural-language examples, and the advanced CLI.</p>
 </section>
 
 <section id="checks" class="panel" role="tabpanel" aria-labelledby="tab-checks" tabindex="0">
@@ -834,6 +834,10 @@ appears in the list. I expected to see it immediately.</pre><span class="copy-st
 <div class="table-wrap"><table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody>
 <tr><td><code>riff-codex init</code></td><td>Connect the current Git project to RIFF.</td></tr>
 <tr><td><code>riff-codex init --configure</code></td><td>Revisit languages, explanations, scope, and autonomy.</td></tr>
+<tr><td><code>riff-codex model-advice configure --mode local|jev|off</code></td><td>Set this project's optional advice mode. Persistent Jev mode also requires <code>--allow-jev-summary</code>.</td></tr>
+<tr><td><code>riff-codex model-advice recommend --input FILE|-</code></td><td>Validate a curated decision summary and record or reuse advice without scanning the repository or starting work.</td></tr>
+<tr><td><code>riff-codex model-advice show</code></td><td>Show the project's advice preference and last recorded advice.</td></tr>
+<tr><td><code>riff-codex model-advice catalog</code></td><td>Print the portable canonical profile grid as JSON.</td></tr>
 <tr><td><code>riff-codex doctor</code></td><td>Check the installation without recording new approval.</td></tr>
 <tr><td><code>riff-codex resync</code></td><td>Refresh the managed links and hooks after an update.</td></tr>
 <tr><td><code>riff-codex status</code></td><td>Read saved project progress.</td></tr>
@@ -881,6 +885,7 @@ appears in the list. I expected to see it immediately.</pre><span class="copy-st
 <li><a href="riff/references/git-delivery.md">Branches and pull requests</a><span>One PR across waves, publication, resume, and final readiness.</span></li>
 <li><a href="docs/installation.md">Installation guide</a><span>Prerequisites, skills, hook approval, updates, and setup problems.</span></li>
 <li><a href="docs/usage.md">Everyday use</a><span>Examples for new ideas, existing applications, small changes, and fixes.</span></li>
+<li><a href="docs/model-advice.md">Model advice</a><span>Optional advice modes, privacy controls, natural-language use, and advanced CLI input.</span></li>
 <li><a href="docs/how-it-works.md">How it works</a><span>The project flow, who does what, and what completion means.</span></li>
 <li><a href="docs/technical-reference.md">Technical reference</a><span>File locations, terminal commands, and coexistence with Claude RIFF.</span></li>
 <li><a href="riff/references/operating-contract.md">Operating contract</a><span>Phase selection, autonomy, retries, reviews, and completion rules.</span></li>
@@ -895,7 +900,7 @@ appears in the list. I expected to see it immediately.</pre><span class="copy-st
 <tr><td><code>.riff-codex</code></td><td>Link to the permanent RIFF checkout's framework folder.</td></tr>
 <tr><td><code>.agents/skills/riff-codex-*</code></td><td>Project entries that expose the RIFF skills.</td></tr>
 <tr><td><code>.codex/hooks.json</code></td><td>RIFF checks merged with the project's existing Codex hooks.</td></tr>
-<tr><td><code>.riff-codex-state/config.json</code></td><td>Preferences and recorded approval of the current hooks.</td></tr>
+<tr><td><code>.riff-codex-state/config.json</code></td><td>Preferences, optional model-advice consent, and recorded approval of the current hooks.</td></tr>
 <tr><td><code>.riff-codex-state/state.json</code></td><td>Current progress. Written only through RIFF's commands.</td></tr>
 <tr><td><code>.riff-codex-state/receipts/</code></td><td>Check and review evidence tied to the reviewed code.</td></tr>
 <tr><td><code>.riff-codex-state/events.ndjson</code></td><td>A short history of events.</td></tr>

@@ -111,6 +111,22 @@ There is one active phase at a time. Substantial independent work inside it may 
 
 To change this preference, run `riff-codex init --configure` in your project's Terminal.
 
+## Ask for model advice
+
+Model advice is optional and does not change the active Codex model. Ask in ordinary language through the RIFF workflow you are already using:
+
+```text
+$riff:wave Before continuing this phase, advise which model and reasoning effort
+fit the work. Report the advice separately, do not change models, and continue
+when the normal RIFF gates allow it.
+```
+
+The default `local` mode means the current Codex agent applies RIFF's profile catalogue. It does not mean on-device inference. A project can explicitly opt into Jev advice through OpenRouter; only a curated decision summary is eligible to be sent, never an automatic repository scan. RIFF reuses matching advice at the same phase and policy version, so ordinary file changes do not cause another request.
+
+Luna suits bounded work, Sol suits well-scoped work with several connected steps, and Astra suits planning or dependent long runs. High and XHigh need a concrete reasoning difficulty. A recommendation is not proof of which model is running, and returned probabilities are not success rates.
+
+See [optional model advice](model-advice.md) for privacy controls, modes, failure behavior, and the advanced CLI.
+
 For a short update in Codex:
 
 ```text
