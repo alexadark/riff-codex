@@ -31,6 +31,7 @@ import { managedHookPolicy } from '../lib/managed-hooks.mjs';
 import { selectReadyPhase } from '../lib/phase-selection.mjs';
 import { portAvailable, observationList, reviewObservation } from '../lib/dashboard.mjs';
 import { DISCOVERY_MANIFEST, discoverySnapshot } from '../lib/delivery-contract.mjs';
+import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -1191,6 +1192,7 @@ function cmdContext(tokens) {
   process.stdout.write(`${JSON.stringify({
     phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome } : null,
     checkpoint,
+    modelAdvice: phase && state.modelAdvice?.phase === phase.id ? state.modelAdvice : null,
     candidate,
     checkpointStale: Boolean(checkpoint && (checkpoint.candidate !== candidate || dirty)),
     discovery: discovery ? { digest: discovery.snapshot.digest, stale: discovery.stale, files: discovery.snapshot.files } : null,
@@ -1915,7 +1917,72 @@ function cmdIncident(tokens) {
   process.stdout.write(`Incident ${entry.id} appended to INCIDENTS.md.\n`);
 }
 
+async function cmdModelAdvice(tokens) {
+  const [action = 'show', ...args] = tokens;
+  const options = parseOptions(args);
+  const allowed = { catalog: [], show: [], configure: ['mode', 'allow_jev_summary'], recommend: ['input', 'mode', 'allow_jev_summary', 'reason'] }[action];
+  if (!allowed || options._.length || Object.keys(options).some((k) => k !== '_' && !allowed.includes(k))) throw new Error('use model-advice catalog|show|configure|recommend with supported options');
+  if (options.allow_jev_summary !== undefined && options.allow_jev_summary !== true) throw new Error('--allow-jev-summary is a flag');
+  if (options.mode !== undefined && !MODES.includes(options.mode)) throw new Error('mode must be off, local or jev');
+  const print = (value) => process.stdout.write(JSON.stringify(value, null, 2) + '\n');
+  if (action === 'catalog') { print(loadCatalog()); return; }
+  const root = gitRoot();
+  const files = pathsFor(root);
+  const readConfig = () => readJson(localPath(root, files.config));
+  const preference = (config) => config.preferences?.modelAdvice ?? { mode: 'local', allowJevSummary: false };
+  if (action === 'show') { print({ preference: preference(readConfig()), advice: readState(root).modelAdvice ?? null }); return; }
+  await withLock(root, async () => {
+    const config = readConfig();
+    if (config.version !== 1) throw new Error('unsupported RIFF configuration');
+    if (action === 'configure') {
+      if (!MODES.includes(options.mode)) throw new Error('configure requires --mode off|local|jev');
+      if (options.mode === 'jev' && options.allow_jev_summary !== true) throw new Error('persistent Jev requires --allow-jev-summary: curated task summaries will be sent to OpenRouter');
+      config.preferences ??= {};
+      config.preferences.modelAdvice = { mode: options.mode, allowJevSummary: options.mode === 'jev' };
+      writeJson(localPath(root, files.config), config);
+      event(root, 'model_advice_configured', config.preferences.modelAdvice);
+      print(config.preferences.modelAdvice);
+      return;
+    }
+    if (typeof options.input !== 'string') throw new Error('recommend requires --input FILE|-');
+    if (options.input !== '-' && (path.isAbsolute(options.input) || options.input.split(/[\\/]/).includes('..'))) throw new Error('advice input must be project-relative without parent traversal');
+    const bytes = readFileSync(options.input === '-' ? 0 : localPath(root, options.input), 'utf8');
+    if (Buffer.byteLength(bytes) > 16384) throw new Error('advice input exceeds 16 KiB; supply a curated summary');
+    let raw;
+    try { raw = JSON.parse(bytes); } catch { throw new Error('advice input must be valid JSON'); }
+    const state = readState(root);
+    if (raw?.phase != null && !state.phases.some((p) => p.id === raw.phase)) throw new Error('advice phase is not in current RIFF state');
+    const pref = preference(config);
+    const mode = options.mode ?? pref.mode;
+    const result = await recommend(raw, {
+      mode, previous: state.modelAdvice ?? null,
+      allowJev: options.allow_jev_summary === true || (pref.mode === 'jev' && pref.allowJevSummary === true),
+      reason: options.reason ?? null,
+    });
+    // Advice and observed identity never overwrite the review model or wave gates.
+    if (!result.reused) {
+      result.recordedAt = now();
+      state.modelAdvice = result;
+      saveState(root, state);
+      event(root, 'model_advice', {
+        phase: result.phase, policyVersion: result.policyVersion, fingerprint: result.fingerprint,
+        origin: result.origin, status: result.status, requestedMode: mode,
+        profile: result.profile ?? null, providerStatus: result.providerStatus,
+        reevaluationReason: result.reevaluationReason, cost: result.jev?.cost ?? null,
+      });
+    } else {
+      const normalizedRecord = { ...result, reused: false };
+      if (JSON.stringify(state.modelAdvice) !== JSON.stringify(normalizedRecord)) {
+        state.modelAdvice = normalizedRecord;
+        saveState(root, state);
+      }
+    }
+    print(result);
+  });
+}
+
 function help() {
+  process.stdout.write('Model advice (never switches the active model):\n  riff-codex model-advice catalog|show\n  riff-codex model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff-codex model-advice recommend --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
   process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex discovery [snapshot|check|review --evidence FILE]\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave context [phase-id]\n  riff-codex wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --review FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
@@ -1928,6 +1995,9 @@ else if (command === 'resync') cmdResync(tokens);
 else if (command === 'doctor') cmdDoctor(tokens);
 else if (command === 'dashboard') await cmdDashboard(tokens);
 else if (command === 'status') cmdStatus();
+else if (command === 'model-advice') {
+  try { await cmdModelAdvice(tokens); } catch (error) { fail(error.message); }
+}
 else if (command === 'discovery') {
   try { withLock(gitRoot(), () => cmdDiscovery(tokens)); } catch (error) { fail(error.message); }
 }

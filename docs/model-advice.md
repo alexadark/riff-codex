@@ -63,11 +63,11 @@ riff-codex model-advice configure --mode off
 
 Switching to `local` or `off` revokes the persistent Jev-summary permission. A one-off Jev request also needs `--allow-jev-summary` unless that project already has the persistent opt-in.
 
-Jev uses an environment credential. RIFF does not write the credential to project state. A missing credential, timeout, provider error, or invalid response is reported explicitly, with no paid automatic retry and no silent provider change. If the input includes a valid current-agent recommendation, RIFF can return it as a fallback labeled `local`; otherwise the result says that local advice is still needed. RIFF never fabricates a Jev result.
+Jev reads `OPENROUTER_API_KEY` from the agent's environment. Supply it through your existing secret configuration, never in a prompt, input JSON, command flag or committed file. RIFF does not write the credential to project state. A missing credential, timeout, provider error, or invalid response is reported explicitly, with no paid automatic retry and no silent provider change. If the input includes a valid current-agent recommendation, RIFF can return it as a fallback labeled `local`; otherwise the result says that local advice is still needed. RIFF never fabricates a Jev result.
 
 ## Advice, reuse, and the model actually used
 
-RIFF stores the project's preference and last advice in its local state. It reuses unchanged results, including a provider failure or a result that still needs local advice, when the phase, structured constraints, and profile-policy version are unchanged. This prevents automatic paid retries. Ordinary file edits do not invalidate the result. After a material change, force reevaluation with a reason:
+RIFF stores the project's preference and last advice in its local state. It reuses unchanged results, including a provider failure or a result that still needs local advice, when the phase, structured constraints, and profile-policy version are unchanged. This prevents automatic paid retries. Ordinary file edits do not invalidate the result. Changed decision facts cause reevaluation; to deliberately refresh unchanged facts, such as after restoring credentials, supply a reason:
 
 ```sh
 riff-codex model-advice recommend --input advice.json --reason "Credentials restored"
@@ -86,6 +86,8 @@ Never infer the active model from the recommendation or from another RIFF state 
 ## Advanced CLI
 
 The CLI is primarily for RIFF agents and integrations. `recommend` requires an initialized RIFF project and consumes a curated JSON object of at most 16 KiB from a project-relative file or standard input. File input may not escape the project through an absolute path, `..`, or a symbolic link. It does not scan the repository.
+
+The complete [input and output contract](../riff/references/model-advice-input.md) also ships inside the plugin, so installed skills do not depend on this repository-level guide.
 
 ```sh
 riff-codex model-advice recommend --input advice.json

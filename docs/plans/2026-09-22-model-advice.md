@@ -1,6 +1,6 @@
 # Plan : conseil de modèle et effort dans RIFF
 
-Date : 2026-09-22. Statut : proposition prête à discuter, implémentation non commencée. Ce document n'active aucune wave et n'autorise ni appel récurrent, ni changement de fournisseur, ni publication. Il complète le [plan agnostique](../agnostic-riff-plan.md) sur le seul conseil de modèle dans Codex, sans lancer sa refonte multi-hôtes.
+Date : 2026-09-22. Statut : implémentation et documentation réalisées et vérifiées en copie isolée ; intégration locale au checkout partagé explicitement autorisée après validation. Aucun appel récurrent, changement de fournisseur principal ou publication autorisé. Ce document complète le [plan agnostique](../agnostic-riff-plan.md) sur le seul conseil de modèle dans Codex, sans lancer sa refonte multi-hôtes. Les sections de conception ci-dessous conservent les décisions avant réalisation.
 
 ## Objectif et état constaté
 
@@ -95,3 +95,13 @@ Interprétation de Codex, pas explication textuelle produite par Jev : Astra Med
 ## Prochaine action après accord
 
 Rester sur Astra Medium, créer l'isolation de travail et réaliser la première livraison : source commune et suppression des prescriptions contradictoires. Continuer ensuite les livraisons prévues dans la même tâche, sans multiplier les validations humaines intermédiaires, en respectant les limites d'adoption et de publication ci-dessus. Ne pas activer une wave fictive dans le framework en l'absence de roadmap ; utiliser les projets jetables pour vérifier le cycle RIFF.
+
+## Réalisation et preuves du 22 septembre
+
+- Catalogue unique livré dans `riff/references/model-profiles.json`, contrat portable d'entrée/sortie dans `model-advice-input.md`, commande `model-advice catalog|show|configure|recommend` et intégration des frontières dans les skills existantes. Aucun nouveau hook, worker d'exécution, SDK ou changement de fournisseur principal.
+- Préférences et décision minimale dans l'état existant, validation des restrictions avant réseau, consentement explicite, réutilisation des erreurs pour éviter les retries payants, identité effective distincte et inconnue par défaut. La CLI conserve les états, preuves et budgets de correction.
+- Documentation produite par un sous-agent Sol Medium : README, guide `docs/model-advice.md`, usage, installation et manuel HTML ; cohérence finale vérifiée par l'agent principal. Rendu réel contrôlé dans le navigateur intégré, section modèles lisible ; les liens, métadonnées et exemples ont été contrôlés séparément.
+- Suite complète : 41/41 tests réussis, dont cinq nouveaux scénarios. Une revue indépendante Sol Medium a trouvé un défaut de validation du cache ; correction et assertions de régression ajoutées dans le scénario existant, cinq scénarios toujours au total. Revue de la correction sans constat résiduel ; contrôles ciblés réexécutés après correction.
+- Pilote réel dans un projet jetable : Jev retourne `luna_low` pour une demande synthétique de trois titres, modèle `typesafe/jev-1.13-20260917`, coût déclaré `0.000064512`. Une seconde demande identique réutilise le résultat sans nouvel appel. Ce pilote prouve le câblage de la consultation et de la reprise, pas un gain empirique de fiabilité des modèles.
+- Adaptation de la skill personnelle préparée dans son dépôt propriétaire : lecteur du même catalogue, deux payloads en dry-run et refus de source absente/invalide vérifiés, projection isolée validée. Aucun contenu personnel ni dépendance au dépôt privé dans RIFF.
+- Limites conservées : sélection du modèle principal manuelle, absence de benchmark comparatif, aucune activation persistante Jev dans les projets existants, aucun push ou déploiement du manuel en ligne. Les copies de plugin indépendantes ne sont pas automatiquement mises à jour.

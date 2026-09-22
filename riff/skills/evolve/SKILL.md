@@ -21,4 +21,4 @@ After the authorized edits, synchronize through `node .riff-codex/bin/riff.mjs w
 
 Report the outcome, assumptions, added/revised/replaced/deferred phases, retained behavior, actual planning checks, and next `$riff:wave` invocation only when ready. Stop after planning. Never activate a wave, implement a product feature, publish issues, or deploy from evolve. Use the shared operating contract's real blocker and retry rules, not a second state system.
 
-Use Astra Medium for synthesis and judgment under the [model-routing contract](../../references/model-routing.md). Delegate bounded mechanical inventory only when useful. Keep native compaction and preserve unrelated work.
+Before planning, follow the [model-advice contract](../../references/model-routing.md) and its single catalog. Advice-only questions do not authorize evolution; read-only exploration does not persist advice without request. Optional advice does not change models, authorize delegation or add a pause in loop mode. Keep native compaction and preserve unrelated work.

@@ -55,6 +55,11 @@ export function withFileLock(lock, action) {
     catch (error) { if (error.code !== 'ENOENT') throw error; }
   };
   process.once('exit', release);
-  try { return action(); }
-  finally { process.removeListener('exit', release); release(); }
+  const finish = () => { process.removeListener('exit', release); release(); };
+  try {
+    const result = action();
+    if (result && typeof result.then === 'function') return result.finally(finish);
+    finish();
+    return result;
+  } catch (error) { finish(); throw error; }
 }

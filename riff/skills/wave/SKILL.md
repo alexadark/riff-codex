@@ -5,6 +5,8 @@ description: Execute or resume RIFF roadmap phases as autonomous vertical waves.
 
 # Run a RIFF wave
 
+For an explicit advice-only request, follow the [model-advice contract](../../references/model-routing.md) and stop without syncing, activating or implementing a phase. During an authorized wave, consult that contract at the selected phase boundary, reuse unchanged advice after recovery and re-evaluate only for changed decision facts or a documented impasse. No paid call without explicit Jev consent, no automatic model switch, no reset of retries and no added pause in loop mode.
+
 Read `.riff-codex/references/taste.md`, the project taste index and only the relevant topics/stack rules. For frontend work, apply `.riff-codex/references/taste/frontend.md`, use the required relevant design skills and obtain rendered browser evidence before visual acceptance. Persist proven reusable conventions before final validation and review; do not create a taste approval queue.
 
 Read `.riff-codex/references/operating-contract.md`, `.riff-codex/references/execution.md` and `.riff-codex/references/model-routing.md`. They own autonomy, phase context, delegation, review, retry and stop rules. Use `PROJECT.md` as the dossier index and load only the selected phase's stories, criteria, data boundaries, rights, integrations and decisions. Load the security reference for a sensitive phase. A production application planned with the discovery manifest must pass `discovery check` before activation; finish all planning and design first. Existing projects without enrollment keep their established contract.

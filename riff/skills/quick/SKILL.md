@@ -5,6 +5,8 @@ description: Deliver a small bounded change with RIFF safety and evidence but no
 
 # Run a quick RIFF change
 
+Follow the [model-advice contract](../../references/model-routing.md) before execution. Use its single catalog for bounded work, never a mandatory worker. An advice-only question must stop before implementation. Advice is optional, preserves explicit model choices and does not switch the primary model.
+
 Read `.riff-codex/references/taste.md` and applicable project conventions. For UI changes, use the relevant design skills and scoped rendered checks from `.riff-codex/references/taste/frontend.md`. Merge a proven reusable lesson before final review; keep this proportional to the change.
 
 Use only for a bounded change that does not alter the product roadmap. Read `.riff-codex/references/git-delivery.md` and establish or reconcile this change's scoped branch before implementation. Inspect the affected boundary, implement with one writer, validate only changed behavior, and perform a fresh functional review. Load `.riff-codex/references/security.md` if the boundary is sensitive.

@@ -39,4 +39,4 @@ Both paths write or conservatively update `PROJECT.md` and `ROADMAP.yaml` after 
 
 The complete path stops after the dossier and readiness check. The light path stops after its shared-artifact sync and projections. Neither path activates or starts a wave from `start`; the user must separately invoke `$riff:wave`. Do not publish issues or external artifacts unless separately requested.
 
-Use Astra Medium for product judgment and final acceptance, following `.riff-codex/references/model-routing.md`. Luna XHigh may perform a bounded mechanical inventory or validation with a clear contract. Keep native compaction, do not invoke nested `codex exec`, and preserve unrelated changes.
+Before discovery, follow the [model-advice contract](../../references/model-routing.md) and its single catalog. Respect explicit advice-only requests without starting discovery. Optional advice does not switch the primary model, add a worker or create a pause in loop mode. Keep native compaction, do not invoke nested `codex exec`, and preserve unrelated changes.
