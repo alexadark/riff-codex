@@ -755,7 +755,7 @@ function readRoadmap(root) {
   return { ...roadmap, format: canonical ? 'codex' : 'claude', project, phases, out_of_scope: normalizeStringArray(roadmap.out_of_scope) };
 }
 
-function syncRoadmap(root) {
+function syncRoadmap(root, { preserveLegacyVerification = false } = {}) {
   const roadmap = readRoadmap(root);
   const state = readState(root);
   const old = new Map(state.phases.map((phase) => [phase.id, phase]));
@@ -767,7 +767,13 @@ function syncRoadmap(root) {
   for (const phase of roadmap.phases) {
     const prior = old.get(phase.id);
     if (prior && ['active', ...TERMINAL_PHASE_STATES].includes(prior.status)) {
-      const changed = changedPlanFields(prior, phase, knownIds);
+      // Older terminal records predate verificationRequired. An explicit compatibility
+      // sync preserves that unknown historical contract; it never backfills evidence.
+      const legacyVerification = preserveLegacyVerification
+        && TERMINAL_PHASE_STATES.has(prior.status)
+        && !Object.hasOwn(prior, 'verificationRequired');
+      const changed = changedPlanFields(prior, phase, knownIds)
+        .filter((field) => !(legacyVerification && field === 'verificationRequired'));
       if (changed.length) throw new Error(`cannot change normalized plan fields for ${prior.status} phase ${prior.id}: ${changed.join(', ')}`);
     }
   }
@@ -786,7 +792,7 @@ function syncRoadmap(root) {
   };
   validateState(nextState);
   saveState(root, nextState);
-  event(root, 'roadmap_synced', { phases: nextState.phases.length });
+  event(root, 'roadmap_synced', { phases: nextState.phases.length, preserveLegacyVerification });
   return nextState;
 }
 
@@ -1191,7 +1197,7 @@ function cmdContext(tokens) {
   const checkpoint = phase?.checkpoint ?? null;
   const discovery = currentDiscovery(root, state);
   process.stdout.write(`${JSON.stringify({
-    phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome } : null,
+    phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome, verificationRequired: phase.verificationRequired ?? null } : null,
     checkpoint,
     modelAdvice: phase && state.modelAdvice?.phase === phase.id ? state.modelAdvice : null,
     modelAdvicePlan: phase && state.modelAdvicePlan?.phase === phase.id ? state.modelAdvicePlan : null,
@@ -1211,7 +1217,7 @@ function cmdWave(tokens) {
   try {
     const autonomy = autonomyMode(root);
     if (action === 'sync') {
-      state = syncRoadmap(root);
+      state = syncRoadmap(root, { preserveLegacyVerification: options.preserve_legacy_verification === true });
       process.stdout.write(`${state.phases.length} roadmap phases synchronized.\n`);
       return;
     }
@@ -1988,7 +1994,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff-codex model-advice catalog|show\n  riff-codex model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff-codex model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex discovery [snapshot|check|review --evidence FILE]\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync\n  riff-codex wave context [phase-id]\n  riff-codex wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --review FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex discovery [snapshot|check|review --evidence FILE]\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync [--preserve-legacy-verification]\n  riff-codex wave context [phase-id]\n  riff-codex wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --review FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);

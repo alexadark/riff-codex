@@ -302,3 +302,68 @@ phase-replacement:
   assert.deepEqual(synced.reviews.functional, state.reviews.functional);
   assert.deepEqual(readFileSync(receiptFile), receiptBytes);
 });
+
+test('explicit legacy verification sync preserves terminal records and receipts, with current gates for new phases', () => {
+  const root = fixture();
+  runCli(root, 'init', '--project-root', root, '--non-interactive');
+  const roadmap = `phase-old:
+  name: Historical interview
+  status: done
+  mode: HITL
+phase-new:
+  name: New interview
+  status: todo
+  smoke_test: true
+`;
+  writeFileSync(path.join(root, 'ROADMAP.yaml'), roadmap);
+  runCli(root, 'wave', 'sync');
+  const state = JSON.parse(readFileSync(stateFile(root), 'utf8'));
+  const old = state.phases.find((p) => p.id === 'old');
+  delete old.verificationRequired;
+  old.commit = 'historical-commit';
+  old.validation = { status: 'pass', candidate: 'historical-tree' };
+  writeJson(stateFile(root), state);
+  const receiptFile = path.join(root, '.riff-codex-state', 'receipts', 'old-functional.json');
+  writeJson(receiptFile, { status: 'pass', candidate: 'historical-tree' });
+  const receipt = readFileSync(receiptFile);
+  const before = readFileSync(stateFile(root));
+  assert.match(runCliFailure(root, 'wave', 'sync'), /verificationRequired/);
+  assert.deepEqual(readFileSync(stateFile(root)), before);
+  runCli(root, 'wave', 'sync', '--preserve-legacy-verification');
+  let synced = JSON.parse(readFileSync(stateFile(root), 'utf8'));
+  assert.deepEqual(synced.phases.find((p) => p.id === 'old'), old);
+  assert.equal(synced.phases.find((p) => p.id === 'new').verificationRequired, true);
+  assert.deepEqual(readFileSync(receiptFile), receipt);
+  assert.equal(readFileSync(path.join(root, 'ROADMAP.yaml'), 'utf8'), roadmap);
+  runCli(root, 'wave', 'sync', '--preserve-legacy-verification');
+  const repeated = JSON.parse(readFileSync(stateFile(root), 'utf8'));
+  assert.deepEqual({ ...repeated, updatedAt: synced.updatedAt }, synced);
+  synced = repeated;
+  writeFileSync(path.join(root, 'ROADMAP.yaml'), roadmap.replace('Historical interview', 'Changed history'));
+  assert.match(runCliFailure(root, 'wave', 'sync', '--preserve-legacy-verification'), /title/);
+  assert.deepEqual(JSON.parse(readFileSync(stateFile(root), 'utf8')), synced);
+});
+
+test('legacy compatibility never overrides an explicit terminal verification contract', () => {
+  const root = fixture();
+  runCli(root, 'init', '--project-root', root, '--non-interactive');
+  writeFileSync(path.join(root, 'ROADMAP.yaml'), 'phase-old:\n  name: Old\n  status: done\n');
+  runCli(root, 'wave', 'sync');
+  const before = readFileSync(stateFile(root));
+  writeFileSync(path.join(root, 'ROADMAP.yaml'), 'phase-old:\n  name: Old\n  status: done\n  mode: HITL\n');
+  assert.match(runCliFailure(root, 'wave', 'sync', '--preserve-legacy-verification'), /verificationRequired/);
+  assert.deepEqual(readFileSync(stateFile(root)), before);
+});
+
+test('legacy compatibility cannot waive verification drift on an active record', () => {
+  const root = fixture();
+  runCli(root, 'init', '--project-root', root, '--non-interactive');
+  writeFileSync(path.join(root, 'ROADMAP.yaml'), 'phase-active:\n  name: Active\n  status: active\n  mode: HITL\n');
+  runCli(root, 'wave', 'sync');
+  const state = JSON.parse(readFileSync(stateFile(root), 'utf8'));
+  delete state.phases[0].verificationRequired;
+  writeJson(stateFile(root), state);
+  const before = readFileSync(stateFile(root));
+  assert.match(runCliFailure(root, 'wave', 'sync', '--preserve-legacy-verification'), /verificationRequired/);
+  assert.deepEqual(readFileSync(stateFile(root)), before);
+});

@@ -106,3 +106,22 @@ For framework code changes, the existing test command is `npm test` from the RIF
 ## Executed evidence and production lifecycle
 
 See [candidate evidence](../riff/references/evidence.md) for the executable validation, review artifact, screenshot report, promotion, incident ledger and finalization contracts. Reports are generated under `.uxtest/runs/` and exposed by the existing dashboard. A status declaration alone no longer permits phase completion.
+
+### Historical verification compatibility
+
+If `wave sync` rejects `verificationRequired` on a completed or imported skipped
+phase, inspect `wave context <id>`. A `null` verification requirement means the
+stored record predates that field, not that verification passed or was waived.
+After confirming this legacy boundary, use:
+
+```sh
+riff-codex wave sync --preserve-legacy-verification
+```
+
+This explicit compatibility mode preserves the entire terminal record and its
+receipts without backfilling the unknown field. It ignores only that field's
+comparison when absent from a terminal record. All other historical drift,
+explicit true/false contracts and active-phase drift still fail. New and pending
+phases retain current verification requirements. Because history is unchanged,
+use this flag on subsequent syncs of the same legacy project as well. This is
+not a way to mark any phase verified or completed.
