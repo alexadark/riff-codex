@@ -159,3 +159,16 @@ test('CLI integration preserves wave state, consent, projections and private inp
     assert.deepEqual(invoke('model-advice', 'catalog'), catalog);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+
+test('Opus 5.5 is opt-in Anthropic advice and respects provider, availability and data filters', async () => {
+  const opus = catalog.profiles.filter((p) => p.provider === 'anthropic');
+  assert.deepEqual(opus.map((p) => p.effort), ['low', 'medium', 'high', 'xhigh', 'max']);
+  assert.ok(opus.every((p) => p.model === 'claude-opus-5-5'));
+  assert.ok(eligible.every((p) => p.provider === 'openai'));
+  const constraints = { providers: ['anthropic'], availableProfiles: ['opus_5_5_medium'] };
+  assert.deepEqual(eligibleProfiles(normalizeInput(brief({ constraints }), catalog), catalog).map((p) => p.id), ['opus_5_5_medium']);
+  const result = await recommend(brief({ constraints }));
+  assert.equal(result.profile, 'opus_5_5_medium');
+  assert.equal(result.origin, 'constraint');
+  assert.deepEqual(eligibleProfiles(normalizeInput(brief({ constraints: { ...constraints, dataPolicy: 'local-only' } }), catalog), catalog), []);
+});

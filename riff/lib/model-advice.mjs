@@ -22,7 +22,7 @@ export function loadCatalog() {
   if (!catalog.version || !catalog.objective || !Array.isArray(catalog.rules) || !catalog.rules.length || !Array.isArray(catalog.profiles) || !catalog.profiles.length) throw new Error('invalid model catalog');
   const ids = new Set();
   for (const p of catalog.profiles) {
-    if (!/^[a-z0-9_]+$/.test(p.id) || ids.has(p.id) || !p.model || !p.effort || !p.usage || !['openai', 'ollama'].includes(p.provider)) throw new Error('invalid model profile');
+    if (!/^[a-z0-9_]+$/.test(p.id) || ids.has(p.id) || !p.model || !p.effort || !p.usage || !['openai', 'ollama', 'anthropic'].includes(p.provider)) throw new Error('invalid model profile');
     ids.add(p.id);
   }
   return catalog;
@@ -39,7 +39,7 @@ export function normalizeInput(raw, catalog) {
   const c = raw.constraints ?? {};
   keys(c, ['providers', 'dataPolicy', 'allowedProfiles', 'availableProfiles', 'deepseek'], 'constraints');
   input.constraints = {
-    providers: values(c.providers ?? ['openai'], ['openai', 'ollama'], 'providers'),
+    providers: values(c.providers ?? ['openai'], ['openai', 'ollama', 'anthropic'], 'providers'),
     dataPolicy: c.dataPolicy ?? 'cloud-allowed',
   };
   if (!['cloud-allowed', 'local-only'].includes(input.constraints.dataPolicy)) throw new Error('invalid dataPolicy');
