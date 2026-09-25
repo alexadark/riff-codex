@@ -99,7 +99,7 @@ test('recovery reuses decisions including failures, explicit reason refreshes, a
   assert.equal(calls, 3, 'restoring key alone does not cause a retry');
   const repaired = await recommend(brief(), { ...options, previous: { ...first, model: 'forged-model', effort: 'made-up', privateExtra: 'must not survive' } });
   assert.equal(repaired.reused, false);
-  assert.equal(repaired.model, 'gpt-5.6-sol');
+  assert.equal(repaired.model, 'gpt-6-sol');
   assert.equal(repaired.privateExtra, undefined);
   const invalidProvider = await recommend(brief(), { ...options, previous: { ...first, jev: { ...first.jev, model: false } } });
   assert.equal(invalidProvider.reused, false);

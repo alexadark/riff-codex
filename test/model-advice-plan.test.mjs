@@ -34,7 +34,7 @@ test('role plan batches once, filters each role, and prepares native dispatch wi
   assert.ok(!JSON.stringify(requests).includes('delegationAllowed'));
   assert.equal(result.callCost, 0.0003, 'one batch cost, not a sum of role metadata');
   assert.equal(result.roles[0].dispatch.status, 'manual');
-  assert.deepEqual(result.roles[1].dispatch, { status: 'ready', model: 'gpt-5.6-sol', effort: 'medium' });
+  assert.deepEqual(result.roles[1].dispatch, { status: 'ready', model: 'gpt-6-sol', effort: 'medium' });
   assert.equal(result.roles[1].advice.effectiveModel, null);
 });
 
