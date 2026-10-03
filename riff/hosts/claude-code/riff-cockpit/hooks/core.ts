@@ -2,9 +2,9 @@
 // decide what the band, the pane tabs and the text commands show.
 // The CLI stays the source of truth; the text parser only serves projects linked to an older CLI.
 
-export type Phase = { id: string; title: string | null; status: string }
-export type Finding = { id: string; severity: string | null; summary: string | null; phase: string | null }
-export type Review = { phase: string; status: string; summary: string | null; valid: boolean }
+type Phase = { id: string; title: string | null; status: string }
+type Finding = { id: string; severity: string | null; summary: string | null; phase: string | null }
+type Review = { phase: string; status: string; summary: string | null; valid: boolean }
 
 export type RiffStatus = {
   name: string
@@ -38,7 +38,7 @@ export function parseStatus(text: string): RiffStatus | null {
   return parseStatusJson(text) ?? parseStatusText(text)
 }
 
-export function parseStatusJson(text: string): RiffStatus | null {
+function parseStatusJson(text: string): RiffStatus | null {
   let data
   try {
     data = JSON.parse(text)
@@ -60,7 +60,7 @@ export function parseStatusJson(text: string): RiffStatus | null {
   }
 }
 
-export function parseStatusText(text: string): RiffStatus | null {
+function parseStatusText(text: string): RiffStatus | null {
   const lines = String(text).trim().split('\n')
   const progress = lines[1]?.match(/^(\d+)\/(\d+) phases completed\. Active: (.+?)\. Next: (.+?)\.$/)
   const human = lines[2]?.match(/^Human action: (.+)$/)
