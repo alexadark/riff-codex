@@ -68,7 +68,7 @@ Répond directement au risque principal du plan Astra (Opus compacte trop tard, 
 ### M-E. Pilote de boucle et alertes humaines
 
 - En autonomie `loop`, sur `turn.complete` : si `riff status --json` indique une phase prête, aucun blocage et aucune action humaine, le mod relance `/riff:wave` via `$.prompt.submit`. Ça corrige la tendance des modèles à s'arrêter trop tôt.
-- Limites strictes : plafond de relances par session, arrêt si le tour a été interrompu (`e.isAborted`), arrêt sur toute action humaine, désactivé hors session interactive.
+- Limites strictes : arrêt après deux relances de suite sans progrès (voir question 3), arrêt si le tour a été interrompu (`e.isAborted`), arrêt sur toute action humaine, désactivé hors session interactive.
 - Action humaine requise : toast, bande rouge persistante, et `$.audio.speak` en option.
 - Le plus risqué : à construire après le pilote, une fois M-A et M-B éprouvés.
 
@@ -107,9 +107,9 @@ Ordre conseillé : M0, M1, M2 rapidement (gain visible, risque faible), puis M3 
 
 ## Questions ouvertes
 
-1. Le cockpit remplace-t-il l'ouverture automatique du dashboard web, ou les deux coexistent-ils ?
-2. M3 : compaction lancée automatiquement aux frontières de phase, ou seulement proposée avec un bouton ?
-3. M6 : quel plafond de relances automatiques par session ?
+1. ~~Le cockpit remplace-t-il le dashboard web ?~~ **Tranché le 2026-10-03** : les deux coexistent. Le cockpit doit aussi tourner dans l'app Desktop, pas seulement dans le terminal.
+2. ~~M3 : compaction automatique ou proposée ?~~ **Tranché le 2026-10-03** : proposée à la frontière de phase, jamais automatique. Pas de proposition quand il reste peu de travail (dernière phase ou presque).
+3. ~~M6 : quel plafond de relances ?~~ **Tranché le 2026-10-03** : pas de plafond en nombre de relances ni de phases. Le pilote s'arrête quand deux relances de suite ne font avancer aucune phase (même phase relancée deux fois sans progrès, ou phases qui alternent sans aboutir), en plus des arrêts existants (interruption, action humaine, phase bloquée par RIFF). Le suivi de progrès vit dans l'état RIFF pour survivre au handoff.
 
 ## Résultat de M0 (2026-10-03)
 
