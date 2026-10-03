@@ -217,9 +217,15 @@ test('status --json and wave context --json expose stable host contracts without
   assert.equal(idle.active, null);
   assert.deepEqual(idle.next, { id: 'a', title: 'Fixture a' });
   assert.equal(idle.humanAction, null);
+  assert.deepEqual(idle.phases, [{ id: 'a', title: 'Fixture a', status: 'ready' }, { id: 'b', title: 'Fixture b', status: 'ready' }]);
+  assert.deepEqual(idle.findings, []);
+  assert.deepEqual(idle.reviews, { functional: null, security: null });
 
   ok(root, 'wave', 'activate', 'a');
   assert.equal(JSON.parse(ok(root, 'status', '--json')).active, 'a');
+  const finding = injectFinding(root, 'HIGH');
+  assert.deepEqual(JSON.parse(ok(root, 'status', '--json')).findings,
+    [{ id: finding.id, severity: 'HIGH', summary: 'Synthetic lifecycle warning', phase: 'a' }]);
 
   const context = JSON.parse(ok(root, 'wave', 'context', '--json'));
   assert.equal(context.schema, 'riff.wave-context/1');

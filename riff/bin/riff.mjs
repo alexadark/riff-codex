@@ -1807,8 +1807,10 @@ function cmdHook(tokens) {
 }
 
 function cmdStatus(tokens) {
-  const data = dashboardData(gitRoot());
+  const root = gitRoot();
+  const data = dashboardData(root);
   if (parseOptions(tokens).json) {
+    const review = (receipt) => receipt && { phase: receipt.phase, status: receipt.status, summary: receipt.summary ?? null, valid: receipt.valid };
     // Stable contract for host integrations (Claude Code cockpit); extend, never rename.
     process.stdout.write(`${JSON.stringify({
       schema: 'riff.status/1',
@@ -1818,6 +1820,10 @@ function cmdStatus(tokens) {
       active: data.activeWave?.phase ?? null,
       next: data.nextReady ? { id: data.nextReady.id, title: data.nextReady.title ?? null } : null,
       humanAction: data.humanAction ?? null,
+      phases: readState(root).phases.map((phase) => ({ id: phase.id, title: phase.title ?? null, status: phase.status })),
+      findings: data.securityFindings.filter((finding) => finding.status === 'pending')
+        .map((finding) => ({ id: finding.id, severity: finding.severity ?? null, summary: finding.summary ?? null, phase: finding.phase ?? null })),
+      reviews: { functional: review(data.reviews.functional), security: review(data.reviews.security) },
     }, null, 2)}\n`);
     return;
   }

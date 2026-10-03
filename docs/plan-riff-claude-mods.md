@@ -95,7 +95,7 @@ Pas de durée : complexité pour l'agent et poids de validation pour toi. Les é
 | --- | --- | --- | --- | --- |
 | M0. Prérequis et spike (**fait le 2026-10-03**) | Claude Code ≥ 2.1.287. Un mod minimal dans `riff/hosts/claude-code/` affiche `riff-codex status` dans la bande d'un projet de test ; `claude plugin validate` et `claude plugin test` passent. | Rien | Faible | Faible : voir la bande apparaître |
 | M1. Contrats JSON de la CLI (**fait le 2026-10-03**) | `riff status --json` et `riff wave context --json`, avec tests dans `test/`. Sortie texte inchangée. | Phase 1 du plan Astra (renommage), ou avant si le nom reste `riff-codex` | Faible | Faible |
-| M2. Cockpit (M-A) | Bande, panneau à onglets, `/riff-status` et `/riff-context`, repli texte hors interface, tests du cockpit. | M1 | Faible à moyenne | Faible : juger la lisibilité |
+| M2. Cockpit (M-A) (**fait le 2026-10-03**) | Bande, panneau à onglets, `/riff-status` et `/riff-context`, repli texte hors interface, tests du cockpit. | M1 | Faible à moyenne | Faible : juger la lisibilité |
 | M3. Gardien de compaction (M-B) | Jauge 200K, checkpoint avant compaction, compaction proposée puis lancée aux frontières de phase, instructions issues de `wave context`. | M1, phase 3 du plan Astra (`autoCompactWindow`) | Moyenne (vérifier le comportement réel de `session.compact`) | Moyenne : une wave à deux compactions |
 | M4. Routeur et preuve de modèle (M-D) | Profils appliqués aux sous-agents ; modèle observé enregistré par la CLI et visible dans les reçus. | Phase 2 du plan Astra (profils) | Moyenne | Faible |
 | M5. Suivi de review (M-C) | `/riff-review` lance le pont en arrière-plan, affiche les findings, relance un tour de correction. Neutralisé dans les sessions reviewer. | Phase 4 du plan Astra (pont) | Moyenne | Moyenne : utilité des findings affichés |
@@ -128,4 +128,15 @@ Essai : `claude --plugin-dir ~/DEV/frameworks/riff-codex/riff/hosts/claude-code/
 - Le cockpit appelle `status --json`. Un projet relié à une CLI plus ancienne, qui ignore le drapeau et répond en texte, reste lu par l'ancien analyseur.
 - Tests : 51 tests de la CLI passent, dont un nouveau test de contrat ; 6 tests du cockpit passent ; `claude plugin validate` passe. Vérifié sur une copie de l'état de `tamos-outreach` : JSON et texte concordent.
 
-Prochaine action : M2 (panneau à onglets, `/riff-context`, repli texte hors interface).
+## Résultat de M2 (2026-10-03)
+
+- `/riff` ouvre un panneau avec quatre onglets : Roadmap, Phase, Findings, Reviews. Touches 1 à 4 ou clic. Là où aucun panneau ne peut s'afficher (terminal étroit, extension, mode `-p`), `/riff` répond avec le contenu des quatre onglets en texte.
+- `/riff-context` donne la phase en cours, son checkpoint (signalé s'il est périmé), la prochaine action et les références. Si la CLI échoue, le cockpit affiche sa vraie erreur.
+- La bande ajoute le nombre de findings ouverts. Le cockpit se rafraîchit aussi après chaque commande Bash qui lance la CLI RIFF.
+- `status --json` gagne `phases`, `findings` (ouverts) et `reviews`, sans rien renommer.
+- Tests : 51 tests de la CLI ; 11 tests du cockpit, dont le changement d'onglet sur terminal et desktop ; `claude plugin validate` passe.
+- Vérifié en vraie session CLI sur une copie de `tamos-outreach` : panneau ancré à droite avec les 15 phases, onglet Reviews au clavier, `/riff-context` avec l'erreur réelle de la CLI.
+- Non fait : les boutons « Checkpoint » et « Ouvrir le dashboard » du plan M-A. Le checkpoint demande un résumé que seul Claude peut écrire, et le dashboard lance un serveur ; à décider avec la question ouverte 1.
+- Non vérifié : l'affichage dans l'app Desktop.
+
+Prochaine action : M3 (gardien de compaction) ou la phase 0 du plan Astra (inventaire des skills).
