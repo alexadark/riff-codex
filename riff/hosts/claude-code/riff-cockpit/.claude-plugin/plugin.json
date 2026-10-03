@@ -1,0 +1,6 @@
+{
+  "name": "riff-cockpit",
+  "version": "0.1.0",
+  "description": "RIFF progress above the prompt and an instant /riff-status, read from the RIFF CLI",
+  "author": { "name": "Alexandra Spalato" }
+}
