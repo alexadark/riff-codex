@@ -1,0 +1,12 @@
+{
+  "name": "riff-claude-code",
+  "owner": { "name": "Alexandra Spalato" },
+  "description": "RIFF integration for Claude Code",
+  "plugins": [
+    {
+      "name": "riff-cockpit",
+      "source": "./riff-cockpit",
+      "description": "RIFF band, /riff pane with tabs, /riff-status and /riff-context, read from the RIFF CLI"
+    }
+  ]
+}
