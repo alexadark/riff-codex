@@ -3,9 +3,9 @@
 // which answers at once without a Claude turn. Outside a RIFF project it draws nothing.
 //
 // The mod never writes RIFF state: it runs the project's own CLI through the
-// `.riff-codex` link, so the band reads exactly what `riff-codex status` reports.
+// `.riff-codex` link, so the band reads exactly what `riff-codex status --json` reports.
 
-import { clip, parseStatus, summary, type RiffStatus } from './core.ts'
+import { clip, describe, parseStatus, summary, type RiffStatus } from './core.ts'
 
 // Node may be missing from the app's PATH (nvm), so known locations follow.
 const NODES = ['node', '/usr/local/bin/node', '/opt/homebrew/bin/node']
@@ -29,6 +29,7 @@ export function register(on) {
 
   on('command.run', { command: 'riff-status' }, async ($) => {
     await refresh($)
+    if (status) return { text: describe(status) }
     return { text: raw ?? 'Not a RIFF project: no .riff-codex link at the repository root.' }
   })
 
@@ -65,7 +66,8 @@ async function refresh($) {
 async function runStatus($, script: string, root: string): Promise<string | null> {
   for (const node of NODES) {
     try {
-      const run = await $.process.run([node, script, 'status'], { cwd: root, timeoutMs: 10000 })
+      // An older CLI ignores --json and prints its text output, which parseStatus also reads.
+      const run = await $.process.run([node, script, 'status', '--json'], { cwd: root, timeoutMs: 10000 })
       if (run.exitCode === 0) return run.stdout.trim()
     } catch {
       // try the next location

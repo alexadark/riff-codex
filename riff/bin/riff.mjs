@@ -1185,7 +1185,8 @@ function cmdDiscovery(tokens) {
 function cmdContext(tokens) {
   const root = gitRoot();
   const state = readState(root);
-  const requested = tokens[0];
+  // Output is always JSON; --json is accepted so hosts can ask for it explicitly.
+  const requested = parseOptions(tokens)._[0];
   const phase = requested ? phaseById(state, requested) : state.phases.find((item) => item.status === 'active') ?? selectReadyPhase(state.phases);
   const candidate = candidateTree(root);
   const generated = /^(?:\.riff-codex$|\.riff-codex-state(?:\/|$)|\.agents(?:\/|$)|\.codex(?:\/|$)|\.uxtest(?:\/|$))/;
@@ -1197,6 +1198,7 @@ function cmdContext(tokens) {
   const checkpoint = phase?.checkpoint ?? null;
   const discovery = currentDiscovery(root, state);
   process.stdout.write(`${JSON.stringify({
+    schema: 'riff.wave-context/1',
     phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome, verificationRequired: phase.verificationRequired ?? null } : null,
     checkpoint,
     modelAdvice: phase && state.modelAdvice?.phase === phase.id ? state.modelAdvice : null,
@@ -1804,8 +1806,21 @@ function cmdHook(tokens) {
   } catch (error) { fail(`hook ${name}: ${error.message}`); }
 }
 
-function cmdStatus() {
+function cmdStatus(tokens) {
   const data = dashboardData(gitRoot());
+  if (parseOptions(tokens).json) {
+    // Stable contract for host integrations (Claude Code cockpit); extend, never rename.
+    process.stdout.write(`${JSON.stringify({
+      schema: 'riff.status/1',
+      version: data.version,
+      project: { name: data.project.name ?? null, objective: data.project.objective ?? null },
+      progress: data.progress,
+      active: data.activeWave?.phase ?? null,
+      next: data.nextReady ? { id: data.nextReady.id, title: data.nextReady.title ?? null } : null,
+      humanAction: data.humanAction ?? null,
+    }, null, 2)}\n`);
+    return;
+  }
   process.stdout.write(`${data.project.name ?? 'Unshaped project'}: ${data.project.objective ?? 'no objective yet'}\n${data.progress.completed}/${data.progress.total} phases completed. Active: ${data.activeWave?.phase ?? 'none'}. Next: ${data.nextReady?.id ?? 'none'}.\nHuman action: ${data.humanAction?.reason ?? 'none'}\n`);
 }
 
@@ -1994,7 +2009,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff-codex model-advice catalog|show\n  riff-codex model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff-codex model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status\n  riff-codex discovery [snapshot|check|review --evidence FILE]\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync [--preserve-legacy-verification]\n  riff-codex wave context [phase-id]\n  riff-codex wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --review FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status [--json]\n  riff-codex discovery [snapshot|check|review --evidence FILE]\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync [--preserve-legacy-verification]\n  riff-codex wave context [phase-id] [--json]\n  riff-codex wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --review FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -2004,7 +2019,7 @@ else if (command === 'init') await cmdInit(tokens);
 else if (command === 'resync') cmdResync(tokens);
 else if (command === 'doctor') cmdDoctor(tokens);
 else if (command === 'dashboard') await cmdDashboard(tokens);
-else if (command === 'status') cmdStatus();
+else if (command === 'status') cmdStatus(tokens);
 else if (command === 'model-advice') {
   try { await cmdModelAdvice(tokens); } catch (error) { fail(error.message); }
 }

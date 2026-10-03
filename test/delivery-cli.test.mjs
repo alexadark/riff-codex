@@ -204,3 +204,26 @@ test('failed unchanged attempts cannot turn into success through repeated review
   ok(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'fail', '--summary', 'Synthetic review failure', '--evidence', proof(root, 'functional', tree, 'fail'));
   rejected(root, /unchanged|failure/, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Unchanged review attempt', '--evidence', proof(root, 'functional', tree));
 });
+
+test('status --json and wave context --json expose stable host contracts without changing the text output', () => {
+  const root = fixture({ phases: ['a', 'b'] });
+  const text = ok(root, 'status');
+  assert.match(text, /^Fixture: no objective yet\n0\/2 phases completed\. Active: none\. Next: a\.\nHuman action: none\n$/);
+
+  const idle = JSON.parse(ok(root, 'status', '--json'));
+  assert.equal(idle.schema, 'riff.status/1');
+  assert.deepEqual(idle.project, { name: 'Fixture', objective: null });
+  assert.deepEqual(idle.progress, { completed: 0, total: 2 });
+  assert.equal(idle.active, null);
+  assert.deepEqual(idle.next, { id: 'a', title: 'Fixture a' });
+  assert.equal(idle.humanAction, null);
+
+  ok(root, 'wave', 'activate', 'a');
+  assert.equal(JSON.parse(ok(root, 'status', '--json')).active, 'a');
+
+  const context = JSON.parse(ok(root, 'wave', 'context', '--json'));
+  assert.equal(context.schema, 'riff.wave-context/1');
+  assert.equal(context.phase.id, 'a');
+  assert.equal(JSON.parse(ok(root, 'wave', 'context', 'b', '--json')).phase.id, 'b');
+  assert.deepEqual(JSON.parse(ok(root, 'wave', 'context', 'b')), JSON.parse(ok(root, 'wave', 'context', 'b', '--json')));
+});

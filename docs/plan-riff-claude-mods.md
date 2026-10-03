@@ -94,7 +94,7 @@ Pas de durée : complexité pour l'agent et poids de validation pour toi. Les é
 | Étape | Résultat observable | Dépend de | Complexité agent | Validation par toi |
 | --- | --- | --- | --- | --- |
 | M0. Prérequis et spike (**fait le 2026-10-03**) | Claude Code ≥ 2.1.287. Un mod minimal dans `riff/hosts/claude-code/` affiche `riff-codex status` dans la bande d'un projet de test ; `claude plugin validate` et `claude plugin test` passent. | Rien | Faible | Faible : voir la bande apparaître |
-| M1. Contrats JSON de la CLI | `riff status --json` et `riff wave context --json`, avec tests dans `test/`. Sortie texte inchangée. | Phase 1 du plan Astra (renommage), ou avant si le nom reste `riff-codex` | Faible | Faible |
+| M1. Contrats JSON de la CLI (**fait le 2026-10-03**) | `riff status --json` et `riff wave context --json`, avec tests dans `test/`. Sortie texte inchangée. | Phase 1 du plan Astra (renommage), ou avant si le nom reste `riff-codex` | Faible | Faible |
 | M2. Cockpit (M-A) | Bande, panneau à onglets, `/riff-status` et `/riff-context`, repli texte hors interface, tests du cockpit. | M1 | Faible à moyenne | Faible : juger la lisibilité |
 | M3. Gardien de compaction (M-B) | Jauge 200K, checkpoint avant compaction, compaction proposée puis lancée aux frontières de phase, instructions issues de `wave context`. | M1, phase 3 du plan Astra (`autoCompactWindow`) | Moyenne (vérifier le comportement réel de `session.compact`) | Moyenne : une wave à deux compactions |
 | M4. Routeur et preuve de modèle (M-D) | Profils appliqués aux sous-agents ; modèle observé enregistré par la CLI et visible dans les reçus. | Phase 2 du plan Astra (profils) | Moyenne | Faible |
@@ -121,4 +121,11 @@ Ordre conseillé : M0, M1, M2 rapidement (gain visible, risque faible), puis M3 
 
 Essai : `claude --plugin-dir ~/DEV/frameworks/riff-codex/riff/hosts/claude-code/riff-cockpit` dans un projet RIFF.
 
-Prochaine action : M1.
+## Résultat de M1 (2026-10-03)
+
+- `riff-codex status --json` renvoie un contrat stable `riff.status/1` : projet (nom, objectif), progression, phase active, prochaine phase prête, action humaine. La sortie texte de `status` est inchangée.
+- `riff-codex wave context [phase-id] --json` accepte le drapeau (avant, `--json` était pris pour un identifiant de phase). La sortie, déjà en JSON, gagne le champ `schema: riff.wave-context/1`.
+- Le cockpit appelle `status --json`. Un projet relié à une CLI plus ancienne, qui ignore le drapeau et répond en texte, reste lu par l'ancien analyseur.
+- Tests : 51 tests de la CLI passent, dont un nouveau test de contrat ; 6 tests du cockpit passent ; `claude plugin validate` passe. Vérifié sur une copie de l'état de `tamos-outreach` : JSON et texte concordent.
+
+Prochaine action : M2 (panneau à onglets, `/riff-context`, repli texte hors interface).
