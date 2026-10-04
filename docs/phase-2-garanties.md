@@ -167,3 +167,23 @@ Les tests cités sont dans `test/` : `riff-codex.test.mjs` (RC), `delivery-cli.t
 ## Tests ajoutés
 
 Deux tests dans `test/riff-codex.test.mjs` couvrent W18, W28, W36b, W39 et W40, un troisième couvre W58. Suite complète : 56 tests CLI et 2 tests dashboard passent.
+
+## Avancement au 2026-10-04 (branche `phase-2-prompting`)
+
+Fait et testé (58 tests CLI, 2 tests dashboard) :
+
+- Tableau des garanties et cinq tests qui prouvent les règles retirées de `wave`.
+- Passage d'amélioration en fin de phase (`riff improve`), visible dans le dashboard, boîte à idées `ideas/inbox.ndjson`.
+- `done_when` et `verify` dans le roadmap, transmis par `wave context`, signalés par `doctor`, écrits par `start`, `evolve` et `add-phase`.
+- Lien `.riff-cli` créé dans tous les projets par `resync`, même sans migration de l'état ; les skills et références citent `.riff-cli/`.
+- Catalogue de modèles sans préférence de fournisseur, profil Opus `max` retiré.
+- Principe de goût pour le code et trois interdits design.
+- Fusions : `incident` dans `debug`, `map` dans `onboard`, `promote` dans `start` ; `resync` retire les liens des skills supprimés.
+- Brouillons de `wave` (4,4 Ko contre 6,2 Ko) et `quick` (2,4 Ko) au gabarit « but, condition de fin, vérification ». `debug` et `onboard` sont aussi au gabarit.
+
+Reste :
+
+1. Validation par Alexandra du ton de `wave` et `quick`.
+2. Comparaison avant/après : le projet de test et le script sont prêts dans le dossier temporaire de la session (`ab/template`, `ab/run-arm.sh`, `ab/analyze.mjs`). Bloquée : la commande `claude` du terminal n'est pas connectée (`claude auth login` à lancer par Alexandra).
+3. Réécriture au gabarit des autres skills : `start`, `evolve`, `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
+4. Avant la fusion dans `main` : `riff resync` dans chaque projet connecté pour créer `.riff-cli` (accord d'Alexandra requis), puis mise à jour de la documentation en phase 7.
