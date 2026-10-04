@@ -1,51 +1,51 @@
 ---
 name: start
-description: Shape a product with discovery and a vertical RIFF roadmap, or turn a prototype into a production project. Use when the user invokes this skill or the former promote skill, or wants to define a project before building.
+description: Plan a product before building it, from a light roadmap entry to a complete reviewed dossier, or turn a prototype into a production project. Use when the user invokes this skill or the former promote skill by name, or asks RIFF to define a project before building.
 ---
 
-# Start RIFF discovery
+# Start a RIFF project
 
-Use [the discovery contract](../../references/discovery.md) for scope, dossier, design handoff, readiness, review, and stop rules. Use [project framing](../../references/project-framing.md) for the product synthesis that belongs in `PROJECT.md`.
+`riff` means `node .riff-cli/bin/riff.mjs`. The CLI checks the readiness manifest, ties the discovery review to the dossier's content, refuses to activate a phase of an enrolled project until `riff discovery check` passes, and refuses a promotion with unresolved active work or missing reviews.
 
-## Scope first
+## Goal
 
-Classify the request before choosing the depth of discovery:
+Leave the project with a plan the `wave` skill can build from, at the depth the request needs, then stop. Pick the path first:
 
-- An explicit request to plan a full application, or a new application intended for production, requires a complete scoped-version dossier.
-- Scratch work, a bounded spike, an existing small application with one clear outcome, and the `quick` skill remain on the light path unless the user explicitly asks for a full application plan.
-- A risk probe may use a small isolated prototype. It must not become product implementation or a hidden phase.
+- Complete dossier: the user explicitly asks for a full application plan, or plans a new application for production.
+- Light path: scratch work, a bounded spike, a change for the `quick` skill, or an existing small application with one clear outcome. An explicit full-app request beats a convenient light reading.
+- Promotion: the project is scratch-scoped and the user explicitly asks to make it a production project. An ordinary push, deployment, merge, audit or review request isn't a promotion.
 
-Run `node .riff-cli/bin/riff.mjs doctor`. Inspect the configured autonomy mode, the repository, existing `PROJECT.md` and `ROADMAP.yaml`, relevant documentation, and project taste before asking anything. For a production or complete dossier, read `.riff-cli/references/taste.md` and establish or conservatively merge the project-owned `taste.md`; for a UI product, include the applicable frontend direction and design-skill routing. Scratch and light work reads existing taste without bootstrapping a production file set. Read only the taste and stack topics that apply. Inspect existing supporting specifications and preserve them. Determine technical details from the repository, approved template, taste, and user stack; follow the mode boundary below for product questions.
+A risk probe may use a small isolated prototype; it never becomes product code or a hidden phase.
 
-Respect the configured mode. In `loop`, resolve ordinary product and technical ambiguity with the smallest reversible choice, record assumptions, and freeze the conservative summary without a confirmation round. In `guided`, present the summary and ask the user to confirm or correct it before freezing shared artifacts. Loop mode never creates `awaiting_human` for a product or technical decision; only the hard blockers in the discovery and operating contracts may stop it.
+## Done when
 
-## Full dossier
+- `PROJECT.md` and `ROADMAP.yaml` are written or conservatively updated, and every phase has `done_when` (observable conditions in the running product) and `verify` (the checks that prove them), sized to the phase.
+- `riff wave sync` passed and each phase has its `EXPLAIN.simple.md`.
+- Complete path: the whole committed version is planned, each area of `docs/specs/readiness.json` lists useful files or a concrete `not_applicable` reason, a passing independent review covers the current dossier, and `riff discovery check` passes.
+- Promotion: `riff promote --apply` succeeded and the scope reads production.
+- No phase is active. Building starts only when the user invokes the `wave` skill.
 
-For the complete path, produce the whole version plan before any implementation wave. `PROJECT.md` is the product synthesis and index. `ROADMAP.yaml` is the canonical phase list. Supporting `docs/specs/`, `docs/diagrams/`, or existing project paths may hold detail and must be linked rather than duplicated. The dossier must include:
+## Verify
 
-- numbered stories and observable criteria with stable IDs, and a mapping from stories and criteria to phases;
-- journeys, screens, states, responsive ASCII wireframes, and error, empty, recovery, privacy, authorization, and audit behavior where applicable;
-- the data model with fields, types, keys, constraints, index reasons, relationships, lifecycle, rights, and tenancy boundaries;
-- the smallest architecture and each API or integration contract, with decisions justified by repository, template, stack, taste, and user precedence;
-- risks and bounded probes, verification evidence, explicit exclusions, assumptions, and later fog of war;
-- real Mermaid `.mmd` source files for architecture, the ER model when data exists, critical-path sequences, and state diagrams when applicable;
-- a design handoff package, or a declared external design dependency, mapped to screens, tokens, stories, and criteria.
+- `riff doctor` flags no phase without `done_when` or `verify`.
+- The dossier reviewer is a fresh agent that didn't write it and reads the whole dossier, not a subset. Fix its findings, snapshot again and get a new review. Its evidence attests what it checked; it doesn't prove the product claims.
+- A design reference counts as received only at a verifiable local path or an immutable capture. Until then it stays `pending_external`, and the dossier can't pass.
 
-Every area either has useful linked files or an explicit `not_applicable` reason. Never fill a section with placeholders. If an external reference is promised but not available, continue independent product planning, record the missing artifact as an external dependency, and do not invent or silently substitute a design. Create native RIFF design only when the user authorizes it.
+## How to work
 
-## Freeze and hand off
+1. Run `riff doctor`, then read the configured mode, the repository, existing `PROJECT.md`, `ROADMAP.yaml`, specs, documentation and taste before asking anything. Settle technical facts from the repository, approved template, taste and stack instead of asking the user.
+2. On the complete path or a promotion, establish or conservatively merge the project's `taste.md`, with the frontend direction and design skills for a UI product. On the light path, read existing taste without creating a production file set. Read only the topics that apply.
+3. In `loop` mode, settle ordinary product and technical ambiguity with the smallest reversible choice, record the assumption and freeze without a confirmation round; such a decision never creates `awaiting_human`, and only a blocker kind from the operating contract stops the work. In `guided` mode, present the summary and let the user confirm or correct it before freezing shared files.
+4. Write the plan. `PROJECT.md` is the product synthesis and index, `ROADMAP.yaml` the canonical phase list; detail lives in existing project paths or `docs/specs/` and `docs/diagrams/` and is linked, not copied. Preserve existing specs and unrelated changes. Never write placeholders. If a promised design reference is missing, plan everything else, record it as an external dependency and never invent or substitute a design. Create a RIFF design only when the user authorizes it.
+5. Complete path: follow the discovery reference for the dossier content, the twelve readiness areas and the Mermaid diagrams. Run `riff discovery snapshot`, get the review, record it with `riff discovery review --evidence FILE`, fix and repeat until it passes, then run `riff discovery check`.
+6. Promotion: run `riff promote` to see the scope and stop if it's already production. Set production boundaries in `PROJECT.md`, `ROADMAP.yaml` and `taste.md`, keeping existing decisions, and resolve active phases and blockers. Stage the candidate, get fresh independent architecture, roadmap and functional reviews, plus security for a sensitive project, then run `riff promote --apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]` and check the scope and `INCIDENTS.md`.
 
-Both paths write or conservatively update `PROJECT.md` and `ROADMAP.yaml` after the applicable mode boundary; every phase carries `done_when` and `verify` (operating contract). Run `node .riff-cli/bin/riff.mjs wave sync`, check that both artifacts parse, and write each phase's `EXPLAIN.simple.md` projection using `.riff-cli/references/dashboard.md`. Only the complete path creates `docs/specs/readiness.json` with the version 1 area manifest described in the discovery reference, runs the discovery snapshot, obtains an independent review of the complete dossier, applies corrections automatically, and runs the discovery check again. Review evidence is an attestation of the review, not proof that its claims are true.
+A request for model advice alone stops before discovery; optional advice never switches the primary model or adds a pause in `loop` mode.
 
-The complete path stops after the dossier and readiness check. The light path stops after its shared-artifact sync and projections. Neither path activates or starts a wave from `start`; the user must separately invoke the `wave` skill. Do not publish issues or external artifacts unless separately requested.
+Never publish issues or external artifacts unless asked, or relaunch your own host to do the work. Promotion changes the RIFF scope only: it never authorizes a push, merge, deployment or publication, and a later authorized Git finalization runs `riff finish --check` first.
 
-Before discovery, follow the [model-advice contract](../../references/model-routing.md) and its single catalog. Respect explicit advice-only requests without starting discovery. Optional advice does not switch the primary model, add a worker or create a pause in loop mode. Keep native compaction, do not invoke nested `codex exec`, and preserve unrelated changes.
+Report the path taken, the files written, the check results, what remains unverified outside the repository, and that building starts with the `wave` skill.
 
-## Turn a prototype into a production project
+## References
 
-When the project is scratch-scoped and the user wants it to become a production project (formerly the `promote` skill):
-
-- Run `node .riff-cli/bin/riff.mjs promote` to see the current scope; if it is already production, say so and stop.
-- Establish the production boundaries in the shared `PROJECT.md`, `ROADMAP.yaml` and `taste.md`, keeping existing decisions. Resolve active phases and blockers first.
-- Stage the candidate and obtain fresh independent reviews of the architecture, the roadmap and the functional behavior, plus security for a sensitive project (security reference). Then apply `promote --apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]` and check the resulting scope and incident ledger. The evidence reference describes the promotion contract.
-- Report what remains unverified outside the repository. Promotion changes the RIFF scope only: it never authorizes a push, merge, deployment, publication or destructive change.
+Read when the step needs them, under `.riff-cli/references/`: `discovery.md` (dossier quality bar, design handoff states, readiness manifest, review lifecycle), `project-framing.md` (content of `PROJECT.md` and `ROADMAP.yaml`, light path), `operating-contract.md` (modes, blocker kinds, phase contract), `dashboard.md` (`EXPLAIN.simple.md`), `evidence.md` (promotion review artifacts), `security.md`, `model-routing.md`, `taste.md` and `taste/frontend.md`.

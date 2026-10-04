@@ -817,3 +817,21 @@ test('resync removes links to retired RIFF skills and keeps foreign entries', ()
   assert.equal(entries.includes('riff-codex-custom'), true);
   assert.equal(realpathSync(path.join(skills, 'riff-codex-debug')), path.join(PLUGIN_ROOT, 'skills', 'debug'));
 });
+
+test('promotion refuses unresolved active work and requires a security review for a sensitive project', () => {
+  const prepare = (phases) => {
+    const root = lifecycleFixture('scratch');
+    roadmapFixture(root, phases);
+    writeFileSync(path.join(root, 'PROJECT.md'), '# Project\nAccounts sign in with auth and keep user data private.\n');
+    writeFileSync(path.join(root, 'taste.md'), '# Taste\nPreserve user data.\n');
+    execFileSync('git', ['add', '--', 'PROJECT.md', 'ROADMAP.yaml', 'taste.md'], { cwd: root });
+    const candidate = execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
+    return { root, candidate, reviews: ['architecture', 'roadmap', 'functional'].flatMap((type) => [`--${type}`, proofFile(root, type, candidate)]) };
+  };
+  const busy = prepare([fixturePhase('busy')]);
+  runCli(busy.root, 'wave', 'activate', 'busy');
+  assert.match(runCliFailure(busy.root, 'promote', '--apply', ...busy.reviews), /resolve active work/);
+  const sensitive = prepare([]);
+  assert.match(runCliFailure(sensitive.root, 'promote', '--apply', ...sensitive.reviews), /security is required/);
+  assert.match(runCli(sensitive.root, 'promote', '--apply', ...sensitive.reviews, '--security', proofFile(sensitive.root, 'security', sensitive.candidate)), /Scope promoted/);
+});

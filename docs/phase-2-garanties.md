@@ -20,7 +20,7 @@ Chaque règle du skill reçoit un classement :
 - **CLI partielle** : la CLI couvre une partie (souvent seulement les projets inscrits au contrat discovery). Le reste reste une consigne.
 - **Consigne** : rien ne l'applique hors du prompt. La règle reste dans le skill ou dans une référence.
 
-Les tests cités sont dans `test/` : `riff-codex.test.mjs` (RC), `delivery-cli.test.mjs` (DC), `evolve-planning.test.mjs` (EP), `model-advice.test.mjs` (MA), `model-advice-plan.test.mjs` (MAP). Le numéro est la ligne du test.
+Les tests cités sont dans `test/` : `riff-codex.test.mjs` (RC), `delivery-cli.test.mjs` (DC), `delivery-contract.test.mjs` (DK), `evolve-planning.test.mjs` (EP), `model-advice.test.mjs` (MA), `model-advice-plan.test.mjs` (MAP). Le numéro est la ligne du test.
 
 ## `wave` (57 règles)
 
@@ -164,9 +164,57 @@ Les tests cités sont dans `test/` : `riff-codex.test.mjs` (RC), `delivery-cli.t
 - `quick` peut quand même raccourcir en déplaçant les procédures (conseil de modèle, Git, rapport) dans les références.
 - **Décision (2026-10-04)** : pas de reçu dans la CLI pour `quick`. Alexandra préfère le moins de cérémonie possible. Sa validation et sa review restent des consignes du skill, et c'est la garantie la plus faible de RIFF, acceptée pour des changements bornés.
 
+## `start` (25 règles, plus 10 venues de `promote`)
+
+Comparé ligne à ligne avec `git show main:riff/skills/start/SKILL.md` et `main:riff/skills/promote/SKILL.md`. « Gardée » veut dire que la nouvelle version la contient encore ; « référence » veut dire qu'elle vit dans une référence citée par le skill.
+
+| # | Règle | Classement | Où elle est maintenant |
+| --- | --- | --- | --- |
+| S1 | Choisir le chemin : dossier complet sur demande explicite ou application de production, sinon chemin léger ; la demande explicite l'emporte | Consigne | Gardée (But) |
+| S2 | Un prototype de risque reste isolé, jamais une phase cachée | Consigne | Gardée (But) |
+| S3 | `doctor`, puis lire mode, dépôt, `PROJECT.md`, `ROADMAP.yaml`, docs et goût avant toute question | Consigne | Gardée (étape 1) |
+| S4 | Dossier complet ou production : établir ou fusionner `taste.md` ; UI : direction frontend et skills de design | Consigne | Gardée (étape 2) |
+| S5 | Chemin léger : lire le goût existant sans créer de fichiers de production | Consigne | Gardée (étape 2) |
+| S6 | Préserver les specs existantes et les changements sans rapport | Consigne | Gardée (étape 4) |
+| S7 | Les faits techniques viennent du dépôt, du gabarit, du goût et de la stack, pas de l'utilisateur | Consigne | Gardée (étape 1) |
+| S8 | `loop` : plus petit choix réversible, hypothèse notée, pas de confirmation, jamais `awaiting_human` ; seuls les blocages durs arrêtent | Consigne | Gardée (étape 3) |
+| S9 | `guided` : présenter le résumé et faire confirmer avant de figer | Consigne | Gardée (étape 3) |
+| S10 | Dossier complet avant toute phase | CLI pour un projet inscrit | DC 101 : `wave activate` refuse sans `discovery check` |
+| S11 | `PROJECT.md` synthèse et index, `ROADMAP.yaml` liste canonique, détails liés et non copiés | Consigne | Gardée (étape 4) |
+| S12 | Contenu du dossier (stories, parcours, wireframes, données, architecture, risques, diagrammes Mermaid, design) | Consigne | Référence : `discovery.md`, « Dossier quality bar », plus détaillée que l'ancien skill ; l'étape 5 y renvoie |
+| S13 | Chaque zone a des fichiers utiles ou une raison `not_applicable` | CLI partielle | DK 23 prouve la structure et les fichiers ; l'utilité reste une consigne (Done when) |
+| S14 | Jamais de section bouche-trou | Consigne | Gardée (étape 4) |
+| S15 | Référence externe absente : continuer, noter la dépendance, ne rien inventer | Consigne | Gardée (étape 4, Verify) |
+| S16 | Design RIFF seulement sur autorisation | Consigne | Gardée (étape 4) |
+| S17 | Écrire `PROJECT.md` et `ROADMAP.yaml` ; chaque phase a `done_when` et `verify` | CLI partielle | RC 791 : `doctor` signale une phase sans eux ; gardée (Done when, Verify) |
+| S18 | `wave sync` et artefacts lisibles | Consigne | Gardée (Done when) |
+| S19 | `EXPLAIN.simple.md` par phase | Consigne | Gardée (Done when) |
+| S20 | Manifeste, snapshot, review, corrections, check | CLI partielle | DC 101 et DK 23 ; l'indépendance du relecteur reste une consigne (Verify) |
+| S21 | La preuve de review atteste, elle ne prouve pas le produit | Consigne | Gardée (Verify) |
+| S22 | `start` s'arrête et n'active jamais de phase | Consigne | Gardée (But, Done when) |
+| S23 | Pas d'issue ni d'artefact externe sans demande | Consigne | Gardée |
+| S24 | Conseil de modèle : demande seule s'arrête, pas de changement de modèle, pas de pause en `loop` | CLI partielle | Comme Q2 (MA 48, MAP 27) ; gardée |
+| S25 | Compaction native, pas de `codex exec` imbriqué | Consigne | Compaction : référence `execution.md` (vocabulaire Codex, phase 3). `codex exec` devient « ne pas relancer son propre hôte », comme dans `wave` |
+| P1 | `riff promote` pour voir le périmètre ; déjà en production, s'arrêter | CLI | RC 609 ; gardée (étape 6) |
+| P2 | Limites de production dans les trois fichiers partagés, décisions existantes gardées | CLI partielle | La CLI exige les trois fichiers non vides et indexés ; le contenu reste une consigne (étape 6) |
+| P3 | Résoudre les phases actives et les blocages avant | CLI | RC 821 (ajouté le 2026-10-04) ; gardée en une phrase pour éviter le refus |
+| P4 | Reviews architecture, roadmap, fonctionnelle, et sécurité pour un projet sensible | CLI | RC 609 et RC 821 ; l'indépendance reste une consigne |
+| P5 | Vérifier le périmètre et `INCIDENTS.md` après | Consigne | Gardée (étape 6) |
+| P6 | Dire ce qui reste invérifié hors du dépôt | Consigne | Gardée (rapport) |
+| P7 | Seulement sur demande explicite, jamais pour un push, un déploiement, un audit | Consigne | Gardée (But) |
+| P8 | La promotion n'autorise ni push, ni merge, ni déploiement, ni publication | Consigne | Gardée |
+| P9 | Une finalisation Git ultérieure passe d'abord par `finish --check` | Consigne | Perdue dans la fusion, remise le 2026-10-04 |
+| P10 | Charger la référence sécurité | CLI partielle | La CLI détecte un projet sensible et exige `--security` ; `security.md` est dans les références |
+
+### Bilan `start`
+
+- Aucune garantie perdue. P9 avait disparu lors de la fusion avec `promote` et revient.
+- La liste du contenu du dossier (S12) sort du skill : `discovery.md` la porte en plus détaillé, et l'étape 5 oblige à la lire.
+- Taille : 5,8 Ko contre 6,6 Ko pour l'ancien `start` et `promote` réunis.
+
 ## Tests ajoutés
 
-Deux tests dans `test/riff-codex.test.mjs` couvrent W18, W28, W36b, W39 et W40, un troisième couvre W58. Suite complète : 56 tests CLI et 2 tests dashboard passent.
+Deux tests dans `test/riff-codex.test.mjs` couvrent W18, W28, W36b, W39 et W40, un troisième couvre W58, un quatrième (RC 821) couvre P3 et P4. Suite complète : 59 tests passent (`npm test`).
 
 ## Avancement au 2026-10-04 (branche `phase-2-prompting`)
 
@@ -185,5 +233,5 @@ Fait et testé (58 tests CLI, 2 tests dashboard) :
 
 Reste :
 
-1. Réécriture au gabarit des autres skills : `start`, `evolve`, `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
+1. Réécriture au gabarit des autres skills (`start` fait, ton à relire par Alexandra) : `evolve`, `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
 2. Avant la fusion dans `main` : `riff resync` dans chaque projet connecté pour créer `.riff-cli` (accord d'Alexandra requis), puis mise à jour de la documentation en phase 7.
