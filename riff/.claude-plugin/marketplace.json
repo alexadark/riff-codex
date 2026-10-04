@@ -14,7 +14,6 @@
         "name": "Alexandra Spalato"
       },
       "skills": [
-        "./skills/.DS_Store",
         "./skills/add-phase",
         "./skills/dashboard",
         "./skills/debug",

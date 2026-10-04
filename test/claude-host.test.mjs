@@ -20,7 +20,9 @@ test('the riff plugin exposes every skill except the Codex-only deep-audit', () 
   const marketplace = JSON.parse(readFileSync(path.join(RIFF, '.claude-plugin', 'marketplace.json'), 'utf8'));
   const plugin = marketplace.plugins.find((entry) => entry.name === 'riff');
   assert.equal(plugin.source, '.');
-  const skills = readdirSync(path.join(RIFF, 'skills')).filter((name) => name !== 'deep-audit').sort();
+  const skills = readdirSync(path.join(RIFF, 'skills'))
+    .filter((name) => name !== 'deep-audit' && existsSync(path.join(RIFF, 'skills', name, 'SKILL.md')))
+    .sort();
   assert.deepEqual(plugin.skills, skills.map((name) => `./skills/${name}`));
   for (const entry of marketplace.plugins) assert.equal(existsSync(path.join(RIFF, entry.source)), true, entry.source);
 });
