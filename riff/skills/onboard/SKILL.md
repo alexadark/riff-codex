@@ -1,18 +1,37 @@
 ---
 name: onboard
-description: Bring an existing project into RIFF with concise brownfield discovery. Use when the user invokes $riff:onboard or wants RIFF artifacts for an application that already has code.
+description: Map an existing codebase and bring it into RIFF as a baseline. Use for $riff:onboard, $riff:map, or a request to map or onboard a project that already has code.
 ---
 
-# Onboard an existing project
+# Map and onboard an existing project
 
-Installation → `$riff:map` → `$riff:onboard` → `$riff:evolve` → `$riff:wave` is the explicit path for an existing application that needs new features. Read a reusable `.riff-codex-state/MAP.md` and existing project answers first, check affected findings against current code, and reuse them rather than repeating discovery. For this brownfield entry path, if no reusable map exists, point to `$riff:map` before writing onboarding artifacts; do not silently invoke it. Existing onboarding artifacts remain valid and need no retrospective map. Onboard establishes the existing application as the baseline, not a retrospective set of completed phases. Leave an empty phase list when no future outcome has been requested; `$riff:evolve` plans the subsequent change.
+`riff` means `node .riff-cli/bin/riff.mjs`. The brownfield path is: install RIFF, then onboard, then `$riff:evolve` for new features, then `$riff:wave`.
 
-Read `.riff-codex/references/taste.md`. For production onboarding, preserve existing Claude/project taste and merge verified conventions from the actual code and design into the applicable project taste files alongside the product artifacts. Confirm the actual stack and reuse its references. For UI products, include frontend direction and design-skill routing; do not redesign the application during onboarding.
+## Goal
 
-Inspect the repository and configured autonomy mode first. Classify the scope before choosing the depth of discovery. For an existing project with several dependent outcomes, multiple user roles or system boundaries, a multi-system integration, or an explicit large-project request, read `.riff-codex/references/project-framing.md` and capture user stories with observable criteria, the relevant entities, relationships, constraints and rights, architecture and integrations with motivated decisions, and a phase map connecting outcomes to stories. Keep a small application with one clear outcome on the concise onboarding path. Reuse existing answers and project documents rather than repeating resolved questions. Separate implemented facts from preferences, assumptions, and open product decisions. Summarize current user-visible capabilities, architecture, constraints, risks, and vocabulary.
+Understand the existing application from its code, then record it as the RIFF baseline: what it does today, not a retrospective list of completed phases. A request to map only stops after the map.
 
-In default `loop` mode, resolve current product and technical decisions conservatively from repository evidence: preserve existing behavior and data, minimize scope, permissions, dependencies, and external effects, prefer reversible choices, record assumptions, and continue without asking. In `guided` mode, ask only decisions at the current product boundary, with a recommendation for each. Identify technical debt only when it blocks a vertical outcome. Mark uncertain later work as fog of war.
+## Done when
 
-Draft `PROJECT.md` and a vertical `ROADMAP.yaml` with an explicit justified P0-P3 priority for every phase. In `loop`, write the conservative draft without a confirmation round. In `guided`, ask for confirmation before writing it. Do not assign one default priority across the roadmap. Treat both artifacts as shared with Claude RIFF. Preserve existing content, roadmap representation, comments, key order, and unknown fields unless the user authorizes a targeted replacement. After the mode-specific boundary, write the artifacts, run `node .riff-codex/bin/riff.mjs wave sync`, and stop. Do not publish GitHub issues unless the user separately invokes `$riff:issue`.
+- **Map:** user-visible flows are linked to entry points, data boundaries, external systems and sensitive surfaces, with verified facts kept apart from inference. If the map will be reused, `MAP.md` in the RIFF state folder records the inspected revision, sources and remaining uncertainties. No target architecture, implementation plan or exhaustive file inventory.
+- **Onboard:** `PROJECT.md` summarizes current capabilities, architecture, constraints, risks and vocabulary, separating implemented facts from preferences, assumptions and open decisions. `ROADMAP.yaml` lists only requested future outcomes, often none; each phase has a justified P0 to P3 priority, `done_when` and `verify`. `riff wave sync` passed, and the skill stopped there.
+- The project taste holds the verified conventions of the actual code and design, merged into existing Claude or project taste without overwriting it. For a UI product, it includes the frontend direction and design-skill routing.
 
-In `loop`, stop only for missing credentials or external access, impossible third-party verification, an unidentifiable destructive target, or failed RIFF validation. Never create `awaiting_human` for a product or technical decision. `guided` retains its confirmation behavior.
+## Verify
+
+Check every map finding against the current code before relying on it, including findings from an earlier `MAP.md`. Confirm the actual stack and reuse its stack references.
+
+## How to work
+
+1. Inspect the repository, existing project answers and the configured autonomy mode. Reuse a valid `MAP.md` and existing onboarding artifacts instead of repeating discovery.
+2. Classify the scope. Several dependent outcomes, multiple user roles or system boundaries, multi-system integration or an explicit large-project request use the project framing reference: stories with observable criteria, entities, relationships and rights, architecture and integrations with motivated decisions, and a phase map. A small application with one clear outcome stays concise.
+3. A read-only map reports useful conventions without changing taste and doesn't persist model advice or call paid advice without an explicit request. Save conventions only when asked.
+4. In `loop` mode, settle product and technical questions from repository evidence: preserve behavior and data, minimize scope, permissions, dependencies and external effects, prefer reversible choices, record assumptions and continue. Never create `awaiting_human` for a decision. Stop only for missing credentials or access, impossible third-party verification, an unidentifiable destructive target or a failed RIFF validation. In `guided` mode, ask only product-boundary decisions, each with a recommendation, and confirm before writing the artifacts.
+5. Name technical debt only when it blocks a vertical outcome; mark uncertain later work as fog of war. Don't redesign the application.
+6. `PROJECT.md` and `ROADMAP.yaml` are shared with Claude RIFF: keep existing content, representation, comments, key order and unknown fields unless a targeted replacement is authorized.
+
+Publish GitHub issues only through `$riff:issue`.
+
+## References
+
+Read when the step needs them, under `.riff-cli/references/`: `project-framing.md`, `evolution.md`, `taste.md` and `taste/frontend.md`, `model-routing.md`, `operating-contract.md`.

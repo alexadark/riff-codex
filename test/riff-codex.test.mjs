@@ -803,3 +803,17 @@ test('phase done_when and verify reach wave context and doctor flags phases with
   assert.match(doctor.stdout, /WARN  phase contracts: vague lack done_when or verify/);
   assert.doesNotMatch(doctor.stdout, /specified lack/);
 });
+
+test('resync removes links to retired RIFF skills and keeps foreign entries', () => {
+  const root = lifecycleFixture();
+  const skills = path.join(root, '.agents', 'skills');
+  symlinkSync('../../.riff-codex/skills/map', path.join(skills, 'riff-codex-map'));
+  symlinkSync('../../.riff-cli/skills/incident', path.join(skills, 'riff-codex-incident'));
+  symlinkSync('../../elsewhere/custom', path.join(skills, 'riff-codex-custom'));
+  runCli(root, 'resync');
+  const entries = readdirSync(skills);
+  assert.equal(entries.includes('riff-codex-map'), false);
+  assert.equal(entries.includes('riff-codex-incident'), false);
+  assert.equal(entries.includes('riff-codex-custom'), true);
+  assert.equal(realpathSync(path.join(skills, 'riff-codex-debug')), path.join(PLUGIN_ROOT, 'skills', 'debug'));
+});

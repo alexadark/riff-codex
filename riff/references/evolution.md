@@ -4,7 +4,7 @@
 
 ## Prerequisites and scope
 
-The brownfield path is explicit: install RIFF, `$riff:map`, `$riff:onboard`, `$riff:evolve`, then `$riff:wave`. Installation exposes commands; map describes the system; onboard establishes the product baseline; evolve plans changes; wave builds them. An already onboarded RIFF application can enter evolve directly. A saved map is useful evidence, not a mandatory freshness certificate or a reason to remap the entire repository.
+The brownfield path is explicit: install RIFF, `$riff:onboard`, `$riff:evolve`, then `$riff:wave`. Installation exposes commands; onboard maps the system and establishes the product baseline; evolve plans changes; wave builds them. An already onboarded RIFF application can enter evolve directly. A saved map is useful evidence, not a mandatory freshness certificate or a reason to remap the entire repository.
 
 Require an installed CLI, initialized state, and existing `PROJECT.md` and `ROADMAP.yaml`. Run doctor and status through the CLI. A missing prerequisite returns its explicit next step without creating artifacts or executing another command's work. A missing installation is not repaired inside evolve. Failed RIFF validation follows the operating contract; do not work around it by editing state files.
 

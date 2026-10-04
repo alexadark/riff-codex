@@ -1,4 +1,4 @@
 interface:
   display_name: "RIFF Onboard"
-  short_description: "Bring an existing application into RIFF"
-  default_prompt: "Use $onboard through $riff:onboard for this project."
+  short_description: "Map an existing app and make it the RIFF baseline"
+  default_prompt: "Use $onboard through $riff:onboard to map and onboard this project."

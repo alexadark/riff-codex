@@ -458,7 +458,19 @@ function exposeSkills(root, migration) {
     }
     symlinkSync(desired, target);
   }
+  removeRetiredSkillLinks(destination, new Set(readFileNames(source)));
   return preserved;
+}
+
+// Skills merged into others leave links RIFF created; foreign entries are never touched.
+function removeRetiredSkillLinks(destination, current) {
+  for (const entry of readdirSync(destination)) {
+    if (!entry.startsWith('riff-codex-') || current.has(entry.slice('riff-codex-'.length))) continue;
+    const link = path.join(destination, entry);
+    try {
+      if (lstatSync(link).isSymbolicLink() && /(?:^|\/)\.riff-(?:cli|codex)\/skills\/[^/]+$/.test(readlinkSync(link))) unlinkSync(link);
+    } catch { /* vanished entry */ }
+  }
 }
 
 function pointsTo(link, expected) {

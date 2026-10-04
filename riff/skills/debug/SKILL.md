@@ -1,16 +1,37 @@
 ---
 name: debug
-description: Diagnose and minimally fix a concrete failure within RIFF boundaries. Use when the user invokes $riff:debug or supplies a reproducible application bug.
+description: Diagnose and fix a concrete failure, including a live production incident. Use for $riff:debug, $riff:incident, a reproducible bug or a failing check.
 ---
 
 # Debug a concrete failure
 
-Read `.riff-codex/references/taste.md` and the relevant project conventions. For a UI failure, apply the relevant design skills and rendered checks from `.riff-codex/references/taste/frontend.md`. Persist a reusable prevention rule only when the diagnosis and correction establish it.
+`riff` means `node .riff-cli/bin/riff.mjs`.
 
-Reproduce only the reported failure. Identify the smallest supported cause, explain it, and implement a minimal correction when authorized. Validate the failed behavior once and add a narrow regression check only if necessary for this concrete case.
+## Goal
 
-Before finishing, perform agent-owned observation triage under `.riff-codex/references/dashboard.md#end-of-work-observation-triage`. Inspect current code and evidence, repair confirmed in-scope problems, and record justified decisions through `observations review`. Do not delegate technical validity judgments to the user or mark unverified findings resolved.
+Find the smallest supported cause of the reported failure and fix it, without turning the fix into hardening, compatibility work or an edge-case matrix.
 
-Respect an active wave and record its validation and review evidence through the wave commands. Do not generalize the fix into hardening, compatibility work, or an edge-case matrix.
+## Done when
 
-Use `.riff-codex/references/learning.md` to check relevant prior lessons and merge a verified prevention rule before final validation when this failure teaches something reusable.
+- The reported failure is reproduced, its cause is explained with evidence, and a minimal fix is in place when the fix is authorized.
+- The failed behavior passes once. A narrow regression check exists only if this case needs one.
+- Observations are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review`, nothing unverified marked resolved, no technical judgment handed to the user.
+- Inside an active wave, validation and review evidence went through the wave commands.
+- A failure that teaches something reusable left a verified prevention rule in the project taste, merged before final validation.
+
+## Verify
+
+Re-run the failing behavior on the fix. For a UI failure, check the rendered screen in a real browser with the relevant design skills from the frontend taste.
+
+## Production incident
+
+When users or data are affected in production right now, protect people and data first:
+
+- Establish the verified impact, affected users or data, current symptoms and ownership. Preserve evidence in the RIFF state folder without exposing secrets.
+- Recommend the smallest safe, reversible containment. Ask before a destructive or external change that isn't already authorized. Read the security reference at a security boundary.
+- Don't resume normal waves while the incident is unstable.
+- Once it is stable, log the confirmed impact, cause and prevention with `riff incident log --evidence FILE` (format in the evidence reference). `INCIDENTS.md` is append-only and keyed by incident id. Review it for recurring causes only when asked.
+
+## References
+
+Read when the step needs them, under `.riff-cli/references/`: `taste.md` and `taste/frontend.md`, `learning.md`, `dashboard.md` (observation triage), `security.md`, `evidence.md`.

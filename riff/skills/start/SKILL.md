@@ -1,6 +1,6 @@
 ---
 name: start
-description: Shape a new product with repository-aware discovery and a vertical RIFF roadmap. Use when the user invokes $riff:start or asks RIFF to define a project before building.
+description: Shape a product with discovery and a vertical RIFF roadmap, or turn a prototype into a production project. Use for $riff:start, $riff:promote, or defining a project before building.
 ---
 
 # Start RIFF discovery
@@ -40,3 +40,12 @@ Both paths write or conservatively update `PROJECT.md` and `ROADMAP.yaml` after 
 The complete path stops after the dossier and readiness check. The light path stops after its shared-artifact sync and projections. Neither path activates or starts a wave from `start`; the user must separately invoke `$riff:wave`. Do not publish issues or external artifacts unless separately requested.
 
 Before discovery, follow the [model-advice contract](../../references/model-routing.md) and its single catalog. Respect explicit advice-only requests without starting discovery. Optional advice does not switch the primary model, add a worker or create a pause in loop mode. Keep native compaction, do not invoke nested `codex exec`, and preserve unrelated changes.
+
+## Turn a prototype into a production project
+
+When the project is scratch-scoped and the user wants it to become a production project (formerly `$riff:promote`):
+
+- Run `node .riff-cli/bin/riff.mjs promote` to see the current scope; if it is already production, say so and stop.
+- Establish the production boundaries in the shared `PROJECT.md`, `ROADMAP.yaml` and `taste.md`, keeping existing decisions. Resolve active phases and blockers first.
+- Stage the candidate and obtain fresh independent reviews of the architecture, the roadmap and the functional behavior, plus security for a sensitive project (security reference). Then apply `promote --apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]` and check the resulting scope and incident ledger. The evidence reference describes the promotion contract.
+- Report what remains unverified outside the repository. Promotion changes the RIFF scope only: it never authorizes a push, merge, deployment, publication or destructive change.
