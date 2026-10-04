@@ -74,6 +74,16 @@ function gitRoot(candidate = process.cwd()) {
   }
 }
 
+function ensureGitRepository(candidate, allowNonEmpty) {
+  if (existsSync(candidate)) {
+    try { run('git', ['rev-parse', '--show-toplevel'], { cwd: candidate }); return; } catch {}
+    const entries = readdirSync(candidate).filter((name) => name !== '.DS_Store');
+    if (entries.length && !allowNonEmpty) fail(`not inside a Git repository: ${candidate}\nRun git init first, or riff init --git-init to create the repository in this folder.`);
+  } else mkdirSync(candidate, { recursive: true });
+  run('git', ['init', '-q'], { cwd: candidate });
+  process.stdout.write(`Created a Git repository in ${candidate}.\n`);
+}
+
 function ensureDir(fileOrDir, isFile = false) {
   mkdirSync(isFile ? path.dirname(fileOrDir) : fileOrDir, { recursive: true });
 }
@@ -638,6 +648,7 @@ async function cmdInit(tokens) {
   const options = parseOptions(tokens);
   if (options.autonomy && !AUTONOMY_MODES.has(options.autonomy)) fail('--autonomy must be loop or guided');
   const candidate = path.resolve(options.project_root ?? process.cwd());
+  ensureGitRepository(candidate, options.git_init);
   const root = gitRoot(candidate);
   if (root !== candidate) fail(`--project-root must be the Git root (${root})`);
   try { installationPreflight(root); } catch (error) { fail(error.message); }
@@ -2132,7 +2143,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);

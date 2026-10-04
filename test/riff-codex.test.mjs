@@ -835,3 +835,19 @@ test('promotion refuses unresolved active work and requires a security review fo
   assert.match(runCliFailure(sensitive.root, 'promote', '--apply', ...sensitive.reviews), /security is required/);
   assert.match(runCli(sensitive.root, 'promote', '--apply', ...sensitive.reviews, '--security', proofFile(sensitive.root, 'security', sensitive.candidate)), /Scope promoted/);
 });
+
+test('init creates the Git repository for an empty or new folder and needs --git-init for a non-empty one', () => {
+  const base = realpathSync(mkdtempSync(path.join(tmpdir(), 'riff-codex-test-')));
+  roots.push(base);
+  mkdirSync(path.join(base, '.home'));
+  const idea = path.join(base, 'idea');
+  assert.match(runCli(base, 'init', '--project-root', idea, '--non-interactive'), /Created a Git repository/);
+  assert.equal(execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: idea, encoding: 'utf8' }).trim(), idea);
+  assert.match(runCli(base, 'init', '--project-root', idea, '--non-interactive'), /initialized/);
+  const notes = path.join(base, 'notes');
+  mkdirSync(notes);
+  writeFileSync(path.join(notes, 'idea.md'), 'An idea\n');
+  assert.match(runCliFailure(base, 'init', '--project-root', notes, '--non-interactive'), /--git-init/);
+  assert.equal(existsSync(path.join(notes, '.git')), false);
+  assert.match(runCli(base, 'init', '--project-root', notes, '--non-interactive', '--git-init'), /Created a Git repository/);
+});
