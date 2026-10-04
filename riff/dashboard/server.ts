@@ -272,6 +272,7 @@ function codexOperationalState(projectRoot: string): Record<string, unknown> | n
       last_validation: state.lastValidation ?? null,
       reviews: state.reviews ?? { functional: null, security: null },
       security_findings: observationList(state),
+      improvements: Array.isArray(state.improvements) ? state.improvements : [],
       human_action: state.humanAction ?? null,
       model: state.model ?? null,
       next_ready: nextReady ? `${nextReady.id} - ${nextReady.title}` : null,
@@ -536,11 +537,13 @@ app.get("/api/projects/:slug/uxruns/:runId/artifact", (c) => {
   return new Response(Bun.file(candidate));
 });
 
-/** Observation triage is the only project-state write exposed by the dashboard. */
+function sameOriginJson(c: any) {
+  return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(c.req.url).hostname) && c.req.header("origin") === new URL(c.req.url).origin && Boolean(c.req.header("content-type")?.startsWith("application/json"));
+}
+
+/** Observation triage and improvement decisions are the only project-state writes exposed by the dashboard. */
 app.post("/api/projects/:slug/observations/:id", async (c) => {
-  if (!["localhost", "127.0.0.1", "[::1]"].includes(new URL(c.req.url).hostname) || c.req.header("origin") !== new URL(c.req.url).origin || !c.req.header("content-type")?.startsWith("application/json")) {
-    return c.json({ error: "Same-origin JSON request required" }, 403);
-  }
+  if (!sameOriginJson(c)) return c.json({ error: "Same-origin JSON request required" }, 403);
   const ctx = contexts.get(c.req.param("slug"));
   if (!ctx || !existsSync(join(ctx.root, ".riff-codex-state", "state.json"))) return c.json({ error: "RIFF Codex project not found" }, 404);
   try {
@@ -550,6 +553,22 @@ app.post("/api/projects/:slug/observations/:id", async (c) => {
       "--id", c.req.param("id"), "--revision", body.revision, "--status", body.status, "--note", body.note],
       { cwd: ctx.root, encoding: "utf8", timeout: 10000, maxBuffer: 65536 });
     return c.json(JSON.parse(result));
+  } catch (error: any) {
+    return c.json({ error: String(error.stderr || error.message).trim() }, 400);
+  }
+});
+
+app.post("/api/projects/:slug/improvements/:id", async (c) => {
+  if (!sameOriginJson(c)) return c.json({ error: "Same-origin JSON request required" }, 403);
+  const ctx = contexts.get(c.req.param("slug"));
+  if (!ctx || !existsSync(join(ctx.root, ".riff-codex-state", "state.json"))) return c.json({ error: "RIFF project not found" }, 404);
+  try {
+    const body = await c.req.json();
+    if (!["taken", "dismissed"].includes(body.status) || typeof body.note !== "string") return c.json({ error: "Status taken or dismissed and a note are required" }, 400);
+    const result = execFileSync("node", [join(RESOLVED_FRAMEWORK_ROOT, "bin", "riff.mjs"), "improve", "decide",
+      "--id", c.req.param("id"), "--status", body.status, "--note", body.note],
+      { cwd: ctx.root, encoding: "utf8", timeout: 10000, maxBuffer: 65536 });
+    return c.json({ result: result.trim() });
   } catch (error: any) {
     return c.json({ error: String(error.stderr || error.message).trim() }, 400);
   }

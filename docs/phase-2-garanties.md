@@ -5,8 +5,11 @@ Date : 2026-10-04. Plan parent : [plan-riff-claude-astra.md](plan-riff-claude-as
 ## Décisions déjà prises pour la phase 2
 
 - Travail dans le worktree `riff-codex-phase2`, branche `phase-2-prompting`. Fusion dans `main` seulement après validation complète.
-- Skills : `dashboard` reste ; `deep-audit` sort du plugin Claude (reste côté hôte Codex) ; `incident` fusionne dans `debug` comme mode « panne en production » ; `onboard` et `map` fusionnent. Résultat : 12 skills.
+- Skills : `dashboard` reste ; `deep-audit` sort du plugin Claude (reste côté hôte Codex) ; `incident` fusionne dans `debug` comme mode « panne en production » ; `onboard` et `map` fusionnent ; `promote` fusionne dans `start` (« transformer ce prototype en projet de production »), la commande `riff promote` reste. Résultat : 11 skills.
+- Amélioration automatique (validée le 2026-10-04) : à la fin de chaque phase de `wave`, 0 à 3 propositions enregistrées par `riff improve record`. Celles du projet vont dans l'état local et le dashboard, sans jamais bloquer ; celles de RIFF vont dans la boîte à idées `ideas/inbox.ndjson` du dépôt RIFF, non versionnée. `wave complete` refuse tant que le passage n'est pas enregistré, même vide. L'agent propose, il n'applique jamais.
 - Design : seulement trois interdits pour l'instant (copywriting générique, dégradés violets, eyebrows). Le goût design viendra plus tard, avec une validation visuelle.
+- Un seul style de prompt pour tous les modèles (décision du 2026-10-04, d'après le guide d'OpenAI pour GPT-6 Astra du 5 septembre 2026 cité par Alexandra) : but, condition de fin explicite, vérification, peu de règles, descriptions courtes. Le style `guarded` est abandonné ; les profils gardent seulement le modèle et l'effort.
+- Deux idées reprises de ce guide : des tests proportionnés au changement, et une liste de tics d'écriture typiques de l'IA à éviter, à côté de la liste anti-tics visuels.
 
 ## Classement
 
@@ -124,6 +127,7 @@ Les tests cités sont dans `test/` : `riff-codex.test.mjs` (RC), `delivery-cli.t
 | W55 | Jamais de planificateur | Consigne | |
 | W56 | Jamais d'issue GitHub sans `$riff:issue` | Consigne | |
 | W57 | Jamais de commande publique `next` | CLI | `riff next` refuse déjà (`bin/riff.mjs`) ; la règle peut disparaître |
+| W58 | Passage d'amélioration en fin de phase : 0 à 3 propositions, sans doublon, jamais appliquées | CLI pour l'existence, le plafond et les doublons ; consigne pour la qualité | RC « phase completion requires… » (refus sans passage), RC « improvement pass caps proposals… » |
 
 ### Bilan `wave`
 
@@ -162,4 +166,4 @@ Les tests cités sont dans `test/` : `riff-codex.test.mjs` (RC), `delivery-cli.t
 
 ## Tests ajoutés
 
-Deux tests dans `test/riff-codex.test.mjs` couvrent W18, W28, W36b, W39 et W40. Suite complète : 55 tests passent.
+Deux tests dans `test/riff-codex.test.mjs` couvrent W18, W28, W36b, W39 et W40, un troisième couvre W58. Suite complète : 56 tests CLI et 2 tests dashboard passent.

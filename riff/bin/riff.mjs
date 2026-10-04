@@ -34,6 +34,7 @@ import { portAvailable, observationList, reviewObservation } from '../lib/dashbo
 import { DISCOVERY_MANIFEST, discoverySnapshot } from '../lib/delivery-contract.mjs';
 import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 import { recommendPlan } from '../lib/model-advice-plan.mjs';
+import { decideImprovement, ideasFile, improvementPassError, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
 
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -1177,6 +1178,8 @@ function completePhase(root, state, phase, commit) {
   if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree || !evidenceValid(root, functional.evidence)) throw new Error('a passing functional receipt with intact evidence for the exact commit tree is required');
   if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree || !evidenceValid(root, security.evidence))) throw new Error('a passing security receipt with intact evidence for the exact sensitive commit tree is required');
   requireEnrolledCompletionGates(root, state, phase, commitTree);
+  const improvementError = improvementPassError(phase);
+  if (improvementError) throw new Error(improvementError);
   phase.commit = run('git', ['rev-parse', commit], { cwd: root });
   phase.status = 'completed';
   phase.reason = null;
@@ -1989,6 +1992,41 @@ function cmdPromote(tokens) {
   process.stdout.write('Scope promoted from scratch to production. Existing phases preserved. No deployment performed.\n');
 }
 
+function cmdImprove(tokens) {
+  const root = gitRoot();
+  const action = tokens[0] ?? 'list';
+  const options = parseOptions(tokens.slice(1));
+  const ideas = ideasFile(path.dirname(PLUGIN_ROOT));
+  if (action === 'list') {
+    const target = options.target ?? 'project';
+    if (!['project', 'riff'].includes(target)) throw new Error('--target must be project or riff');
+    const items = target === 'riff' ? readIdeas(ideas) : readState(root).improvements ?? [];
+    process.stdout.write(`${JSON.stringify(items)}\n`);
+    return;
+  }
+  if (!['record', 'decide'].includes(action)) throw new Error('use improve record --phase ID --file FILE, improve list [--target project|riff], or improve decide --id ID --status taken|dismissed');
+  withLock(root, () => {
+    const state = readState(root);
+    if (action === 'decide') {
+      const item = decideImprovement(state, { id: optionRequired(options, 'id'), status: optionRequired(options, 'status'), note: options.note, at: now() });
+      saveState(root, state);
+      event(root, 'improvement_decided', { id: item.id, status: item.status });
+      process.stdout.write(`${item.id} ${item.status}.\n`);
+      return;
+    }
+    const phase = phaseById(state, optionRequired(options, 'phase'));
+    activePhase(state, phase);
+    const proposals = parseProposals(readJson(localPath(root, optionRequired(options, 'file'))));
+    const { recorded, skipped } = recordImprovements({ state, phase, proposals, project: state.project?.name || path.basename(root), ideas, at: now() });
+    saveState(root, state);
+    event(root, 'improvement_pass', { phase: phase.id, recorded: recorded.map((entry) => entry.id), skipped: skipped.length });
+    const lines = [`Improvement pass recorded for ${phase.id}: ${recorded.length} new, ${skipped.length} duplicate.`];
+    for (const entry of recorded) lines.push(`  ${entry.id} [${entry.target}] ${entry.title}`);
+    for (const entry of skipped) lines.push(`  skipped duplicate of ${entry.duplicateOf}: ${entry.title}`);
+    process.stdout.write(`${lines.join('\n')}\n`);
+  });
+}
+
 function cmdIncident(tokens) {
   if (tokens[0] !== 'log') throw new Error('use incident log --evidence FILE');
   const options = parseOptions(tokens.slice(1));
@@ -2076,7 +2114,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -2099,6 +2137,9 @@ else if (['report', 'promote', 'incident', 'finish'].includes(command)) {
     if (command === 'finish' && !parseOptions(tokens).review) action();
     else withLock(gitRoot(), action);
   } catch (error) { fail(error.message); }
+}
+else if (command === 'improve') {
+  try { cmdImprove(tokens); } catch (error) { fail(error.message); }
 }
 else if (command === 'observations') {
   try {

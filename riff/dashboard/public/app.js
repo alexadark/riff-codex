@@ -738,6 +738,34 @@
     return form;
   }
 
+  function improvementItem(entry) {
+    const slug = state.currentProjectSlug;
+    const message = el("p", { role: "status" });
+    const button = el("button", { type: "button", class: "btn", onClick: async () => {
+      button.disabled = true;
+      message.textContent = "Saving…";
+      try {
+        await api(`/api/projects/${encodeURIComponent(slug)}/improvements/${entry.id}`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "dismissed", note: "Dismissed from the dashboard" }),
+        });
+        // The project cache refreshes on the next file event; reflect the recorded decision now.
+        entry.status = "dismissed";
+        renderOperationalSummary();
+      } catch (error) { message.textContent = error.message; button.disabled = false; }
+    } }, "Dismiss");
+    return el("details", { class: "status-observation" }, [
+      el("summary", null, `${entry.title} · ${entry.impact}`),
+      el("div", { class: "status-value" }, [
+        `From phase: ${entry.phase}`,
+        `Could go in: ${entry.suggested_phase || "new phase"}`,
+        `What happened: ${entry.what_happened}`,
+        `Proposal: ${entry.proposal}`,
+      ].join("\n")),
+      button, message,
+    ]);
+  }
+
   function renderOperationalSummary() {
     const root = $("#project-status");
     clear(root);
@@ -809,6 +837,15 @@
           : `Security observations to review · ${observations.length} grouped`),
         el("p", { class: "fg-muted small" }, "Recorded checks, not a current scan. Repeated observations are grouped; details remain available."),
         ...observations,
+      ]));
+    }
+    const improvements = Array.isArray(data.improvements) ? data.improvements : [];
+    const proposed = improvements.filter((entry) => entry.status === "proposed");
+    if (proposed.length) {
+      root.appendChild(el("details", { class: "status-events status-observations", dataset: { category: "improvements" }, open: true }, [
+        el("summary", null, `Proposed improvements · ${proposed.length}`),
+        el("p", { class: "fg-muted small" }, "Suggested by the agent at the end of a phase. Nothing is applied: add the useful ones with add-phase or evolve."),
+        ...proposed.map(improvementItem),
       ]));
     }
     if (events.length) {

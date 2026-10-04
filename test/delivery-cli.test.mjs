@@ -17,7 +17,7 @@ function write(root, file, value) {
 const git = (root, ...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
 function cli(root, ...args) {
   const result = spawnSync(process.execPath, [CLI, ...args], { cwd: root, encoding: 'utf8',
-    env: { ...process.env, HOME: path.join(root, '.fixture-home'), CODEX_HOME: path.join(root, '.fixture-home/.codex') } });
+    env: { ...process.env, HOME: path.join(root, '.fixture-home'), CODEX_HOME: path.join(root, '.fixture-home/.codex'), RIFF_IDEAS_FILE: path.join(root, '.fixture-home/ideas.ndjson') } });
   return { status: result.status, text: `${result.stdout ?? ''}${result.stderr ?? ''}` };
 }
 function ok(root, ...args) {
@@ -82,6 +82,10 @@ function candidate(root) {
   ok(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Fixture behavior verified', '--evidence', proof(root, 'functional', tree));
   return tree;
 }
+function improvementPass(root, id = 'a') {
+  write(root, `.riff-codex-state/${id}-improvements.json`, []);
+  ok(root, 'improve', 'record', '--phase', id, '--file', `.riff-codex-state/${id}-improvements.json`);
+}
 function checkpoint(root) {
   ok(root, 'wave', 'checkpoint', 'a', '--summary', 'Fixture feature verified', '--next', 'Consult ROADMAP.yaml and verify delivery');
 }
@@ -130,6 +134,7 @@ test('enrolled completion needs a current checkpoint and explicit observation ha
   const warning = injectFinding(root, 'HIGH');
   rejected(root, /HIGH.*blocks/, 'wave', 'complete', 'a', '--commit', 'HEAD');
   ok(root, 'observations', 'review', '--id', warning.id, '--revision', warning.revision, '--status', 'false_positive', '--note', 'Synthetic fixture injection, not a real code defect.');
+  improvementPass(root);
   ok(root, 'wave', 'complete', 'a', '--commit', 'HEAD');
   rejected(root, /delivery review/, 'finish', '--check');
   write(root, '.riff-codex-state/write.lock', { pid: process.pid });
@@ -166,6 +171,7 @@ test('nonblocking observations require a literal unfinished follow-up phase, and
   ok(root, 'observations', 'review', '--id', warning.id, '--revision', warning.revision, '--status', 'pending', '--note', 'Follow up in phaseXfollow-up because that phase owns the affected fixture.');
   rejected(root, /follow-up/, 'wave', 'complete', 'a', '--commit', 'HEAD');
   ok(root, 'observations', 'review', '--id', warning.id, '--revision', warning.revision, '--status', 'pending', '--note', 'Follow up in phase.follow-up because that phase owns the affected fixture.');
+  improvementPass(root);
   ok(root, 'wave', 'complete', 'a', '--commit', 'HEAD');
 });
 

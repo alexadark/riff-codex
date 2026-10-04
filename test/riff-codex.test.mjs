@@ -37,7 +37,7 @@ function runCli(root, ...args) {
   return execFileSync(process.execPath, [CLI, ...args], {
     cwd: root,
     encoding: 'utf8',
-    env: { ...process.env, HOME: path.join(root, '.home'), CODEX_HOME: path.join(root, '.home', '.codex') },
+    env: { ...process.env, HOME: path.join(root, '.home'), CODEX_HOME: path.join(root, '.home', '.codex'), RIFF_IDEAS_FILE: path.join(root, '.home', 'ideas.ndjson') },
   });
 }
 
@@ -491,6 +491,11 @@ function roadmapFixture(root, phases) {
   runCli(root, 'wave', 'sync');
 }
 const fixturePhase = (id, priority = 'P2', depends_on = []) => ({ id, title: id, outcome: 'Visible result', priority, depends_on });
+function improvementPass(root, id, proposals = []) {
+  const file = path.join(root, '.riff-codex-state', `${id}-improvements.json`);
+  writeJson(file, proposals);
+  return runCli(root, 'improve', 'record', '--phase', id, '--file', file);
+}
 function proofFile(root, type, candidate, status = 'pass') {
   const file = path.join(root, '.riff-codex-state', `${type}-review.json`);
   writeJson(file, { version: 1, candidate, type, status, reviewer: { id: 'fresh-test-reviewer', independent: true }, evidence: ['README.md:1 inspected'], findings: [] });
@@ -550,6 +555,8 @@ test('phase completion requires executed scoped validation and intact independen
   writeFileSync(reportPath, reportBytes);
   runCli(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Reviewed behavior', '--evidence', proof);
   execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Verified phase'], { cwd: root });
+  assert.match(runCliFailure(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /improvement pass/);
+  improvementPass(root, 'a');
   assert.match(runCli(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /a completed/);
   assert.match(runCli(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /already completed/);
   assert.equal(JSON.parse(runCli(root, 'wave', 'select')).id, 'b');
@@ -632,6 +639,7 @@ test('resume reconciles an interrupted verified commit once and preserves dirty 
   runCli(root, 'wave', 'validate', 'recover', '--run', '--command', '["node","-e","process.exit(0)"]', '--paths', '["ROADMAP.yaml"]');
   const candidate = execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
   runCli(root, 'wave', 'review', 'recover', '--type', 'functional', '--status', 'pass', '--summary', 'Observed fixture', '--evidence', proofFile(root, 'functional', candidate));
+  improvementPass(root, 'recover');
   execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Interrupted delivery'], { cwd: root });
   const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
   const readState = () => JSON.parse(readFileSync(path.join(root, '.riff-codex-state/state.json')));
@@ -744,5 +752,37 @@ test('completion rejects missing security receipts, stale receipts and passing r
   assert.match(runCliFailure(root, 'wave', 'complete', 's', '--commit', 'HEAD'), /functional receipt/);
   review('functional', second);
   review('security', second);
+  improvementPass(root, 's');
   assert.match(runCli(root, 'wave', 'complete', 's', '--commit', 'HEAD'), /s completed/);
+});
+
+test('improvement pass caps proposals, skips duplicates, feeds the idea box and never blocks on decisions', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [fixturePhase('a', 'P1'), fixturePhase('b', 'P2')]);
+  assert.match(runCliFailure(root, 'improve', 'record', '--phase', 'a', '--file', '.riff-codex-state/none.json'), /must be active/);
+  runCli(root, 'wave', 'activate', 'a');
+  const proposal = (target, title, extra = {}) => ({ target, title, what_happened: 'Observed during the fixture', proposal: 'Do the simpler thing', impact: 'medium', ...extra });
+  const rejectedPass = (proposals) => {
+    writeJson(path.join(root, '.riff-codex-state/rejected.json'), proposals);
+    return runCliFailure(root, 'improve', 'record', '--phase', 'a', '--file', '.riff-codex-state/rejected.json');
+  };
+  assert.match(rejectedPass([1, 2, 3, 4].map((n) => proposal('project', `Idea ${n}`))), /at most 3/);
+  assert.match(rejectedPass([{ target: 'riff', title: 'No detail' }]), /what_happened is required/);
+  const first = improvementPass(root, 'a', [
+    proposal('project', 'Cache the search results', { suggested_phase: 'b' }),
+    proposal('riff', 'Explain wave retry in the skill', { area: 'skill' }),
+  ]);
+  assert.match(first, /2 new, 0 duplicate/);
+  const repeat = improvementPass(root, 'a', [proposal('project', 'cache the  search results!'), proposal('riff', 'Explain wave retry in the skill')]);
+  assert.match(repeat, /0 new, 2 duplicate/);
+  const projectItems = JSON.parse(runCli(root, 'improve', 'list'));
+  assert.equal(projectItems.length, 1);
+  assert.equal(projectItems[0].suggested_phase, 'b');
+  assert.equal(projectItems[0].status, 'proposed');
+  const ideas = JSON.parse(runCli(root, 'improve', 'list', '--target', 'riff'));
+  assert.deepEqual(ideas.map((idea) => [idea.project, idea.phase, idea.area, idea.impact]), [['Fixture', 'a', 'skill', 'MEDIUM']]);
+  assert.equal(readFileSync(path.join(root, '.home', 'ideas.ndjson'), 'utf8').trim().split('\n').length, 1);
+  assert.match(runCli(root, 'improve', 'decide', '--id', projectItems[0].id, '--status', 'dismissed', '--note', 'Not needed'), /dismissed/);
+  assert.equal(JSON.parse(runCli(root, 'improve', 'list'))[0].status, 'dismissed');
+  assert.match(runCliFailure(root, 'improve', 'decide', '--id', projectItems[0].id, '--status', 'applied'), /taken or dismissed/);
 });
