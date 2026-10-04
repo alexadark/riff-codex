@@ -1,0 +1,30 @@
+version: 1
+project:
+  name: Tasklist
+  objective: Tasks carry a priority and can be filtered by it
+phases:
+  - id: priority
+    title: Task priority
+    outcome: A task can be created with a priority of low, normal or high; normal is the default
+    demo: Add a high-priority task and see its priority in the list
+    priority: P1
+    done_when:
+      - add accepts an optional priority of low, normal or high and defaults to normal
+      - an unknown priority is rejected with a clear error
+      - list returns each task with its priority
+    verify:
+      - npm test
+  - id: filter
+    title: Filter by priority
+    outcome: The list can be filtered to one priority
+    demo: Filter the list to high-priority tasks
+    priority: P2
+    depends_on: [priority]
+    done_when:
+      - list accepts an optional priority filter and returns only matching tasks
+      - list without a filter still returns every task
+    verify:
+      - npm test
+out_of_scope:
+  - date handling
+  - persistence
