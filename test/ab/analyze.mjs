@@ -44,9 +44,16 @@ for (const name of readdirSync(runs).sort()) {
     outOfScope: changed.filter((f) => f.startsWith('src/dates') || f === 'ROADMAP.yaml' || f === 'PROJECT.md').join(' ') || 'none',
     uncommitted: dirty.join(' ') || 'none',
     testsFailing: tests ?? 'unknown',
-    explainPost: existsSync(path.join(project, 'EXPLAIN-POST.simple.md')),
+    explainPost: phaseExplanations(project),
     endedWithQuestion: /\?\s*$/.test(String(result.result ?? '').trim()),
     isError: result.is_error ?? null,
   });
 }
 console.log(JSON.stringify(rows, null, 2));
+
+// Phases whose dashboard folder holds the post-completion explanation.
+function phaseExplanations(project) {
+  const dir = path.join(project, '.riff-data/dashboard/phases');
+  if (!existsSync(dir)) return 0;
+  return readdirSync(dir).filter((name) => existsSync(path.join(dir, name, 'EXPLAIN-POST.simple.md'))).length;
+}
