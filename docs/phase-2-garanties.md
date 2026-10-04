@@ -179,11 +179,11 @@ Fait et testé (58 tests CLI, 2 tests dashboard) :
 - Catalogue de modèles sans préférence de fournisseur, profil Opus `max` retiré.
 - Principe de goût pour le code et trois interdits design.
 - Fusions : `incident` dans `debug`, `map` dans `onboard`, `promote` dans `start` ; `resync` retire les liens des skills supprimés.
-- Brouillons de `wave` (4,4 Ko contre 6,2 Ko) et `quick` (2,4 Ko) au gabarit « but, condition de fin, vérification ». `debug` et `onboard` sont aussi au gabarit.
+- Brouillons de `wave` (4,4 Ko contre 6,2 Ko) et `quick` (2,4 Ko) au gabarit « but, condition de fin, vérification », ton validé par Alexandra. `debug` et `onboard` sont aussi au gabarit.
+- Skills nommés sans syntaxe d'hôte (« le skill `wave` » au lieu de `$riff:wave`), dossier d'état cité `.riff-data/`, branches créées en `riff/<change>`.
+- Comparaison avant/après (Opus 5.5, effort medium, un essai par cas) : les deux versions vont au bout sans question et évitent le piège `src/dates.js`. La nouvelle fait en plus la review indépendante de `quick` (sautée par l'ancienne) et le passage d'amélioration de `wave` (absent dans l'ancienne). Coût : `quick` 0,64 $ contre 0,41 $, `wave` 2,27 $ contre 2,03 $. Les deux `wave` ont réparé le script `npm test` cassé du projet de test pour que la validation passe, et l'ont signalé.
 
 Reste :
 
-1. Validation par Alexandra du ton de `wave` et `quick`.
-2. Comparaison avant/après : le projet de test et les scripts sont prêts dans `test/ab/` (`run-arm.sh old|new wave|quick N`, puis `node test/ab/analyze.mjs`). Bloquée : la commande `claude` du terminal n'est pas connectée (`claude auth login` à lancer par Alexandra).
-3. Réécriture au gabarit des autres skills : `start`, `evolve`, `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
-4. Avant la fusion dans `main` : `riff resync` dans chaque projet connecté pour créer `.riff-cli` (accord d'Alexandra requis), puis mise à jour de la documentation en phase 7.
+1. Réécriture au gabarit des autres skills : `start`, `evolve`, `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
+2. Avant la fusion dans `main` : `riff resync` dans chaque projet connecté pour créer `.riff-cli` (accord d'Alexandra requis), puis mise à jour de la documentation en phase 7.
