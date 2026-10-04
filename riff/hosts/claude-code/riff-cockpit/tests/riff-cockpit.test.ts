@@ -30,12 +30,12 @@ const STATUS = [
   'Human action: Scoped Brave Search API key is missing.',
 ].join('\n')
 
-function setup(on, world: { isGit: boolean; isRiff: boolean; firstNodeMissing?: boolean; legacyCli?: boolean; noPane?: boolean }) {
+function setup(on, world: { isGit: boolean; isRiff: boolean; firstNodeMissing?: boolean; legacyCli?: boolean; noPane?: boolean; preRename?: boolean }) {
   const runs: string[][] = []
   on('session.start', () => ({ cwd: ROOT }))
   on('command.register', () => ({ value: undefined }))
   on('session.cwd', () => ({ value: ROOT }))
-  on('fs.exists', () => ({ value: world.isRiff }))
+  on('fs.exists', ($, e) => ({ value: world.isRiff && !(world.preRename && String(e.path).includes('/.riff-cli/')) }))
   on('turn.complete', () => ({ text: '' }))
   on('ui.open', () => ({ value: world.noPane ? { isPlaced: false, reason: 'too narrow' } : { isPlaced: true } }))
   on('process.run', ($, e) => {
@@ -54,6 +54,14 @@ async function start($) {
 
 test('/riff-status answers from the RIFF CLI without a turn', async ($, on) => {
   const runs = setup(on, { isGit: true, isRiff: true })
+  await start($)
+  const answer = await $.command.run({ command: 'riff-status', args: '' })
+  expect(answer.text).toBe(STATUS)
+  expect(runs.some((argv) => argv.join(' ') === `node ${ROOT}/.riff-cli/bin/riff.mjs status --json`)).toBe(true)
+})
+
+test('a project not yet migrated is read through its .riff-codex link', async ($, on) => {
+  const runs = setup(on, { isGit: true, isRiff: true, preRename: true })
   await start($)
   const answer = await $.command.run({ command: 'riff-status', args: '' })
   expect(answer.text).toBe(STATUS)
@@ -131,7 +139,7 @@ test('status text is parsed into the band fields, without the tab data', () => {
   const status = parseStatus(STATUS)
   expect(status).toMatchObject({ name: 'TAMOS Outreach', completed: 7, total: 15, active: 'phase-8', next: null })
   expect(summary(status!, 120)).toBe('TAMOS Outreach · 7/15 phases · active phase-8')
-  expect(tabLines('roadmap', status!, null)).toEqual(['Update the RIFF CLI linked by .riff-codex to see this tab.'])
+  expect(tabLines('roadmap', status!, null)).toEqual(['Update the RIFF CLI linked by .riff-cli to see this tab.'])
   expect(parseStatus('something else')).toBe(null)
 })
 

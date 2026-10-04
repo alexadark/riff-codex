@@ -1,6 +1,6 @@
 {
   "name": "riff-cockpit",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "RIFF band, /riff pane with tabs, /riff-status and /riff-context, read from the RIFF CLI",
   "author": {
     "name": "Alexandra Spalato"

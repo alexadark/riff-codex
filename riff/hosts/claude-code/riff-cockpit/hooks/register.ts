@@ -4,7 +4,7 @@
 //
 // Refreshed when the session starts, after each main turn and after each Bash call that
 // runs the RIFF CLI. The mod never writes RIFF state: it runs the project's own CLI
-// through the `.riff-codex` link, so it shows exactly what `status --json` and
+// through the `.riff-cli` link (`.riff-codex` before the rename), so it shows exactly what `status --json` and
 // `wave context --json` report.
 
 import {
@@ -25,7 +25,9 @@ import {
 // Node may be missing from the app's PATH (nvm), so known locations follow.
 const NODES = ['node', '/usr/local/bin/node', '/opt/homebrew/bin/node']
 const PANE = 'riff'
-const NOT_RIFF = 'Not a RIFF project: no .riff-codex link at the repository root.'
+const NOT_RIFF = 'Not a RIFF project: no .riff-cli or .riff-codex link at the repository root.'
+// Projects not yet migrated by `riff resync` only have the pre-rename link.
+const LINKS = ['.riff-cli', '.riff-codex']
 const RIFF_COMMAND = /(^|[\s;&|/])(riff|riff-codex|riff\.mjs)(\s|$)/
 
 let status: RiffStatus | null = null
@@ -129,9 +131,12 @@ async function refresh($) {
   const cwd = await $.session.cwd()
   const top = await $.process.run(['git', 'rev-parse', '--show-toplevel'], { cwd, timeoutMs: 5000 })
   const root = top.exitCode === 0 ? top.stdout.trim() : null
-  const script = root ? `${root}/.riff-codex/bin/riff.mjs` : null
+  let script: string | null = null
+  for (const link of root ? LINKS : []) {
+    if (await $.fs.exists(`${root}/${link}/bin/riff.mjs`)) { script = `${root}/${link}/bin/riff.mjs`; break }
+  }
   // An older CLI ignores --json on status and prints its text output, which parseStatus also reads.
-  const statusRun = script && (await $.fs.exists(script)) ? await runCli($, script, root, ['status', '--json']) : null
+  const statusRun = script ? await runCli($, script, root, ['status', '--json']) : null
   raw = statusRun?.ok ? statusRun.text : null
   status = raw ? parseStatus(raw) : null
   // `wave context` has always printed JSON; no flag keeps older CLIs answering.

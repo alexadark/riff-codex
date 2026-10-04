@@ -6,7 +6,25 @@ export function inside(root, target) {
   return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
 }
 
+export const STATE_DIR = '.riff-data';
+export const CODEX_STATE_DIR = '.riff-codex-state';
+
+function isRealDirectory(target) {
+  try { return lstatSync(target).isDirectory(); } catch { return false; }
+}
+
+// A project keeps its pre-rename state directory until `riff resync` migrates it.
+export function stateDirFor(root) {
+  if (!isRealDirectory(path.join(root, STATE_DIR)) && isRealDirectory(path.join(root, CODEX_STATE_DIR))) return CODEX_STATE_DIR;
+  return STATE_DIR;
+}
+
 export function localPath(root, value) {
+  // After migration the old state name is only a compatibility link; write through the real directory.
+  if (typeof value === 'string' && stateDirFor(root) === STATE_DIR) {
+    const relative = path.relative(root, path.resolve(root, value));
+    if (relative === CODEX_STATE_DIR || relative.startsWith(`${CODEX_STATE_DIR}${path.sep}`)) value = STATE_DIR + relative.slice(CODEX_STATE_DIR.length);
+  }
   const target = path.resolve(root, value);
   if (!inside(root, target)) throw new Error(`path escapes project: ${value}`);
   let current = root;
@@ -24,9 +42,9 @@ export function phaseId(id) {
 }
 
 export function withLock(root, action) {
-  const directory = localPath(root, '.riff-codex-state');
+  const directory = localPath(root, stateDirFor(root));
   mkdirSync(directory, { recursive: true });
-  return withFileLock(localPath(root, '.riff-codex-state/write.lock'), action);
+  return withFileLock(path.join(directory, 'write.lock'), action);
 }
 
 export function withFileLock(lock, action) {

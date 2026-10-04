@@ -1,9 +1,10 @@
 {
-  "name": "riff-codex",
+  "name": "riff",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
+    "riff": "./riff/bin/riff.mjs",
     "riff-codex": "./riff/bin/riff.mjs"
   },
   "engines": {

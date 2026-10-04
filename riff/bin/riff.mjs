@@ -5,6 +5,7 @@ import {
   closeSync,
   chmodSync,
   copyFileSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -25,7 +26,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
-import { inside, localPath, phaseId, withLock, withFileLock } from '../lib/safety.mjs';
+import { CODEX_STATE_DIR, STATE_DIR, inside, localPath, phaseId, stateDirFor, withLock, withFileLock } from '../lib/safety.mjs';
 import { verificationEvidence, writeReport } from '../lib/report.mjs';
 import { managedHookPolicy } from '../lib/managed-hooks.mjs';
 import { selectReadyPhase } from '../lib/phase-selection.mjs';
@@ -37,8 +38,10 @@ import { recommendPlan } from '../lib/model-advice-plan.mjs';
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = path.resolve(path.dirname(SCRIPT), '..');
-const FRAMEWORK_DIR = '.riff-codex';
-const STATE_DIR = '.riff-codex-state';
+const FRAMEWORK_DIR = '.riff-cli';
+// Names used before the rename. Migrated projects keep them as compatibility links
+// so the dashboard, Codex hooks and skill text keep working during the transition.
+const CODEX_FRAMEWORK_DIR = '.riff-codex';
 const LEGACY_FRAMEWORK_DIR = '.riff';
 const LEGACY_STATE_DIR = '.riff-state';
 const HOOK_ID = 'riff-codex-hook:';
@@ -105,15 +108,20 @@ function now() {
   return new Date().toISOString();
 }
 
+function frameworkDirFor(root) {
+  return stateDirFor(root) === STATE_DIR ? FRAMEWORK_DIR : CODEX_FRAMEWORK_DIR;
+}
+
 function pathsFor(root) {
+  const state = stateDirFor(root);
   return {
     root,
-    framework: path.join(root, FRAMEWORK_DIR),
-    riff: path.join(root, STATE_DIR),
-    config: path.join(root, STATE_DIR, 'config.json'),
-    state: path.join(root, STATE_DIR, 'state.json'),
-    events: path.join(root, STATE_DIR, 'events.ndjson'),
-    receipts: path.join(root, STATE_DIR, 'receipts'),
+    framework: path.join(root, frameworkDirFor(root)),
+    riff: path.join(root, state),
+    config: path.join(root, state, 'config.json'),
+    state: path.join(root, state, 'state.json'),
+    events: path.join(root, state, 'events.ndjson'),
+    receipts: path.join(root, state, 'receipts'),
     hooks: path.join(root, '.codex', 'hooks.json'),
     roadmap: path.join(root, 'ROADMAP.yaml'),
     project: path.join(root, 'PROJECT.md'),
@@ -148,14 +156,14 @@ function event(root, type, data = {}) {
 }
 
 function readState(root) {
-  localPath(root, `${STATE_DIR}/state.json`);
+  localPath(root, `${stateDirFor(root)}/state.json`);
   const state = readJson(pathsFor(root).state);
   validateState(state);
   return state;
 }
 
 function saveState(root, state) {
-  localPath(root, `${STATE_DIR}/state.json`);
+  localPath(root, `${stateDirFor(root)}/state.json`);
   state.updatedAt = now();
   writeJson(pathsFor(root).state, state);
 }
@@ -260,7 +268,7 @@ function gitHooksDir(root) {
 
 function installationPreflight(root) {
   const directory = gitHooksDir(root);
-  for (const name of [STATE_DIR, '.codex', '.agents', '.agents/skills']) {
+  for (const name of [stateDirFor(root), '.codex', '.agents', '.agents/skills']) {
     const target = localPath(root, name);
     if (existsSync(target) && !statSync(target).isDirectory()) throw new Error(`${name} must be a directory`);
   }
@@ -271,14 +279,14 @@ function installationPreflight(root) {
   const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
   const exclude = path.resolve(root, run('git', ['rev-parse', '--git-path', 'info/exclude'], { cwd: root }));
   localPath(inside(root, exclude) ? root : common, exclude);
-  for (const name of [STATE_DIR, '.codex/hooks.json', '.agents/skills']) localPath(root, name);
+  for (const name of [stateDirFor(root), '.codex/hooks.json', '.agents/skills']) localPath(root, name);
 }
 
 function installGitHook(root, name, migration) {
   const directory = gitHooksDir(root);
   ensureDir(directory);
   const target = path.join(directory, name);
-  const backupDir = path.join(root, STATE_DIR, 'git-hooks');
+  const backupDir = path.join(root, stateDirFor(root), 'git-hooks');
   ensureDir(backupDir);
   let prior = null;
   if (pathExists(target)) {
@@ -296,16 +304,18 @@ function installGitHook(root, name, migration) {
     } else {
       const match = current.match(/^# RIFF_CODEX_PREVIOUS_JSON=(.+)$/m) ?? current.match(/^(?:RIFF_CODEX_PREVIOUS|RIFF_PREVIOUS)=(.+)$/m);
       prior = match?.[1] ? JSON.parse(match[1]) : null;
-      const legacyPrefix = `${path.join(root, LEGACY_STATE_DIR)}${path.sep}`;
-      if (migration.migratedState && typeof prior === 'string' && prior.startsWith(legacyPrefix)) {
-        const migratedPrior = path.join(root, STATE_DIR, path.relative(path.join(root, LEGACY_STATE_DIR), prior));
-        if (pathExists(migratedPrior)) prior = migratedPrior;
+      for (const [migrated, previous] of [[migration.migratedState, LEGACY_STATE_DIR], [migration.migratedCodexState, CODEX_STATE_DIR]]) {
+        const legacyPrefix = `${path.join(root, previous)}${path.sep}`;
+        if (migrated && typeof prior === 'string' && prior.startsWith(legacyPrefix)) {
+          const migratedPrior = path.join(root, STATE_DIR, path.relative(path.join(root, previous), prior));
+          if (pathExists(migratedPrior)) prior = migratedPrior;
+        }
       }
     }
   }
   const previousLine = `'${String(prior ?? '').replaceAll("'", "'\"'\"'")}'`;
   const arg = name === 'commit-msg' ? ' "$@"' : '';
-  const wrapper = `#!/bin/sh\n${GIT_HOOK_MARKER}\n# RIFF_CODEX_PREVIOUS_JSON=${JSON.stringify(prior ?? '')}\nRIFF_CODEX_PREVIOUS=${previousLine}\nif [ -n "$RIFF_CODEX_PREVIOUS" ] && [ -x "$RIFF_CODEX_PREVIOUS" ]; then "$RIFF_CODEX_PREVIOUS" "$@" || exit $?; fi\n/usr/bin/env node "$(git rev-parse --show-toplevel)/${FRAMEWORK_DIR}/bin/riff.mjs" hook git-${name}${arg}\n`;
+  const wrapper = `#!/bin/sh\n${GIT_HOOK_MARKER}\n# RIFF_CODEX_PREVIOUS_JSON=${JSON.stringify(prior ?? '')}\nRIFF_CODEX_PREVIOUS=${previousLine}\nif [ -n "$RIFF_CODEX_PREVIOUS" ] && [ -x "$RIFF_CODEX_PREVIOUS" ]; then "$RIFF_CODEX_PREVIOUS" "$@" || exit $?; fi\n/usr/bin/env node "$(git rev-parse --show-toplevel)/${frameworkDirFor(root)}/bin/riff.mjs" hook git-${name}${arg}\n`;
   const temporary = `${target}.riff-${process.pid}`;
   writeFileSync(temporary, wrapper, { flag: 'wx', mode: 0o755 });
   renameSync(temporary, target);
@@ -351,7 +361,7 @@ function migrateLegacyInstall(root) {
     changes.push(`removed obsolete ${LEGACY_FRAMEWORK_DIR} Codex link`);
   }
 
-  if (!pathExists(state) && pathExists(legacyState) && ownership.owned) {
+  if (!pathExists(state) && !pathExists(path.join(root, CODEX_STATE_DIR)) && pathExists(legacyState) && ownership.owned) {
     if (lstatSync(legacyState).isSymbolicLink()) throw new Error('owned legacy state must be a real directory before migration');
     renameSync(legacyState, state);
     migratedState = true;
@@ -365,18 +375,54 @@ function migrateLegacyInstall(root) {
   };
 }
 
-function ensureFrameworkLink(root) {
-  const target = path.join(root, FRAMEWORK_DIR);
+// Move .riff-codex-state to .riff-data once no phase is running, after a full backup.
+// The old name stays as a link to the new directory until every reader uses the new names.
+function migrateCodexNames(root, migration) {
+  const previous = path.join(root, CODEX_STATE_DIR);
+  if (stateDirFor(root) !== CODEX_STATE_DIR) return migration;
+  const defer = (reason) => ({ ...migration, deferred: reason });
+  const state = readJson(path.join(previous, 'state.json'), false);
+  const active = state?.phases?.find((phase) => phase.status === 'active');
+  if (active || state?.activeWave) return defer(`phase ${active?.id ?? state.activeWave.phase ?? 'wave'} is active; run resync again after it finishes`);
+  if (pathExists(path.join(previous, 'write.lock'))) return defer('another RIFF command holds the state lock');
+  if (pathExists(path.join(root, STATE_DIR))) throw new Error(`${STATE_DIR} already exists and is not a directory; preserving it`);
+  const config = readJson(path.join(previous, 'config.json'), false);
+  const backup = path.join(previous, 'backups', `riff-codex-state-${now().replace(/[:.]/g, '-')}`);
+  ensureDir(backup);
+  for (const entry of readdirSync(previous)) {
+    if (entry !== 'backups') cpSync(path.join(previous, entry), path.join(backup, entry), { recursive: true, verbatimSymlinks: true });
+  }
+  const hooks = path.join(root, '.codex', 'hooks.json');
+  if (existsSync(hooks)) copyFileSync(hooks, path.join(backup, 'codex-hooks.json'));
+  renameSync(previous, path.join(root, STATE_DIR));
+  symlinkSync(STATE_DIR, previous);
+  const approved = config?.hooks?.approvedHash;
+  return {
+    ...migration,
+    changes: [...migration.changes, `${CODEX_STATE_DIR} -> ${STATE_DIR} (backup in ${path.join(STATE_DIR, path.relative(previous, backup))})`],
+    migratedCodexState: true,
+    preserveHookApproval: migration.preserveHookApproval || (typeof approved === 'string' && approved.length > 0 && approved === config?.managed?.hooksHash),
+  };
+}
+
+function ensureFrameworkLink(root, name = frameworkDirFor(root)) {
+  const target = path.join(root, name);
   if (pathExists(target)) {
     const stat = lstatSync(target);
-    if (!stat.isSymbolicLink()) throw new Error(`${FRAMEWORK_DIR} already exists and is not a symlink; preserving it`);
+    if (!stat.isSymbolicLink()) throw new Error(`${name} already exists and is not a symlink; preserving it`);
     let resolved;
-    try { resolved = path.resolve(path.dirname(target), readlinkSync(target)); } catch (error) { throw new Error(`cannot read ${FRAMEWORK_DIR} symlink: ${error.message}`); }
-    if (resolved !== PLUGIN_ROOT) throw new Error(`${FRAMEWORK_DIR} points to ${resolved}; expected permanent RIFF Codex folder ${PLUGIN_ROOT}`);
+    try { resolved = path.resolve(path.dirname(target), readlinkSync(target)); } catch (error) { throw new Error(`cannot read ${name} symlink: ${error.message}`); }
+    if (resolved !== PLUGIN_ROOT) throw new Error(`${name} points to ${resolved}; expected permanent RIFF folder ${PLUGIN_ROOT}`);
     return false;
   }
   symlinkSync(path.relative(root, PLUGIN_ROOT), target);
   return true;
+}
+
+function ensureCompatibilityLinks(root) {
+  if (stateDirFor(root) !== STATE_DIR) return;
+  if (!pathExists(path.join(root, CODEX_FRAMEWORK_DIR))) ensureFrameworkLink(root, CODEX_FRAMEWORK_DIR);
+  if (!pathExists(path.join(root, CODEX_STATE_DIR))) symlinkSync(STATE_DIR, path.join(root, CODEX_STATE_DIR));
 }
 
 function exposeSkills(root, migration) {
@@ -386,7 +432,7 @@ function exposeSkills(root, migration) {
   const preserved = [];
   for (const name of readFileNames(source)) {
     const target = path.join(destination, `riff-codex-${name}`);
-    const desiredTarget = path.join(root, FRAMEWORK_DIR, 'skills', name);
+    const desiredTarget = path.join(root, frameworkDirFor(root), 'skills', name);
     const desired = path.relative(destination, desiredTarget);
     const legacyTarget = path.join(destination, name);
     const legacyDesired = path.relative(destination, path.join(root, LEGACY_FRAMEWORK_DIR, 'skills', name));
@@ -402,13 +448,18 @@ function exposeSkills(root, migration) {
     let existing = null;
     try { existing = lstatSync(target); } catch { /* missing */ }
     if (existing) {
-      if (existing.isSymbolicLink() && readlinkSync(target) === desired) continue;
+      // A link through the pre-rename .riff-codex name still reaches this skill; leave tracked links alone.
+      if (existing.isSymbolicLink() && pointsTo(target, path.join(PLUGIN_ROOT, 'skills', name))) continue;
       preserved.push(path.relative(root, target));
       continue;
     }
     symlinkSync(desired, target);
   }
   return preserved;
+}
+
+function pointsTo(link, expected) {
+  try { return realpathSync(link) === realpathSync(expected); } catch { return false; }
 }
 
 function readFileNames(directory) {
@@ -419,8 +470,11 @@ function excludeLocalState(root) {
   const exclude = path.resolve(root, run('git', ['rev-parse', '--git-path', 'info/exclude'], { cwd: root }));
   ensureDir(exclude, true);
   const current = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
-  if (!/^\.riff-codex-state\/$/m.test(current)) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF Codex worktree-local state\n${STATE_DIR}/\n`);
-  if (!/^\.uxtest\/runs\/$/m.test(current)) appendFileSync(exclude, '.uxtest/runs/\n');
+  const lines = new Set(current.split('\n'));
+  // Links are files to Git, so they need bare patterns. Exclusion never hides a tracked link.
+  const entries = stateDirFor(root) === STATE_DIR ? [`${STATE_DIR}/`, FRAMEWORK_DIR, CODEX_STATE_DIR, CODEX_FRAMEWORK_DIR] : [`${CODEX_STATE_DIR}/`];
+  const missing = [...entries, '.uxtest/runs/'].filter((line) => !lines.has(line));
+  if (missing.length) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF worktree-local state\n${missing.join('\n')}\n`);
 }
 
 function dashboardRegistryFile() {
@@ -444,7 +498,7 @@ function syncManaged(root, options = {}) {
   const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
   localPath(inside(root, installLock) ? root : common, installLock);
   return withFileLock(installLock, () => {
-    const migration = migrateLegacyInstall(root);
+    const migration = migrateCodexNames(root, migrateLegacyInstall(root));
     return withLock(root, () => syncManagedUnlocked(root, { ...options, migration }));
   });
 }
@@ -453,6 +507,7 @@ function syncManagedUnlocked(root, options) {
   const migration = options.migration ?? migrateLegacyInstall(root);
   const files = pathsFor(root);
   ensureFrameworkLink(root);
+  ensureCompatibilityLinks(root);
   excludeLocalState(root);
   ensureDir(files.riff);
   ensureDir(files.receipts);
@@ -471,19 +526,19 @@ function syncManagedUnlocked(root, options) {
       managed: {},
     };
   }
-  if (config.version !== 1) throw new Error(`unsupported ${STATE_DIR}/config.json version`);
+  if (config.version !== 1) throw new Error(`unsupported ${stateDirFor(root)}/config.json version`);
   config.preferences ??= {};
   if (options.autonomy) config.preferences = { ...config.preferences, autonomy: options.autonomy };
   config.preferences.autonomy ??= 'loop';
   if (!AUTONOMY_MODES.has(config.preferences.autonomy)) throw new Error('autonomy must be loop or guided');
   const existingHooks = readJson(files.hooks, false);
-  const projectCli = `$(git rev-parse --show-toplevel)/${FRAMEWORK_DIR}/bin/riff.mjs`;
+  const projectCli = `$(git rev-parse --show-toplevel)/${frameworkDirFor(root)}/bin/riff.mjs`;
   const systemPolicy = managedHookPolicy(root, PLUGIN_ROOT);
   const merged = mergeHooks(existingHooks, projectCli, migration.legacyFrameworkOwned || migration.migratedState, Boolean(systemPolicy));
   writeJson(files.hooks, merged);
   const currentHash = hooksHash(merged);
   const preservedSkills = exposeSkills(root, migration);
-  config.managed = { ...(config.managed ?? {}), version: VERSION, pluginRoot: PLUGIN_ROOT, cli: `${FRAMEWORK_DIR}/bin/riff.mjs`, hooksHash: currentHash, preservedSkills };
+  config.managed = { ...(config.managed ?? {}), version: VERSION, pluginRoot: PLUGIN_ROOT, cli: `${frameworkDirFor(root)}/bin/riff.mjs`, hooksHash: currentHash, preservedSkills };
   config.hooks ??= { approvedHash: null };
   config.hooks.source = systemPolicy ? 'system' : 'project';
   if (options.recordApproval || migration.preserveHookApproval) config.hooks.approvedHash = currentHash;
@@ -586,10 +641,15 @@ async function cmdInit(tokens) {
   try {
     if (existing.project?.scope === 'scratch' && configuration.scope === 'production') throw new Error('use promote for a reviewed scratch-to-production transition');
     const result = syncManaged(root, { ...configuration, recordApproval: options.record_hooks_approved });
-    if (result.migration.changes.length) process.stdout.write(`Migrated existing RIFF Codex installation: ${result.migration.changes.join(', ')}.\n`);
+    reportMigration(result.migration);
   } catch (error) { fail(error.message); }
   const config = readJson(pathsFor(root).config);
-  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${FRAMEWORK_DIR} -> ${PLUGIN_ROOT}\nSkills: namespaced under .agents/skills/riff-codex-*; the native plugin supplies the $riff:* namespace.\nState: project-local in ${STATE_DIR}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\n${config.hooks?.source === 'system' ? 'Hooks use the installed system policy; no per-hook approval is required after configuration reload.' : 'Required: open /hooks in Codex, review the local hooks, then run riff-codex doctor --record-hooks-approved.'}\nClaude RIFF paths and state were not created or replaced.\n`);
+  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${frameworkDirFor(root)} -> ${PLUGIN_ROOT}\nSkills: namespaced under .agents/skills/riff-codex-*; the native plugin supplies the $riff:* namespace.\nState: project-local in ${stateDirFor(root)}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\n${config.hooks?.source === 'system' ? 'Hooks use the installed system policy; no per-hook approval is required after configuration reload.' : 'Required: open /hooks in Codex, review the local hooks, then run riff doctor --record-hooks-approved.'}\nClaude RIFF paths and state were not created or replaced.\n`);
+}
+
+function reportMigration(migration) {
+  if (migration.changes.length) process.stdout.write(`Migrated existing RIFF installation: ${migration.changes.join(', ')}.\n`);
+  if (migration.deferred) process.stdout.write(`Kept ${CODEX_STATE_DIR}/ for now: ${migration.deferred}.\n`);
 }
 
 function cmdResync(tokens) {
@@ -598,7 +658,7 @@ function cmdResync(tokens) {
   let result;
   try { result = syncManaged(root, { resync: true, recordApproval: options.record_hooks_approved }); }
   catch (error) { fail(error.message); }
-  if (result.migration.changes.length) process.stdout.write(`Migrated existing RIFF Codex installation: ${result.migration.changes.join(', ')}.\n`);
+  reportMigration(result.migration);
   process.stdout.write(`RIFF managed files repaired. Foreign hook entries and chained Git hooks were preserved.\n${result.config.hooks?.source === 'system' ? 'System policy selected; no duplicate project hooks or manual approval marker.' : 'Run /hooks if the managed hook hash changed.'}\n`);
 }
 
@@ -863,7 +923,7 @@ function reviewArtifact(root, file, candidate, type, status) {
 
 function storeEvidence(root, kind, bytes) {
   const digest = sha(bytes);
-  const file = localPath(root, `${STATE_DIR}/evidence/${kind}-${digest}.json`);
+  const file = localPath(root, `${stateDirFor(root)}/evidence/${kind}-${digest}.json`);
   ensureDir(file, true);
   if (!existsSync(file)) writeFileSync(file, bytes, { flag: 'wx' });
   if (sha(readFileSync(file)) !== digest) throw new Error('stored evidence hash mismatch');
@@ -1189,7 +1249,7 @@ function cmdContext(tokens) {
   const requested = parseOptions(tokens)._[0];
   const phase = requested ? phaseById(state, requested) : state.phases.find((item) => item.status === 'active') ?? selectReadyPhase(state.phases);
   const candidate = candidateTree(root);
-  const generated = /^(?:\.riff-codex$|\.riff-codex-state(?:\/|$)|\.agents(?:\/|$)|\.codex(?:\/|$)|\.uxtest(?:\/|$))/;
+  const generated = /^(?:\.riff-(?:cli|codex)$|\.riff-(?:data|codex-state)(?:\/|$)|\.agents(?:\/|$)|\.codex(?:\/|$)|\.uxtest(?:\/|$))/;
   const dirty = run('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root })
     .split('\n').filter(Boolean).some((line) => {
       const relative = line.slice(3).replace(/^\"|\"$/g, '');
@@ -1215,7 +1275,7 @@ function cmdWave(tokens) {
   const action = tokens[0] ?? 'select';
   const options = parseOptions(tokens.slice(1));
   let state;
-  try { state = readState(root); } catch (error) { fail(`${error.message}; run riff-codex init`); }
+  try { state = readState(root); } catch (error) { fail(`${error.message}; run riff init`); }
   try {
     const autonomy = autonomyMode(root);
     if (action === 'sync') {
@@ -1268,7 +1328,7 @@ function cmdWave(tokens) {
       return;
     }
     const id = options._[0];
-    if (!id) throw new Error(`riff-codex wave ${action} requires a phase id`);
+    if (!id) throw new Error(`riff wave ${action} requires a phase id`);
     const phase = phaseById(state, id);
     if (action === 'activate') {
       const selected = selectPhase(state, id);
@@ -1362,18 +1422,19 @@ function doctor(root, recordApproval = false) {
     const currentHash = hooksHash(hooks);
     if (recordApproval) { config.hooks ??= {}; config.hooks.approvedHash = currentHash; writeJson(files.config, config); }
     if (config.hooks?.approvedHash === currentHash) add('ok', 'hook approval', 'recorded for the current hook hash');
-    else add('warn', 'hook approval', 'pending or changed; review with /hooks, then run riff-codex doctor --record-hooks-approved');
+    else add('warn', 'hook approval', 'pending or changed; review with /hooks, then run riff doctor --record-hooks-approved');
   }
   try {
     const framework = lstatSync(files.framework);
     const resolved = path.resolve(root, readlinkSync(files.framework));
-    if (!framework.isSymbolicLink() || resolved !== PLUGIN_ROOT) throw new Error(`expected ${FRAMEWORK_DIR} -> ${PLUGIN_ROOT}`);
-    add('ok', 'framework symlink', `${FRAMEWORK_DIR} -> ${PLUGIN_ROOT}`);
+    if (!framework.isSymbolicLink() || resolved !== PLUGIN_ROOT) throw new Error(`expected ${frameworkDirFor(root)} -> ${PLUGIN_ROOT}`);
+    add('ok', 'framework symlink', `${frameworkDirFor(root)} -> ${PLUGIN_ROOT}`);
+    if (stateDirFor(root) === CODEX_STATE_DIR) add('warn', 'layout', `pre-rename ${CODEX_STATE_DIR}/; run riff resync when no phase is active to move it to ${STATE_DIR}/ with a backup`);
   } catch (error) { add('error', 'framework symlink', error.message); }
   for (const name of readFileNames(path.join(PLUGIN_ROOT, 'skills'))) {
     const target = path.join(root, '.agents', 'skills', `riff-codex-${name}`);
     let valid = false;
-    try { valid = lstatSync(target).isSymbolicLink() && path.resolve(path.dirname(target), readlinkSync(target)) === path.join(root, FRAMEWORK_DIR, 'skills', name); } catch { /* missing */ }
+    try { valid = lstatSync(target).isSymbolicLink() && pointsTo(target, path.join(PLUGIN_ROOT, 'skills', name)); } catch { /* missing */ }
     if (!valid) add('warn', `skill ${name}`, 'project symlink missing or preserved because a foreign entry owns the path');
   }
   for (const name of ['git', 'node', 'bun']) add(executable(name) ? 'ok' : 'error', `executable ${name}`, executable(name) ? 'available' : 'missing');
@@ -1618,7 +1679,7 @@ function orphanFinding(root, file) {
   const base = path.basename(file);
   if (!/\.(?:[cm]?[jt]sx?)$/.test(file)) return null;
   // Phase evidence and diagnostic scripts are run directly, not application modules.
-  if (/^(?:\.planning|\.riff-codex-state|\.uxtest)\//.test(relative)) return null;
+  if (/^(?:\.planning|\.riff-data|\.riff-codex-state|\.uxtest)\//.test(relative)) return null;
   if (/(?:^|\/)(?:index|routes?|pages?|app|scripts?|migrations?|seeds?|fixtures?|__tests__)(?:\/|\.)|\.(?:test|spec|config|d)\./i.test(relative)) return null;
   let added = false;
   try { added = /^(?:\?\?|A | A)/.test(run('git', ['status', '--short', '--', relative], { cwd: root })); } catch { /* advisory */ }
@@ -1784,11 +1845,11 @@ function cmdHook(tokens) {
       const state = readJson(pathsFor(root).state, false);
       event(root, 'hook_session_start', { source: payload.source, model: payload.model });
       const active = state?.phases?.find((phase) => phase.status === 'active');
-      const context = [`RIFF conversation language: ${config?.language ?? 'en'}; artifact language: ${config?.artifactLanguage ?? 'en'}.`, `Project scope: ${config?.project?.scope ?? 'production'}. Preferences: explanation=${config?.preferences?.explanation ?? 'simple'}, autonomy=${config?.preferences?.autonomy ?? 'loop'}.`, `Use PROJECT.md and ROADMAP.yaml as shared product sources; use ${STATE_DIR}/state.json through the RIFF CLI only.`];
-      context.push(`For implementation or review, read project taste.md when present and ${FRAMEWORK_DIR}/references/taste.md; load only relevant topic and stack rules. For frontend work, read ${FRAMEWORK_DIR}/references/taste/frontend.md, apply the relevant design skills and verify the rendered result in the browser. Use $riff:learn-stack for reusable stack-convention gaps.`);
+      const context = [`RIFF conversation language: ${config?.language ?? 'en'}; artifact language: ${config?.artifactLanguage ?? 'en'}.`, `Project scope: ${config?.project?.scope ?? 'production'}. Preferences: explanation=${config?.preferences?.explanation ?? 'simple'}, autonomy=${config?.preferences?.autonomy ?? 'loop'}.`, `Use PROJECT.md and ROADMAP.yaml as shared product sources; use ${stateDirFor(root)}/state.json through the RIFF CLI only.`];
+      context.push(`For implementation or review, read project taste.md when present and ${frameworkDirFor(root)}/references/taste.md; load only relevant topic and stack rules. For frontend work, read ${frameworkDirFor(root)}/references/taste/frontend.md, apply the relevant design skills and verify the rendered result in the browser. Use $riff:learn-stack for reusable stack-convention gaps.`);
       if ((config?.preferences?.autonomy ?? 'loop') === 'loop') context.push('Loop autonomy: make conservative product and technical decisions, follow ready dependencies automatically, and do not request human decisions. Stop only for missing credentials or external access, impossible third-party verification, an unidentifiable destructive target, or failed RIFF validation.');
       else context.push('Guided autonomy: preserve confirmation at product decision boundaries and between phases.');
-      if (active) context.push(`Resume interrupted phase ${active.id}. Load ${FRAMEWORK_DIR}/references/operating-contract.md before continuing.`);
+      if (active) context.push(`Resume interrupted phase ${active.id}. Load ${frameworkDirFor(root)}/references/operating-contract.md before continuing.`);
       output = { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context.join(' ') } };
     } else if (name === 'pre-compact') {
       const state = readJson(pathsFor(root).state, false);
@@ -2013,9 +2074,9 @@ async function cmdModelAdvice(tokens) {
 }
 
 function help() {
-  process.stdout.write('Model advice (never switches the active model):\n  riff-codex model-advice catalog|show\n  riff-codex model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff-codex model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
+  process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff-codex init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff-codex resync [--record-hooks-approved]\n  riff-codex doctor [--record-hooks-approved]\n  riff-codex dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff-codex status [--json]\n  riff-codex discovery [snapshot|check|review --evidence FILE]\n  riff-codex observations list\n  riff-codex observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff-codex wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff-codex wave sync [--preserve-legacy-verification]\n  riff-codex wave context [phase-id] [--json]\n  riff-codex wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff-codex wave activate phase-1\n  riff-codex wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff-codex wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff-codex wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-codex-state/review.json\n  riff-codex wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff-codex report --evidence .riff-codex-state/verification.json\n  riff-codex promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff-codex incident log --evidence FILE\n  riff-codex finish --review FILE\n  riff-codex finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -2064,5 +2125,5 @@ else if (command === 'wave') {
 else if (command === 'hook') {
   try { if (['post-tool', 'pre-compact'].includes(tokens[0])) withLock(gitRoot(), () => cmdHook(tokens)); else cmdHook(tokens); } catch (error) { fail(error.message); }
 }
-else if (command === 'next') fail('riff-codex next is intentionally deferred; use $riff:wave or riff-codex wave select');
-else fail(`unknown command ${command}; run riff-codex --help`);
+else if (command === 'next') fail('riff next is intentionally deferred; use $riff:wave or riff wave select');
+else fail(`unknown command ${command}; run riff --help`);

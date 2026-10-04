@@ -112,7 +112,7 @@ export function summary(status: RiffStatus, columns: number): string {
   return clip(`${status.name} · ${parts.join(' · ')}`, Math.max(20, columns - 8))
 }
 
-const OLD_CLI = 'Update the RIFF CLI linked by .riff-codex to see this tab.'
+const OLD_CLI = 'Update the RIFF CLI linked by .riff-cli to see this tab.'
 
 /** The lines of one pane tab; also the text of /riff where no pane can be drawn. */
 export function tabLines(tab: Tab, status: RiffStatus, context: WaveContext | null, contextError: string | null = null): string[] {

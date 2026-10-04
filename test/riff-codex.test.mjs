@@ -10,6 +10,7 @@ import {
   readlinkSync,
   realpathSync,
   readdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -166,7 +167,64 @@ test('migrates an owned legacy Codex install without losing active state or evid
   const migratedConfig = JSON.parse(readFileSync(path.join(root, '.riff-codex-state', 'config.json'), 'utf8'));
   assert.deepEqual(migratedConfig.unknown, config.unknown);
   assert.equal(migratedConfig.hooks.approvedHash, migratedConfig.managed.hooksHash);
-  assert.match(readFileSync(path.join(hooksDir, 'pre-commit'), 'utf8'), /\.riff-codex-state\/git-hooks\/pre-commit\.foreign\.previous/);
+  assert.match(readFileSync(path.join(hooksDir, 'pre-commit'), 'utf8'), /\.riff-data\/git-hooks\/pre-commit\.foreign\.previous/);
+});
+
+// Rebuild the layout a project had before the rename: .riff-codex link and .riff-codex-state directory.
+function preRenameProject(phases = []) {
+  const root = fixture();
+  runCli(root, 'init', '--project-root', root, '--non-interactive');
+  rmSync(path.join(root, '.riff-codex-state'));
+  rmSync(path.join(root, '.riff-cli'));
+  renameSync(path.join(root, '.riff-data'), path.join(root, '.riff-codex-state'));
+  for (const file of ['.codex/hooks.json', '.git/hooks/pre-commit', '.git/hooks/commit-msg', '.riff-codex-state/config.json']) {
+    writeFileSync(path.join(root, file), readFileSync(path.join(root, file), 'utf8').replaceAll('.riff-cli/', '.riff-codex/').replaceAll('.riff-data/', '.riff-codex-state/'));
+  }
+  for (const name of readdirSync(path.join(root, '.agents', 'skills'))) {
+    const link = path.join(root, '.agents', 'skills', name);
+    const target = readlinkSync(link).replace('.riff-cli/', '.riff-codex/');
+    rmSync(link);
+    symlinkSync(target, link);
+  }
+  writeJson(path.join(root, '.riff-codex-state', 'state.json'), baseState(phases));
+  return root;
+}
+
+test('resync moves pre-rename state to .riff-data with a backup and keeps the old names as links', () => {
+  const root = preRenameProject();
+  const before = readFileSync(path.join(root, '.riff-codex-state', 'state.json'), 'utf8');
+  assert.match(runCli(root, 'status'), /Verify coexistence/);
+  assert.match(runCli(root, 'doctor'), /pre-rename/);
+
+  assert.match(runCli(root, 'resync'), /\.riff-codex-state -> \.riff-data \(backup in \.riff-data\/backups\/riff-codex-state-/);
+
+  assert.equal(lstatSync(path.join(root, '.riff-data')).isDirectory(), true);
+  assert.equal(readlinkSync(path.join(root, '.riff-codex-state')), '.riff-data');
+  assert.equal(realpathSync(path.join(root, '.riff-cli')), PLUGIN_ROOT);
+  assert.equal(realpathSync(path.join(root, '.riff-codex')), PLUGIN_ROOT);
+  const [backup] = readdirSync(path.join(root, '.riff-data', 'backups'));
+  assert.equal(readFileSync(path.join(root, '.riff-data', 'backups', backup, 'state.json'), 'utf8'), before);
+  assert.equal(existsSync(path.join(root, '.riff-data', 'backups', backup, 'codex-hooks.json')), true);
+  assert.match(readFileSync(path.join(root, '.codex', 'hooks.json'), 'utf8'), /\.riff-cli\/bin\/riff\.mjs/);
+  assert.doesNotMatch(readFileSync(path.join(root, '.codex', 'hooks.json'), 'utf8'), /\.riff-codex\/bin/);
+  assert.match(readFileSync(path.join(root, '.git', 'hooks', 'pre-commit'), 'utf8'), /\.riff-cli\/bin\/riff\.mjs/);
+  assert.equal(readlinkSync(path.join(root, '.agents', 'skills', 'riff-codex-wave')), '../../.riff-codex/skills/wave');
+  const doctor = runCli(root, 'doctor');
+  assert.doesNotMatch(doctor, /pre-rename|skill wave/);
+  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).includes('.riff-'), false);
+});
+
+test('resync keeps pre-rename state in place while a phase is active', () => {
+  const phase = { id: 'running', title: 'Running', outcome: 'Keep going', demo: '', priority: 'P1', depends_on: [], blocking_edges: [], risks: [], sensitive: false, status: 'active', commit: null, attempts: 0, reason: null };
+  const root = preRenameProject([phase]);
+
+  assert.match(runCli(root, 'resync'), /Kept \.riff-codex-state\/ for now: phase running is active/);
+
+  assert.equal(lstatSync(path.join(root, '.riff-codex-state')).isDirectory(), true);
+  assert.equal(existsSync(path.join(root, '.riff-data')), false);
+  assert.equal(existsSync(path.join(root, '.riff-cli')), false);
+  assert.match(readFileSync(path.join(root, '.codex', 'hooks.json'), 'utf8'), /\.riff-codex\/bin\/riff\.mjs/);
+  assert.match(runCli(root, 'status'), /0\/1 phases completed/);
 });
 
 test('synchronizes Codex and Claude roadmap formats without rewriting either file', () => {

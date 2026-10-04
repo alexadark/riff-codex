@@ -109,12 +109,12 @@ test('recovery reuses decisions including failures, explicit reason refreshes, a
   try {
     await withLock(directory, async () => {
       await Promise.resolve();
-      assert.equal(existsSync(path.join(directory, '.riff-codex-state/write.lock')), true);
+      assert.equal(existsSync(path.join(directory, '.riff-data/write.lock')), true);
       assert.throws(() => withLock(directory, () => {}), /busy/);
     });
-    assert.equal(existsSync(path.join(directory, '.riff-codex-state/write.lock')), false);
+    assert.equal(existsSync(path.join(directory, '.riff-data/write.lock')), false);
     await assert.rejects(withLock(directory, async () => { throw new Error('failure'); }), /failure/);
-    assert.equal(existsSync(path.join(directory, '.riff-codex-state/write.lock')), false);
+    assert.equal(existsSync(path.join(directory, '.riff-data/write.lock')), false);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
