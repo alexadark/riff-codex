@@ -322,5 +322,5 @@ Fait et testé (58 tests CLI, 2 tests dashboard) :
 
 Reste :
 
-1. Réécriture au gabarit : faite pour tous les skills. `start` et `evolve` validés ; `add-phase`, `learn-stack`, `issue`, `status` et `dashboard` à relire par Alexandra.
+1. Réécriture au gabarit : faite et validée par Alexandra le 2026-10-04 pour tous les skills.
 2. Avant la fusion dans `main` : `riff resync` dans chaque projet connecté pour créer `.riff-cli` (accord d'Alexandra requis), puis mise à jour de la documentation en phase 7.
