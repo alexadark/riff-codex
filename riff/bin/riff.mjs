@@ -47,6 +47,11 @@ const LEGACY_FRAMEWORK_DIR = '.riff';
 const LEGACY_STATE_DIR = '.riff-state';
 const HOOK_ID = 'riff-codex-hook:';
 const LEGACY_HOOK_ID = 'riff-hook:';
+// Claude Code reads machine-local project settings; compaction stays above the 300K auto-handoff.
+const CLAUDE_SETTINGS = path.join('.claude', 'settings.local.json');
+const CLAUDE_COMPACT_WINDOW = 400000;
+const CLAUDE_MARKETPLACE = 'riff';
+const CLAUDE_PLUGINS = [`riff@${CLAUDE_MARKETPLACE}`, `riff-cockpit@${CLAUDE_MARKETPLACE}`];
 const GIT_HOOK_MARKER = '# RIFF Codex managed wrapper';
 const LEGACY_GIT_HOOK_MARKER = '# RIFF managed wrapper';
 const PHASE_STATES = new Set(['ready', 'active', 'completed', 'parked', 'blocked', 'awaiting_human', 'skipped']);
@@ -211,18 +216,21 @@ function quote(value) {
   return `"${String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
-function desiredHooks(script = SCRIPT) {
+function desiredHooks(script = SCRIPT, host = 'codex') {
   const handler = (name, extra = {}) => ({
     type: 'command',
     command: `/usr/bin/env node ${quote(script)} hook ${name} --id ${HOOK_ID}${name}`,
     timeout: 10,
     ...extra,
   });
+  // additionalContextLimit is a Codex field; Claude Code edits through Edit, Write, MultiEdit and NotebookEdit.
+  const limit = (size) => (host === 'codex' ? { additionalContextLimit: size } : {});
+  const tools = host === 'codex' ? 'Bash|apply_patch|Edit|Write|mcp__.*' : 'Bash|Edit|Write|MultiEdit|NotebookEdit|mcp__.*';
   return {
-    SessionStart: [{ matcher: 'startup|resume|clear|compact', hooks: [handler('session-start', { statusMessage: 'Loading RIFF project context', additionalContextLimit: 800 })] }],
+    SessionStart: [{ matcher: 'startup|resume|clear|compact', hooks: [handler('session-start', { statusMessage: 'Loading RIFF project context', ...limit(800) })] }],
     PreCompact: [{ matcher: 'manual|auto', hooks: [handler('pre-compact', { statusMessage: 'Saving RIFF checkpoint' })] }],
-    PreToolUse: [{ matcher: 'Bash|apply_patch|Edit|Write|mcp__.*', hooks: [handler('pre-tool', { statusMessage: 'Checking RIFF safety boundary' })] }],
-    PostToolUse: [{ matcher: 'Bash|apply_patch|Edit|Write|mcp__.*', hooks: [handler('post-tool', { statusMessage: 'Recording RIFF change signals', additionalContextLimit: 900 })] }],
+    PreToolUse: [{ matcher: tools, hooks: [handler('pre-tool', { statusMessage: 'Checking RIFF safety boundary' })] }],
+    PostToolUse: [{ matcher: tools, hooks: [handler('post-tool', { statusMessage: 'Recording RIFF change signals', ...limit(900) })] }],
     Stop: [{ hooks: [handler('stop', { statusMessage: 'Checking RIFF handoff' })] }],
     SessionEnd: [{ hooks: [handler('session-end', { timeout: 3 })] }],
   };
@@ -232,8 +240,8 @@ function isLegacyCodexHook(command) {
   return command.includes(LEGACY_HOOK_ID) && command.includes(`/${LEGACY_FRAMEWORK_DIR}/bin/riff.mjs`);
 }
 
-function mergeHooks(existing, script = SCRIPT, removeLegacyCodexHooks = false, machineManaged = false) {
-  const result = existing ?? { description: 'Project-local Codex hooks.' };
+function mergeHooks(existing, script = SCRIPT, removeLegacyCodexHooks = false, machineManaged = false, host = 'codex') {
+  const result = existing ?? (host === 'codex' ? { description: 'Project-local Codex hooks.' } : {});
   if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('hooks.json root must be an object');
   if (result.hooks !== undefined && (typeof result.hooks !== 'object' || Array.isArray(result.hooks))) throw new Error('hooks.json hooks must be an object');
   result.hooks ??= {};
@@ -249,12 +257,23 @@ function mergeHooks(existing, script = SCRIPT, removeLegacyCodexHooks = false, m
       }))
       .filter((group) => group.hooks.length > 0);
   }
-  for (const [eventName, groups] of Object.entries(machineManaged ? {} : desiredHooks(script))) {
+  for (const [eventName, groups] of Object.entries(machineManaged ? {} : desiredHooks(script, host))) {
     result.hooks[eventName] ??= [];
     result.hooks[eventName].push(...groups);
   }
-  result.description ??= 'Project-local Codex hooks.';
+  if (host === 'codex') result.description ??= 'Project-local Codex hooks.';
   return result;
+}
+
+function mergeClaudeSettings(existing, script = SCRIPT) {
+  const settings = existing ?? {};
+  if (typeof settings !== 'object' || Array.isArray(settings)) throw new Error(`${CLAUDE_SETTINGS} root must be an object`);
+  settings.hooks = mergeHooks({ hooks: settings.hooks }, script, false, false, 'claude').hooks;
+  settings.autoCompactWindow ??= CLAUDE_COMPACT_WINDOW;
+  if (settings.enabledPlugins !== undefined && (typeof settings.enabledPlugins !== 'object' || Array.isArray(settings.enabledPlugins))) throw new Error(`${CLAUDE_SETTINGS} enabledPlugins must be an object`);
+  settings.enabledPlugins ??= {};
+  for (const plugin of CLAUDE_PLUGINS) settings.enabledPlugins[plugin] ??= true;
+  return settings;
 }
 
 function hooksHash(hooks) {
@@ -279,7 +298,7 @@ function gitHooksDir(root) {
 
 function installationPreflight(root) {
   const directory = gitHooksDir(root);
-  for (const name of [stateDirFor(root), '.codex', '.agents', '.agents/skills']) {
+  for (const name of [stateDirFor(root), '.codex', '.claude', '.agents', '.agents/skills']) {
     const target = localPath(root, name);
     if (existsSync(target) && !statSync(target).isDirectory()) throw new Error(`${name} must be a directory`);
   }
@@ -290,7 +309,7 @@ function installationPreflight(root) {
   const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
   const exclude = path.resolve(root, run('git', ['rev-parse', '--git-path', 'info/exclude'], { cwd: root }));
   localPath(inside(root, exclude) ? root : common, exclude);
-  for (const name of [stateDirFor(root), '.codex/hooks.json', '.agents/skills']) localPath(root, name);
+  for (const name of [stateDirFor(root), '.codex/hooks.json', CLAUDE_SETTINGS, '.agents/skills']) localPath(root, name);
 }
 
 function installGitHook(root, name, migration) {
@@ -498,7 +517,7 @@ function excludeLocalState(root) {
   const lines = new Set(current.split('\n'));
   // Links are files to Git, so they need bare patterns. Exclusion never hides a tracked link.
   const entries = stateDirFor(root) === STATE_DIR ? [`${STATE_DIR}/`, FRAMEWORK_DIR, CODEX_STATE_DIR, CODEX_FRAMEWORK_DIR] : [`${CODEX_STATE_DIR}/`, FRAMEWORK_DIR];
-  const missing = [...entries, '.uxtest/runs/'].filter((line) => !lines.has(line));
+  const missing = [...entries, '.uxtest/runs/', CLAUDE_SETTINGS].filter((line) => !lines.has(line));
   if (missing.length) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF worktree-local state\n${missing.join('\n')}\n`);
 }
 
@@ -562,8 +581,12 @@ function syncManagedUnlocked(root, options) {
   const merged = mergeHooks(existingHooks, projectCli, migration.legacyFrameworkOwned || migration.migratedState, Boolean(systemPolicy));
   writeJson(files.hooks, merged);
   const currentHash = hooksHash(merged);
+  const claudeFile = localPath(root, CLAUDE_SETTINGS);
+  ensureDir(claudeFile, true);
+  const claudeSettings = mergeClaudeSettings(readJson(claudeFile, false), projectCli);
+  writeJson(claudeFile, claudeSettings);
   const preservedSkills = exposeSkills(root, migration);
-  config.managed = { ...(config.managed ?? {}), version: VERSION, pluginRoot: PLUGIN_ROOT, cli: `${frameworkDirFor(root)}/bin/riff.mjs`, hooksHash: currentHash, preservedSkills };
+  config.managed = { ...(config.managed ?? {}), version: VERSION, pluginRoot: PLUGIN_ROOT, cli: `${frameworkDirFor(root)}/bin/riff.mjs`, hooksHash: currentHash, claudeHooksHash: hooksHash(claudeSettings), preservedSkills };
   config.hooks ??= { approvedHash: null };
   config.hooks.source = systemPolicy ? 'system' : 'project';
   if (options.recordApproval || migration.preserveHookApproval) config.hooks.approvedHash = currentHash;
@@ -670,7 +693,7 @@ async function cmdInit(tokens) {
     reportMigration(result.migration);
   } catch (error) { fail(error.message); }
   const config = readJson(pathsFor(root).config);
-  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${frameworkDirFor(root)} -> ${PLUGIN_ROOT}\nSkills: namespaced under .agents/skills/riff-codex-*; the native plugin supplies the $riff:* namespace.\nState: project-local in ${stateDirFor(root)}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nHooks: installed in .codex/hooks.json and chained with existing Git hooks.\n${config.hooks?.source === 'system' ? 'Hooks use the installed system policy; no per-hook approval is required after configuration reload.' : 'Required: open /hooks in Codex, review the local hooks, then run riff doctor --record-hooks-approved.'}\nClaude RIFF paths and state were not created or replaced.\n`);
+  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${frameworkDirFor(root)} -> ${PLUGIN_ROOT}\nState: project-local in ${stateDirFor(root)}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nGit hooks: pre-commit and commit-msg chained with existing hooks.\nClaude Code: hooks, compaction at ${CLAUDE_COMPACT_WINDOW} tokens and the riff plugins in ${CLAUDE_SETTINGS}; skills run as /riff:wave, /riff:start. If riff doctor reports the marketplace missing, run once per machine: claude plugin marketplace add ${PLUGIN_ROOT}\nCodex: hooks in .codex/hooks.json, skills under .agents/skills/riff-codex-* and the $riff:* plugin namespace. ${config.hooks?.source === 'system' ? 'Hooks use the installed system policy; no per-hook approval is required after configuration reload.' : 'Open /hooks in Codex, review the local hooks, then run riff doctor --record-hooks-approved.'}\nClaude RIFF paths and state were not created or replaced.\n`);
 }
 
 function reportMigration(migration) {
@@ -1414,6 +1437,38 @@ function executable(name) {
   return spawnSync(name, ['--version'], { stdio: 'ignore' }).status === 0;
 }
 
+function claudeWindow(root) {
+  const fromEnv = process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
+  if (fromEnv) return { value: Number(fromEnv), source: 'CLAUDE_CODE_AUTO_COMPACT_WINDOW' };
+  for (const file of [path.join(root, CLAUDE_SETTINGS), path.join(root, '.claude', 'settings.json'), path.join(homedir(), '.claude', 'settings.json')]) {
+    let value;
+    try { value = readJson(file, false)?.autoCompactWindow; } catch { continue; }
+    if (value !== undefined) return { value: Number(value), source: file };
+  }
+  return null;
+}
+
+function claudeDoctor(root) {
+  const results = [];
+  try {
+    const settings = readJson(path.join(root, CLAUDE_SETTINGS));
+    const count = Object.values(settings.hooks ?? {}).flat().flatMap((group) => group.hooks ?? []).filter((hook) => String(hook.command ?? '').includes(HOOK_ID)).length;
+    if (count < 6) throw new Error(`only ${count}/6 RIFF hook groups found; run riff resync`);
+    results.push(['ok', 'Claude Code hooks', `${count} managed groups in ${CLAUDE_SETTINGS}`]);
+  } catch (error) { results.push(['error', 'Claude Code hooks', error.message]); }
+  const window = claudeWindow(root);
+  if (!window || !Number.isFinite(window.value)) results.push(['warn', 'Claude Code compaction', `no autoCompactWindow: Claude Code compacts near 967K; run riff resync to set ${CLAUDE_COMPACT_WINDOW}`]);
+  else if (window.value > CLAUDE_COMPACT_WINDOW) results.push(['warn', 'Claude Code compaction', `${window.value} from ${window.source} is above ${CLAUDE_COMPACT_WINDOW}`]);
+  else results.push(['ok', 'Claude Code compaction', `${window.value} from ${window.source}`]);
+  let known = {};
+  try { known = readJson(path.join(homedir(), '.claude', 'plugins', 'known_marketplaces.json'), false) ?? {}; } catch { /* unreadable registry */ }
+  const location = known[CLAUDE_MARKETPLACE]?.installLocation ?? known[CLAUDE_MARKETPLACE]?.source?.path;
+  if (location && path.resolve(location) === PLUGIN_ROOT) results.push(['ok', 'Claude Code plugin', `marketplace ${CLAUDE_MARKETPLACE} -> ${PLUGIN_ROOT}`]);
+  else results.push(['warn', 'Claude Code plugin', `${location ? `marketplace ${CLAUDE_MARKETPLACE} points to ${location}` : `marketplace ${CLAUDE_MARKETPLACE} not registered`}; once per machine run: claude plugin marketplace add ${PLUGIN_ROOT}`]);
+  results.push(executable('claude') ? ['ok', 'executable claude', 'available'] : ['warn', 'executable claude', 'missing; Claude Code host unavailable on this machine']);
+  return results;
+}
+
 function doctor(root, recordApproval = false) {
   const files = pathsFor(root);
   const results = [];
@@ -1445,6 +1500,7 @@ function doctor(root, recordApproval = false) {
     if (systemPolicy && count) add('warn', 'Codex hooks', 'system policy and duplicate project hooks; run resync');
     else add('ok', 'Codex hooks', systemPolicy ? '6 hooks configured by system policy; project duplicates removed' : `${count} managed groups installed`);
   } catch (error) { add('error', 'Codex hooks', error.message); }
+  for (const result of claudeDoctor(root)) add(...result);
   const codexHome = process.env.CODEX_HOME ? path.resolve(process.env.CODEX_HOME) : path.join(homedir(), '.codex');
   const disabledAt = [path.join(root, '.codex', 'config.toml'), path.join(codexHome, 'config.toml')].find(configDisablesHooks);
   if (disabledAt && !managedHookPolicy(root, PLUGIN_ROOT)) add('error', 'hook feature', `disabled in ${disabledAt}`); else add('ok', 'hook feature', managedHookPolicy(root, PLUGIN_ROOT) ? 'enabled by system requirements' : 'not disabled in project or user config');

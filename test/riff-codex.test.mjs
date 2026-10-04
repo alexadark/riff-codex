@@ -865,3 +865,34 @@ test('session start reacts to /clear, lets product definition ask, and restores 
   assert.match(context, /Resume interrupted phase build/);
   assert.match(context, /Last checkpoint: Filters render on desktop Next: Verify the 375px layout/);
 });
+
+test('init installs Claude Code settings locally, preserves user choices and stays idempotent', () => {
+  const root = fixture();
+  const settingsFile = path.join(root, '.claude', 'settings.local.json');
+  mkdirSync(path.dirname(settingsFile));
+  const userHook = { matcher: 'Bash', hooks: [{ type: 'command', command: 'echo mine' }] };
+  writeJson(settingsFile, { permissions: { allow: ['Bash(npm test)'] }, autoCompactWindow: 300000, enabledPlugins: { 'riff-cockpit@riff': false }, hooks: { PreToolUse: [userHook] } });
+  runCli(root, 'init', '--project-root', root, '--non-interactive');
+  runCli(root, 'resync');
+  const settings = JSON.parse(readFileSync(settingsFile, 'utf8'));
+  assert.deepEqual(settings.permissions, { allow: ['Bash(npm test)'] });
+  assert.equal(settings.autoCompactWindow, 300000, 'a lower user window is kept');
+  assert.deepEqual(settings.enabledPlugins, { 'riff-cockpit@riff': false, 'riff@riff': true });
+  assert.deepEqual(settings.hooks.PreToolUse[0], userHook);
+  const managed = Object.values(settings.hooks).flat().flatMap((group) => group.hooks).filter((hook) => hook.command.includes('riff-codex-hook:'));
+  assert.equal(managed.length, 6, 'resync does not duplicate managed hooks');
+  assert.ok(managed.every((hook) => hook.command.includes('.riff-cli/bin/riff.mjs') && !('additionalContextLimit' in hook)));
+  assert.match(settings.hooks.PreToolUse.at(-1).matcher, /MultiEdit\|NotebookEdit/);
+  assert.match(readFileSync(path.join(root, '.git', 'info', 'exclude'), 'utf8'), /^\.claude\/settings\.local\.json$/m);
+  const doctor = () => spawnSync(process.execPath, [CLI, 'doctor'], { cwd: root, encoding: 'utf8', env: { ...process.env, HOME: path.join(root, '.home'), CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' } }).stdout;
+  assert.match(doctor(), /OK {4}Claude Code hooks: 6 managed groups/);
+  assert.match(doctor(), /OK {4}Claude Code compaction: 300000/);
+  assert.match(doctor(), /WARN {2}Claude Code plugin: marketplace riff not registered; once per machine run: claude plugin marketplace add /);
+  writeJson(path.join(root, '.home', '.claude', 'plugins', 'known_marketplaces.json'), { riff: { source: { source: 'directory', path: PLUGIN_ROOT }, installLocation: PLUGIN_ROOT } });
+  assert.match(doctor(), /OK {4}Claude Code plugin: marketplace riff/);
+  writeJson(settingsFile, { ...settings, autoCompactWindow: 900000 });
+  assert.match(doctor(), /WARN {2}Claude Code compaction: 900000/);
+  const fresh = fixture();
+  runCli(fresh, 'init', '--project-root', fresh, '--non-interactive');
+  assert.equal(JSON.parse(readFileSync(path.join(fresh, '.claude', 'settings.local.json'), 'utf8')).autoCompactWindow, 400000);
+});
