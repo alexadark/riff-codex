@@ -24,7 +24,7 @@ test('model advice distinguishes local judgment, real provider response and effe
     assert.equal(options.redirect, 'error');
     const body = JSON.parse(options.body);
     assert.equal(body.questions.recommended_profile.type, 'choice');
-    assert.equal(Object.keys(body.questions.recommended_profile.criteria).length, 9);
+    assert.equal(Object.keys(body.questions.recommended_profile.criteria).length, eligible.length);
     assert.deepEqual(body.state.rules, catalog.rules);
     assert.ok(!JSON.stringify(body).includes('localAdvice'));
     assert.ok(!JSON.stringify(body).includes('effectiveModel'));
@@ -160,11 +160,11 @@ test('CLI integration preserves wave state, consent, projections and private inp
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('Opus 5.5 is opt-in Anthropic advice and respects provider, availability and data filters', async () => {
+test('no provider is preferred by default; Ollama stays opt-in and filters still apply', async () => {
   const opus = catalog.profiles.filter((p) => p.provider === 'anthropic');
-  assert.deepEqual(opus.map((p) => p.effort), ['low', 'medium', 'high', 'xhigh', 'max']);
+  assert.deepEqual(opus.map((p) => p.effort), ['low', 'medium', 'high', 'xhigh']);
   assert.ok(opus.every((p) => p.model === 'claude-opus-5-5'));
-  assert.ok(eligible.every((p) => p.provider === 'openai'));
+  assert.deepEqual([...new Set(eligible.map((p) => p.provider))].sort(), ['anthropic', 'openai']);
   const constraints = { providers: ['anthropic'], availableProfiles: ['opus_5_5_medium'] };
   assert.deepEqual(eligibleProfiles(normalizeInput(brief({ constraints }), catalog), catalog).map((p) => p.id), ['opus_5_5_medium']);
   const result = await recommend(brief({ constraints }));

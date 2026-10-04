@@ -39,7 +39,7 @@ export function normalizeInput(raw, catalog) {
   const c = raw.constraints ?? {};
   keys(c, ['providers', 'dataPolicy', 'allowedProfiles', 'availableProfiles', 'deepseek'], 'constraints');
   input.constraints = {
-    providers: values(c.providers ?? ['openai'], ['openai', 'ollama', 'anthropic'], 'providers'),
+    providers: values(c.providers ?? ['openai', 'anthropic'], ['openai', 'ollama', 'anthropic'], 'providers'),
     dataPolicy: c.dataPolicy ?? 'cloud-allowed',
   };
   if (!['cloud-allowed', 'local-only'].includes(input.constraints.dataPolicy)) throw new Error('invalid dataPolicy');

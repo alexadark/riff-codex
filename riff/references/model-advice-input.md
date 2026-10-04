@@ -18,8 +18,8 @@ Optional fields:
 
 - `phase`: an existing RIFF phase id; omit for standalone advice.
 - `unknowns`: at most ten nonempty strings of at most 500 characters.
-- `constraints`: `providers` (array of `openai`, `ollama` and/or `anthropic`, default `['openai']`), `dataPolicy` (`cloud-allowed`, default, or `local-only`), `allowedProfiles` (explicit permitted ids), `availableProfiles` (actually checked model/effort ids). An omitted availability list means unknown, not unavailable; an empty list permits none.
-- `constraints.deepseek`: `available` and `dataAllowed` booleans, plus `benefit` (`preserve-quota` or `validated`). Ollama profiles need both booleans true, a valid benefit and `ollama` among providers. No automatic substitution when OpenAI quota is missing.
+- `constraints`: `providers` (array of `openai`, `ollama` and/or `anthropic`, default `['openai', 'anthropic']`, with no provider preferred), `dataPolicy` (`cloud-allowed`, default, or `local-only`), `allowedProfiles` (explicit permitted ids), `availableProfiles` (actually checked model/effort ids). An omitted availability list means unknown, not unavailable; an empty list permits none.
+- `constraints.deepseek`: `available` and `dataAllowed` booleans, plus `benefit` (`preserve-quota` or `validated`). Ollama profiles need both booleans true, a valid benefit and `ollama` among providers. No automatic substitution when a provider's quota is missing.
 - `localAdvice`: the current agent's `profile`, `reason` and `reconsiderWhen`. The latter two are curated nonempty strings of at most 500 characters, stored as decision metadata, so exclude secrets. No algorithmic model judgment is hidden in the CLI. The local profile must be eligible to be used.
 - `effectiveModel`: `model`, `effort`, and `evidence` (`runtime` or `user-declared`). The caller must have this evidence; omit when unknown. It is separate from the advised profile and review-receipt model.
 
