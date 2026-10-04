@@ -2,7 +2,7 @@
 
 Use this reference for a complete scoped-version dossier. The trigger is either an explicit request to plan a full application or a new application intended for production. Scratch work, a bounded risk probe, a small existing application with one clear outcome, and the `quick` skill stay lightweight unless the user explicitly asks for the full application plan. The [discovery contract](discovery.md) owns the readiness manifest and review lifecycle.
 
-RIFF owns phases, dependencies, validation, review, and completion gates. Project framing adds product clarity; it does not create another orchestrator, another state system, or a mandatory technical interview. Reuse user answers, repository documents, existing specifications, approved templates, project taste, and prior phase decisions. Ask only a product, user-visible, data, permission, integration, or authority question that can change the committed boundary and cannot be inferred.
+RIFF owns phases, dependencies, validation, review, and completion gates. Project framing adds product clarity; it does not create another orchestrator, another state system, or a mandatory technical interview. Reuse user answers, repository documents, existing specifications, approved templates, project taste, and prior phase decisions. Ask only a product, user-visible, data, permission, integration, or authority question that cannot be inferred. The `start` skill interviews the user on these product questions in every autonomy mode; elsewhere, ask only those that can change the committed boundary.
 
 ## Product synthesis in `PROJECT.md`
 

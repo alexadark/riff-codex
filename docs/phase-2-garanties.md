@@ -9,6 +9,7 @@ Date : 2026-10-04. Plan parent : [plan-riff-claude-astra.md](plan-riff-claude-as
 - Amélioration automatique (validée le 2026-10-04) : à la fin de chaque phase de `wave`, 0 à 3 propositions enregistrées par `riff improve record`. Celles du projet vont dans l'état local et le dashboard, sans jamais bloquer ; celles de RIFF vont dans la boîte à idées `ideas/inbox.ndjson` du dépôt RIFF, non versionnée. `wave complete` refuse tant que le passage n'est pas enregistré, même vide. L'agent propose, il n'applique jamais.
 - Design : seulement trois interdits pour l'instant (copywriting générique, dégradés violets, eyebrows). Le goût design viendra plus tard, avec une validation visuelle.
 - Un seul style de prompt pour tous les modèles (décision du 2026-10-04, d'après le guide d'OpenAI pour GPT-6 Astra du 5 septembre 2026 cité par Alexandra) : but, condition de fin explicite, vérification, peu de règles, descriptions courtes. Le style `guarded` est abandonné ; les profils gardent seulement le modèle et l'effort.
+- Questions de `start` (décision d'Alexandra du 2026-10-04) : `start` mène une interview produit dans les deux modes, `loop` comme `guided`, car il se passe avant le loop. Le mode autonome ne règle que les waves. L'interview porte sur le produit (utilisateurs, parcours, écrans, données et droits, exclusions, critères de réussite, design), jamais sur les faits techniques, et se termine par un résumé à confirmer. `evolve` garde ses règles actuelles. Mis à jour : le skill, `discovery.md`, `project-framing.md`, `operating-contract.md`.
 - Deux idées reprises de ce guide : des tests proportionnés au changement, et une liste de tics d'écriture typiques de l'IA à éviter. Cette liste vit dans les instructions globales d'Alexandra (`claude-code-private/instructions/global-shared.md`, pour Claude et Codex), pas dans RIFF.
 
 ## Classement
@@ -177,11 +178,11 @@ Comparé ligne à ligne avec `git show main:riff/skills/start/SKILL.md` et `main
 | S5 | Chemin léger : lire le goût existant sans créer de fichiers de production | Consigne | Gardée (étape 2) |
 | S6 | Préserver les specs existantes et les changements sans rapport | Consigne | Gardée (étape 4) |
 | S7 | Les faits techniques viennent du dépôt, du gabarit, du goût et de la stack, pas de l'utilisateur | Consigne | Gardée (étape 1) |
-| S8 | `loop` : plus petit choix réversible, hypothèse notée, pas de confirmation, jamais `awaiting_human` ; seuls les blocages durs arrêtent | Consigne | Gardée (étape 3) |
-| S9 | `guided` : présenter le résumé et faire confirmer avant de figer | Consigne | Gardée (étape 3) |
+| S8 | `loop` : plus petit choix réversible, hypothèse notée, pas de confirmation, jamais `awaiting_human` ; seuls les blocages durs arrêtent | Consigne | Remplacée le 2026-10-04 par décision d'Alexandra : interview produit dans les deux modes (étape 3). Après la confirmation du résumé, plus de question ; seuls les blocages durs arrêtent |
+| S9 | `guided` : présenter le résumé et faire confirmer avant de figer | Consigne | Étendue aux deux modes (étape 3) |
 | S10 | Dossier complet avant toute phase | CLI pour un projet inscrit | DC 101 : `wave activate` refuse sans `discovery check` |
 | S11 | `PROJECT.md` synthèse et index, `ROADMAP.yaml` liste canonique, détails liés et non copiés | Consigne | Gardée (étape 4) |
-| S12 | Contenu du dossier (stories, parcours, wireframes, données, architecture, risques, diagrammes Mermaid, design) | Consigne | Référence : `discovery.md`, « Dossier quality bar », plus détaillée que l'ancien skill ; l'étape 5 y renvoie |
+| S12 | Contenu du dossier (stories, parcours, wireframes, données, architecture, risques, diagrammes Mermaid, design) | Consigne | Gardée en une phrase à l'étape 5 ; le détail reste dans `discovery.md`, « Dossier quality bar » |
 | S13 | Chaque zone a des fichiers utiles ou une raison `not_applicable` | CLI partielle | DK 23 prouve la structure et les fichiers ; l'utilité reste une consigne (Done when) |
 | S14 | Jamais de section bouche-trou | Consigne | Gardée (étape 4) |
 | S15 | Référence externe absente : continuer, noter la dépendance, ne rien inventer | Consigne | Gardée (étape 4, Verify) |
@@ -209,8 +210,9 @@ Comparé ligne à ligne avec `git show main:riff/skills/start/SKILL.md` et `main
 ### Bilan `start`
 
 - Aucune garantie perdue. P9 avait disparu lors de la fusion avec `promote` et revient.
-- La liste du contenu du dossier (S12) sort du skill : `discovery.md` la porte en plus détaillé, et l'étape 5 oblige à la lire.
-- Taille : 5,8 Ko contre 6,6 Ko pour l'ancien `start` et `promote` réunis.
+- Le contenu du dossier (S12) tient en une phrase à l'étape 5 ; le détail reste dans `discovery.md`.
+- Seul changement de comportement : l'interview produit (S8, S9), décidée par Alexandra.
+- Taille : 6,6 Ko, comme l'ancien `start` et l'ancien `promote` réunis (6,6 Ko) pour l'ancien `start` et `promote` réunis.
 
 ## Tests ajoutés
 
