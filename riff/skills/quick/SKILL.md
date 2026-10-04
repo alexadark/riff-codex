@@ -1,6 +1,6 @@
 ---
 name: quick
-description: Make a small, bounded change with RIFF checks but no roadmap phase. Use for $riff:quick or a quick fix that leaves the roadmap unchanged.
+description: Make a small, bounded change with RIFF checks but no roadmap phase. Use when the user invokes this skill by name or asks for a quick fix that leaves the roadmap unchanged.
 ---
 
 # Run a quick RIFF change
@@ -29,7 +29,7 @@ Make one bounded change that leaves the product roadmap unchanged, on its own br
 2. Read the project taste and only the relevant topics and lessons. For UI work, apply the design skills listed in the frontend taste. Read the security reference for a sensitive boundary.
 3. Work as a single writer: inspect the affected boundary, implement, verify, review, commit. Let the Git hooks record the commit; don't call `riff hook` yourself.
 4. Merge a proven reusable lesson into taste, in proportion to the change.
-5. If the scope grows or a product decision appears, stop and recommend `$riff:add-phase`.
+5. If the scope grows or a product decision appears, stop and recommend the `add-phase` skill.
 
 Model advice is optional and never switches the primary model; a request for advice alone stops before implementation. Report the outcome, commit, checks and PR URL or local-only status. Never claim a merge or a deployment.
 

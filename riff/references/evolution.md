@@ -1,18 +1,18 @@
 # Product evolution contract
 
-`$riff:evolve` turns an authorized change to an existing application into a coherent, verifiable plan. It covers both product judgment and the consequences for existing behavior. [Discovery](discovery.md) owns dossier content, design evidence, review, and readiness. [The operating contract](operating-contract.md) owns phase states and execution. This reference adds no separate state or backlog.
+The `evolve` skill turns an authorized change to an existing application into a coherent, verifiable plan. It covers both product judgment and the consequences for existing behavior. [Discovery](discovery.md) owns dossier content, design evidence, review, and readiness. [The operating contract](operating-contract.md) owns phase states and execution. This reference adds no separate state or backlog.
 
 ## Prerequisites and scope
 
-The brownfield path is explicit: install RIFF, `$riff:onboard`, `$riff:evolve`, then `$riff:wave`. Installation exposes commands; onboard maps the system and establishes the product baseline; evolve plans changes; wave builds them. An already onboarded RIFF application can enter evolve directly. A saved map is useful evidence, not a mandatory freshness certificate or a reason to remap the entire repository.
+The brownfield path is explicit: install RIFF, then the `onboard`, `evolve` and `wave` skills. Installation exposes commands; onboard maps the system and establishes the product baseline; evolve plans changes; wave builds them. An already onboarded RIFF application can enter evolve directly. A saved map is useful evidence, not a mandatory freshness certificate or a reason to remap the entire repository.
 
 Require an installed CLI, initialized state, and existing `PROJECT.md` and `ROADMAP.yaml`. Run doctor and status through the CLI. A missing prerequisite returns its explicit next step without creating artifacts or executing another command's work. A missing installation is not repaired inside evolve. Failed RIFF validation follows the operating contract; do not work around it by editing state files.
 
-Classify the user's intent before writing. An exploratory question or a collaborator's unaccepted suggestion can end with a recommendation and no edits. A request to plan a change authorizes targeted product artifacts under the configured autonomy mode. A request only to append one already-understood independent outcome belongs to `$riff:add-phase`; initial product definition belongs to `$riff:start`. Evolve never starts implementation.
+Classify the user's intent before writing. An exploratory question or a collaborator's unaccepted suggestion can end with a recommendation and no edits. A request to plan a change authorizes targeted product artifacts under the configured autonomy mode. A request only to append one already-understood independent outcome belongs to the `add-phase` skill; initial product definition belongs to the `start` skill. Evolve never starts implementation.
 
 ## Baseline and product decisions
 
-Read existing product sources, relevant specs, project taste, current CLI status, and a reusable `.riff-codex-state/MAP.md` if available. Check the code and existing tests around the affected paths, including externally visible contracts. Reconcile relevant document drift with evidence. Separate implemented capabilities from verified behavior, user preferences, assumptions, and unavailable external evidence.
+Read existing product sources, relevant specs, project taste, current CLI status, and a reusable `.riff-data/MAP.md` if available. Check the code and existing tests around the affected paths, including externally visible contracts. Reconcile relevant document drift with evidence. Separate implemented capabilities from verified behavior, user preferences, assumptions, and unavailable external evidence.
 
 Identify the person affected, present problem, desired observable outcome, and smallest useful change. For a batch of requests, group shared outcomes, expose incompatible demands, and prioritize the committed boundary. Do not assume every meeting suggestion must become a phase. Search current phases and criteria first; an already-covered request references that work and creates no duplicate.
 

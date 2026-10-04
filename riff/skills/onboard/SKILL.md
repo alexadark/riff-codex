@@ -1,11 +1,11 @@
 ---
 name: onboard
-description: Map an existing codebase and bring it into RIFF as a baseline. Use for $riff:onboard, $riff:map, or a request to map or onboard a project that already has code.
+description: Map an existing codebase and bring it into RIFF as a baseline. Use when the user invokes this skill or the former map skill, or asks to map or onboard a project that already has code.
 ---
 
 # Map and onboard an existing project
 
-`riff` means `node .riff-cli/bin/riff.mjs`. The brownfield path is: install RIFF, then onboard, then `$riff:evolve` for new features, then `$riff:wave`.
+`riff` means `node .riff-cli/bin/riff.mjs`. The brownfield path is: install RIFF, then onboard, then the `evolve` skill for new features, then the `wave` skill.
 
 ## Goal
 
@@ -30,7 +30,7 @@ Check every map finding against the current code before relying on it, including
 5. Name technical debt only when it blocks a vertical outcome; mark uncertain later work as fog of war. Don't redesign the application.
 6. `PROJECT.md` and `ROADMAP.yaml` are shared with Claude RIFF: keep existing content, representation, comments, key order and unknown fields unless a targeted replacement is authorized.
 
-Publish GitHub issues only through `$riff:issue`.
+Publish GitHub issues only through the `issue` skill.
 
 ## References
 

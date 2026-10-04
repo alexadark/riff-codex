@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Diagnose and fix a concrete failure, including a live production incident. Use for $riff:debug, $riff:incident, a reproducible bug or a failing check.
+description: Diagnose and fix a concrete failure, including a live production incident. Use when the user invokes this skill or the former incident skill, or for a reproducible bug or a failing check.
 ---
 
 # Debug a concrete failure

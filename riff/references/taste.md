@@ -4,7 +4,7 @@ Goal: preserve useful product, design and engineering judgment across tasks with
 
 ## Code: learn from the best repositories, not from personal rules
 
-RIFF keeps no personal coding preferences. For code, the reference is how the best repositories of each technology are written: official examples, the maintainers' own applications and active, well-regarded open source projects. `$riff:learn-stack` studies them and records rules tagged `[example]` with the repository and file, and [the stack index](taste/stacks/INDEX.md) lists the rules already collected. Project taste records only conventions proven in this project's code; it never invents a house style.
+RIFF keeps no personal coding preferences. For code, the reference is how the best repositories of each technology are written: official examples, the maintainers' own applications and active, well-regarded open source projects. The `learn-stack` skill studies them and records rules tagged `[example]` with the repository and file, and [the stack index](taste/stacks/INDEX.md) lists the rules already collected. Project taste records only conventions proven in this project's code; it never invents a house style.
 
 ## Read and resolve
 
@@ -24,7 +24,7 @@ For an existing production project without taste, an authorized implementation m
 
 ## Learn and finish
 
-Use `$riff:learn-stack` for explicit stack-convention research or a reusable knowledge gap that materially affects the current outcome. Its output belongs to the invoking project under `references/taste/stacks/`, linked from project taste so future work actually finds it. A one-off API lookup stays a normal lookup.
+Use the `learn-stack` skill for explicit stack-convention research or a reusable knowledge gap that materially affects the current outcome. Its output belongs to the invoking project under `references/taste/stacks/`, linked from project taste so future work actually finds it. A one-off API lookup stays a normal lookup.
 
 When implementation or a concrete failure proves a reusable convention, merge the concise rule, its applicability, reason and evidence into the appropriate project topic before final validation/review. Do not persist guesses, duplicate rules, or create a `PENDING` approval queue. Refresh only affected rules after stack upgrades. A consumer task never edits framework references or another project to promote a lesson.
 

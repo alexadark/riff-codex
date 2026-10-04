@@ -1,6 +1,6 @@
 ---
 name: wave
-description: Build or resume RIFF roadmap phases until each is verified and committed. Use for $riff:wave, a named RIFF phase, or a request to continue the build.
+description: Build or resume RIFF roadmap phases until each is verified and committed. Use when the user invokes this skill by name, names a RIFF phase or asks to continue the build.
 ---
 
 # Run a RIFF wave
@@ -39,7 +39,7 @@ After the last phase, the connected journeys of the whole version are verified, 
 
 In `loop` mode, never stop for a product or technical decision or to ask for a test: take the smallest reversible option, record the assumption and continue. Stop only with a CLI blocker kind. In `guided` mode, pause between phases. A request for model advice alone stops before any phase work.
 
-Never relaunch your own host to do the work, create a scheduler, or publish GitHub issues without `$riff:issue`.
+Never relaunch your own host to do the work, create a scheduler, or publish GitHub issues without the `issue` skill.
 
 Report the outcome, commit, checks, PR URL or local-only status, and any real blocker.
 

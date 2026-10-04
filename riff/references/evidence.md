@@ -1,6 +1,6 @@
 # Candidate evidence and verification reports
 
-Stage the complete candidate before verification. `git write-tree` is its identity. Keep transient evidence inside `.riff-codex-state/`; never commit credentials, private screenshots or raw sensitive responses.
+Stage the complete candidate before verification. `git write-tree` is its identity. Keep transient evidence inside `.riff-data/`; never commit credentials, private screenshots or raw sensitive responses.
 
 ## Discovery evidence
 
@@ -33,7 +33,7 @@ For changed user journeys, run the actual flow with the installed browser capabi
     "observed": "Confirmation and order number displayed",
     "url": "http://localhost:3000/confirmation",
     "viewport": "390 x 844",
-    "screenshot": ".riff-codex-state/verification/confirmation.png"
+    "screenshot": ".riff-data/verification/confirmation.png"
   }]
 }
 ```

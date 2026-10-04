@@ -1,13 +1,13 @@
 ---
 name: evolve
-description: Challenge and plan changes to an existing onboarded RIFF product, including interacting requests and roadmap revisions. Use for $riff:evolve or an explicit request to replan an existing RIFF application; not for initial onboarding, a simple phase append, or implementation.
+description: Challenge and plan changes to an existing onboarded RIFF product, including interacting requests and roadmap revisions. Use when the user invokes this skill by name or explicitly asks to replan an existing RIFF application; not for initial onboarding, a simple phase append, or implementation.
 ---
 
 # Evolve an existing product
 
 Use [the evolution contract](../../references/evolution.md) for prerequisites, impact analysis, roadmap preservation, and the planning handoff. Reuse [discovery](../../references/discovery.md) for dossier content and readiness, and [project framing](../../references/project-framing.md) for product synthesis. Do not run initial discovery again for unaffected behavior.
 
-Run `node .riff-cli/bin/riff.mjs doctor` and `node .riff-cli/bin/riff.mjs status` when installed. Require existing `PROJECT.md`, `ROADMAP.yaml`, and initialized RIFF state. If a prerequisite is missing, report the next explicit step in installation → `$riff:onboard` → `$riff:evolve` → `$riff:wave`; do not install or onboard automatically. Inspect the actual baseline and CLI state before changing shared artifacts.
+Run `node .riff-cli/bin/riff.mjs doctor` and `node .riff-cli/bin/riff.mjs status` when installed. Require existing `PROJECT.md`, `ROADMAP.yaml`, and initialized RIFF state. If a prerequisite is missing, report the next explicit step in installation → `onboard` → `evolve` → `wave` skills; do not install or onboard automatically. Inspect the actual baseline and CLI state before changing shared artifacts.
 
 Distinguish an exploration request from authorization to revise the plan. A collaborator's suggestion is input, not automatically a committed feature. Exploration returns options and consequences without changing project artifacts or state. Authorized evolution supports one request or several related requests: identify the underlying problem, users, outcome, competing requests, smallest useful scope, and exclusions before proposing phases. Check whether existing work already covers the outcome.
 
@@ -19,6 +19,6 @@ Revise only affected product and specification content and pending roadmap work;
 
 After the authorized edits, synchronize through `node .riff-cli/bin/riff.mjs wave sync` and refresh affected phase explanations under the [dashboard contract](../../references/dashboard.md). For an enrolled dossier, update affected manifest references, obtain an independent review of the revised candidate, and pass `discovery check`. For an explicit complete-version planning request, establish that same contract. A bounded legacy evolution remains on the light path, with impact and regression criteria checked and a successful sync; do not claim it passed discovery readiness.
 
-Report the outcome, assumptions, added/revised/replaced/deferred phases, retained behavior, actual planning checks, and next `$riff:wave` invocation only when ready. Stop after planning. Never activate a wave, implement a product feature, publish issues, or deploy from evolve. Use the shared operating contract's real blocker and retry rules, not a second state system.
+Report the outcome, assumptions, added/revised/replaced/deferred phases, retained behavior, actual planning checks, and next invocation of the `wave` skill only when ready. Stop after planning. Never activate a wave, implement a product feature, publish issues, or deploy from evolve. Use the shared operating contract's real blocker and retry rules, not a second state system.
 
 Before planning, follow the [model-advice contract](../../references/model-routing.md) and its single catalog. Advice-only questions do not authorize evolution; read-only exploration does not persist advice without request. Optional advice does not change models, authorize delegation or add a pause in loop mode. Keep native compaction and preserve unrelated work.

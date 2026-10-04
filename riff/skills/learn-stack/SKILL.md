@@ -1,6 +1,6 @@
 ---
 name: learn-stack
-description: Research and persist source-backed stack conventions for the invoking project. Use for $riff:learn-stack, explicit stack-convention requests, or a reusable stack knowledge gap blocking a RIFF outcome; not for incidental technology mentions or one-off API questions.
+description: Research and persist source-backed stack conventions for the invoking project. Use when the user invokes this skill by name, asks for stack conventions, or a reusable stack knowledge gap blocks a RIFF outcome; not for incidental technology mentions or one-off API questions.
 ---
 
 # Learn stack conventions
@@ -24,6 +24,6 @@ Write in the invoking consumer project, not the RIFF installation, another consu
 
 Merge an existing file conservatively and idempotently: preserve unrelated rules, decisions and sources, remove duplication, and correct stale claims only with evidence and a short reason. Retain multiple version/focus sections when needed. Do not ask replace/merge/skip in loop mode. If the target resolves outside the project, preserve it and use a regular project-owned supplement with an explicit index entry instead.
 
-Update `references/taste/stacks/INDEX.md` with one precise trigger/link for the result, preserving other rows. Link that index from project `taste.md`, creating a minimal index if absent, so start/wave/quick/review can discover the rules. Honor the same symlink boundary for both indexes. Existing `.riff-codex-state/stack-notes.md` may supply leads, but reusable verified rules belong in project taste; do not delete unrelated notes.
+Update `references/taste/stacks/INDEX.md` with one precise trigger/link for the result, preserving other rows. Link that index from project `taste.md`, creating a minimal index if absent, so start/wave/quick/review can discover the rules. Honor the same symlink boundary for both indexes. Existing `.riff-data/stack-notes.md` may supply leads, but reusable verified rules belong in project taste; do not delete unrelated notes.
 
 Check local links, source attribution, version/focus and preservation of existing content. Report the paths, key retained rules and unresolved evidence. This research does not authorize implementation, dependency upgrades, deployment or framework-wide promotion. Within an active wave, include taste edits in its candidate before final receipts; otherwise follow the repository's normal local commit policy.

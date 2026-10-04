@@ -1424,7 +1424,7 @@ function doctor(root, recordApproval = false) {
   if (existsSync(files.roadmap)) {
     try { const roadmap = readRoadmap(root); add('ok', 'roadmap', `${roadmap.phases.length} phases parse correctly`); }
     catch (error) { add('error', 'roadmap', error.message); }
-  } else add('ok', 'roadmap', 'not created yet; run $riff:start');
+  } else add('ok', 'roadmap', 'not created yet; run the start skill');
   let hooks = null;
   try {
     hooks = readJson(files.hooks);
@@ -1867,7 +1867,7 @@ function cmdHook(tokens) {
       event(root, 'hook_session_start', { source: payload.source, model: payload.model });
       const active = state?.phases?.find((phase) => phase.status === 'active');
       const context = [`RIFF conversation language: ${config?.language ?? 'en'}; artifact language: ${config?.artifactLanguage ?? 'en'}.`, `Project scope: ${config?.project?.scope ?? 'production'}. Preferences: explanation=${config?.preferences?.explanation ?? 'simple'}, autonomy=${config?.preferences?.autonomy ?? 'loop'}.`, `Use PROJECT.md and ROADMAP.yaml as shared product sources; use ${stateDirFor(root)}/state.json through the RIFF CLI only.`];
-      context.push(`For implementation or review, read project taste.md when present and ${frameworkDirFor(root)}/references/taste.md; load only relevant topic and stack rules. For frontend work, read ${frameworkDirFor(root)}/references/taste/frontend.md, apply the relevant design skills and verify the rendered result in the browser. Use $riff:learn-stack for reusable stack-convention gaps.`);
+      context.push(`For implementation or review, read project taste.md when present and ${frameworkDirFor(root)}/references/taste.md; load only relevant topic and stack rules. For frontend work, read ${frameworkDirFor(root)}/references/taste/frontend.md, apply the relevant design skills and verify the rendered result in the browser. Use the learn-stack skill for reusable stack-convention gaps.`);
       if ((config?.preferences?.autonomy ?? 'loop') === 'loop') context.push('Loop autonomy: make conservative product and technical decisions, follow ready dependencies automatically, and do not request human decisions. Stop only for missing credentials or external access, impossible third-party verification, an unidentifiable destructive target, or failed RIFF validation.');
       else context.push('Guided autonomy: preserve confirmation at product decision boundaries and between phases.');
       if (active) context.push(`Resume interrupted phase ${active.id}. Load ${frameworkDirFor(root)}/references/operating-contract.md before continuing.`);
@@ -2184,5 +2184,5 @@ else if (command === 'wave') {
 else if (command === 'hook') {
   try { if (['post-tool', 'pre-compact'].includes(tokens[0])) withLock(gitRoot(), () => cmdHook(tokens)); else cmdHook(tokens); } catch (error) { fail(error.message); }
 }
-else if (command === 'next') fail('riff next is intentionally deferred; use $riff:wave or riff wave select');
+else if (command === 'next') fail('riff next is intentionally deferred; use the wave skill or riff wave select');
 else fail(`unknown command ${command}; run riff --help`);

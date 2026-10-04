@@ -121,7 +121,7 @@ test('session start exposes portable taste guidance without modifying shared con
     assert.match(hook.additionalContext, /read project taste\.md when present/);
     assert.match(hook.additionalContext, /apply the relevant design skills/);
     assert.match(hook.additionalContext, /verify the rendered result in the browser/);
-    assert.match(hook.additionalContext, /\$riff:learn-stack/);
+    assert.match(hook.additionalContext, /learn-stack skill/);
     for (const relative of ['references/taste.md', 'references/taste/frontend.md', 'references/taste/stacks/nowstack.md', 'skills/learn-stack/SKILL.md']) {
       assert.equal(existsSync(path.join(root, '.riff-codex', relative)), true, relative);
     }

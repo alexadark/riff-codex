@@ -1,6 +1,6 @@
 ---
 name: deep-audit
-description: Route an explicitly requested exhaustive audit to Codex Security. Use only when the user invokes $riff:deep-audit or clearly requests a deep repository security audit.
+description: Route an explicitly requested exhaustive audit to Codex Security. Use only when the user invokes this skill by name or clearly requests a deep repository security audit.
 ---
 
 # Route a deep security audit

@@ -1,14 +1,14 @@
 # Discovery dossier and readiness contract
 
-This is the canonical reference for `$riff:start` when it produces a complete scoped-version dossier. It complements [project framing](project-framing.md), which defines the product content in `PROJECT.md` and the phase map in `ROADMAP.yaml`.
+This is the canonical reference for the `start` skill when it produces a complete scoped-version dossier. It complements [project framing](project-framing.md), which defines the product content in `PROJECT.md` and the phase map in `ROADMAP.yaml`.
 
-`$riff:evolve` reuses this contract for an enrolled dossier or an explicitly requested complete next-version plan. Its [evolution contract](evolution.md) defines scoped brownfield analysis and the light path for bounded changes to legacy onboarded applications; it does not duplicate this manifest or review lifecycle.
+The `evolve` skill reuses this contract for an enrolled dossier or an explicitly requested complete next-version plan. Its [evolution contract](evolution.md) defines scoped brownfield analysis and the light path for bounded changes to legacy onboarded applications; it does not duplicate this manifest or review lifecycle.
 
 ## Scope and boundary
 
-Use the complete path when the user explicitly asks for a full application plan or asks to plan a new application for production. Use the light path for scratch work, bounded risk probes, and `$riff:quick`. A small existing application with one clear outcome may remain light. An explicit full-app request takes precedence over a convenient light interpretation.
+Use the complete path when the user explicitly asks for a full application plan or asks to plan a new application for production. Use the light path for scratch work, bounded risk probes, and the `quick` skill. A small existing application with one clear outcome may remain light. An explicit full-app request takes precedence over a convenient light interpretation.
 
-The complete path plans the entire committed version before implementation. It does not require an exhaustive plan for later versions. It may run bounded, isolated prototypes to test a material risk, but a probe cannot become a product feature or an implementation wave. No phase becomes active until the complete dossier and its independent review pass. `start` stops after the dossier and its independent review. Only a separate `$riff:wave` request may activate implementation.
+The complete path plans the entire committed version before implementation. It does not require an exhaustive plan for later versions. It may run bounded, isolated prototypes to test a material risk, but a probe cannot become a product feature or an implementation wave. No phase becomes active until the complete dossier and its independent review pass. `start` stops after the dossier and its independent review. Only a separate request for the `wave` skill may activate implementation.
 
 ## Sources and preservation
 

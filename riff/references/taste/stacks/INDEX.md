@@ -19,6 +19,6 @@ Read only entries matching the actual repository and current behavior. Versions 
 | [Server utilities](server-utilities.md) | The project comes from saas-starter or web-starter and uses its `app/lib/server` utilities. |
 | [react-day-picker](react-day-picker.md) | Editing a calendar component on react-day-picker v10. |
 
-Every rule except NowStack was last audited on 2026-05-28, before Zod 4 and Vitest 4. Check each rule against the installed version before relying on it, and refresh it through `$riff:learn-stack` when it is out of date.
+Every rule except NowStack was last audited on 2026-05-28, before Zod 4 and Vitest 4. Check each rule against the installed version before relying on it, and refresh it through the `learn-stack` skill when it is out of date.
 
-For other stacks, preserve existing project references and use `$riff:learn-stack` when reusable conventions are missing. New research belongs to the invoking project; framework-wide additions require framework work explicitly in scope.
+For other stacks, preserve existing project references and use the `learn-stack` skill when reusable conventions are missing. New research belongs to the invoking project; framework-wide additions require framework work explicitly in scope.

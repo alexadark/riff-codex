@@ -1,6 +1,6 @@
 ---
 name: start
-description: Shape a product with discovery and a vertical RIFF roadmap, or turn a prototype into a production project. Use for $riff:start, $riff:promote, or defining a project before building.
+description: Shape a product with discovery and a vertical RIFF roadmap, or turn a prototype into a production project. Use when the user invokes this skill or the former promote skill, or wants to define a project before building.
 ---
 
 # Start RIFF discovery
@@ -12,7 +12,7 @@ Use [the discovery contract](../../references/discovery.md) for scope, dossier, 
 Classify the request before choosing the depth of discovery:
 
 - An explicit request to plan a full application, or a new application intended for production, requires a complete scoped-version dossier.
-- Scratch work, a bounded spike, an existing small application with one clear outcome, and `$riff:quick` remain on the light path unless the user explicitly asks for a full application plan.
+- Scratch work, a bounded spike, an existing small application with one clear outcome, and the `quick` skill remain on the light path unless the user explicitly asks for a full application plan.
 - A risk probe may use a small isolated prototype. It must not become product implementation or a hidden phase.
 
 Run `node .riff-cli/bin/riff.mjs doctor`. Inspect the configured autonomy mode, the repository, existing `PROJECT.md` and `ROADMAP.yaml`, relevant documentation, and project taste before asking anything. For a production or complete dossier, read `.riff-cli/references/taste.md` and establish or conservatively merge the project-owned `taste.md`; for a UI product, include the applicable frontend direction and design-skill routing. Scratch and light work reads existing taste without bootstrapping a production file set. Read only the taste and stack topics that apply. Inspect existing supporting specifications and preserve them. Determine technical details from the repository, approved template, taste, and user stack; follow the mode boundary below for product questions.
@@ -37,13 +37,13 @@ Every area either has useful linked files or an explicit `not_applicable` reason
 
 Both paths write or conservatively update `PROJECT.md` and `ROADMAP.yaml` after the applicable mode boundary; every phase carries `done_when` and `verify` (operating contract). Run `node .riff-cli/bin/riff.mjs wave sync`, check that both artifacts parse, and write each phase's `EXPLAIN.simple.md` projection using `.riff-cli/references/dashboard.md`. Only the complete path creates `docs/specs/readiness.json` with the version 1 area manifest described in the discovery reference, runs the discovery snapshot, obtains an independent review of the complete dossier, applies corrections automatically, and runs the discovery check again. Review evidence is an attestation of the review, not proof that its claims are true.
 
-The complete path stops after the dossier and readiness check. The light path stops after its shared-artifact sync and projections. Neither path activates or starts a wave from `start`; the user must separately invoke `$riff:wave`. Do not publish issues or external artifacts unless separately requested.
+The complete path stops after the dossier and readiness check. The light path stops after its shared-artifact sync and projections. Neither path activates or starts a wave from `start`; the user must separately invoke the `wave` skill. Do not publish issues or external artifacts unless separately requested.
 
 Before discovery, follow the [model-advice contract](../../references/model-routing.md) and its single catalog. Respect explicit advice-only requests without starting discovery. Optional advice does not switch the primary model, add a worker or create a pause in loop mode. Keep native compaction, do not invoke nested `codex exec`, and preserve unrelated changes.
 
 ## Turn a prototype into a production project
 
-When the project is scratch-scoped and the user wants it to become a production project (formerly `$riff:promote`):
+When the project is scratch-scoped and the user wants it to become a production project (formerly the `promote` skill):
 
 - Run `node .riff-cli/bin/riff.mjs promote` to see the current scope; if it is already production, say so and stop.
 - Establish the production boundaries in the shared `PROJECT.md`, `ROADMAP.yaml` and `taste.md`, keeping existing decisions. Resolve active phases and blockers first.

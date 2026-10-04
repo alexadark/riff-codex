@@ -1,11 +1,11 @@
 ---
 name: add-phase
-description: Add one justified vertical phase to an existing RIFF roadmap. Use when the user invokes $riff:add-phase or approves a newly discovered product outcome.
+description: Add one justified vertical phase to an existing RIFF roadmap. Use when the user invokes this skill by name or approves a newly discovered product outcome.
 ---
 
 # Add a roadmap phase
 
-Use this for one already-understood independent outcome. When the request needs product reconsideration, impact analysis across existing behavior, or several interacting roadmap changes, use `$riff:evolve` and its [evolution contract](../../references/evolution.md) before adding phases. Do not reduce such a request to a blind append.
+Use this for one already-understood independent outcome. When the request needs product reconsideration, impact analysis across existing behavior, or several interacting roadmap changes, use the `evolve` skill and its [evolution contract](../../references/evolution.md) before adding phases. Do not reduce such a request to a blind append.
 
 Read `PROJECT.md`, `ROADMAP.yaml`, the current state, and the configured autonomy mode. If this is a large project, also read `.riff-cli/references/project-framing.md` and reuse its stories, criteria, data boundaries, rights, integrations, decisions, and prior answers. Confirm the new outcome is in product scope and is not already covered. In default `loop` mode, choose conservative product and technical details automatically. If a discovered outcome would widen the product contract without explicit user authorization, keep the existing scope and report that no phase was added instead of creating `awaiting_human`. In `guided` mode, ask before a material product change and recommend a course.
 
