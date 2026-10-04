@@ -851,3 +851,17 @@ test('init creates the Git repository for an empty or new folder and needs --git
   assert.equal(existsSync(path.join(notes, '.git')), false);
   assert.match(runCli(base, 'init', '--project-root', notes, '--non-interactive', '--git-init'), /Created a Git repository/);
 });
+
+test('session start reacts to /clear, lets product definition ask, and restores the active checkpoint', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [fixturePhase('build')]);
+  const hooks = JSON.parse(readFileSync(path.join(root, '.codex', 'hooks.json'), 'utf8')).hooks;
+  assert.match(hooks.SessionStart[0].matcher, /\bclear\b/);
+  runCli(root, 'wave', 'activate', 'build');
+  runCli(root, 'wave', 'checkpoint', 'build', '--summary', 'Filters render on desktop', '--next', 'Verify the 375px layout');
+  const output = execFileSync(process.execPath, [CLI, 'hook', 'session-start'], { cwd: root, encoding: 'utf8', input: JSON.stringify({ source: 'clear' }) });
+  const context = JSON.parse(output).hookSpecificOutput.additionalContext;
+  assert.match(context, /start and evolve skills interview them/);
+  assert.match(context, /Resume interrupted phase build/);
+  assert.match(context, /Last checkpoint: Filters render on desktop Next: Verify the 375px layout/);
+});
