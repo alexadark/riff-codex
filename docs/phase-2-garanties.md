@@ -9,7 +9,7 @@ Date : 2026-10-04. Plan parent : [plan-riff-claude-astra.md](plan-riff-claude-as
 - Amélioration automatique (validée le 2026-10-04) : à la fin de chaque phase de `wave`, 0 à 3 propositions enregistrées par `riff improve record`. Celles du projet vont dans l'état local et le dashboard, sans jamais bloquer ; celles de RIFF vont dans la boîte à idées `ideas/inbox.ndjson` du dépôt RIFF, non versionnée. `wave complete` refuse tant que le passage n'est pas enregistré, même vide. L'agent propose, il n'applique jamais.
 - Design : seulement trois interdits pour l'instant (copywriting générique, dégradés violets, eyebrows). Le goût design viendra plus tard, avec une validation visuelle.
 - Un seul style de prompt pour tous les modèles (décision du 2026-10-04, d'après le guide d'OpenAI pour GPT-6 Astra du 5 septembre 2026 cité par Alexandra) : but, condition de fin explicite, vérification, peu de règles, descriptions courtes. Le style `guarded` est abandonné ; les profils gardent seulement le modèle et l'effort.
-- Questions de `start` (décision d'Alexandra du 2026-10-04) : `start` mène une interview produit dans les deux modes, `loop` comme `guided`, car il se passe avant le loop. Le mode autonome ne règle que les waves. L'interview porte sur le produit (utilisateurs, parcours, écrans, données et droits, exclusions, critères de réussite, design), jamais sur les faits techniques que le dépôt établit, et se termine par un résumé à confirmer. Sans code existant (départ d'une simple idée), l'interview couvre aussi la stack : options, compromis et recommandation, NowStack par défaut quand il convient ; le choix est noté comme décision et la première phase l'installe. Pour ce départ, `riff init` crée lui-même le dépôt Git dans un dossier vide ou inexistant ; un dossier non vide sans Git exige `--git-init` (test RC en fin de fichier). La doc d'installation, qui demande encore un `git init` préalable, sera mise à jour en phase 7. `evolve` garde ses règles actuelles. Mis à jour : le skill, `discovery.md`, `project-framing.md`, `operating-contract.md`.
+- Questions de `start` (décision d'Alexandra du 2026-10-04) : `start` mène une interview produit dans les deux modes, `loop` comme `guided`, car il se passe avant le loop. Le mode autonome ne règle que les waves. L'interview porte sur le produit (utilisateurs, parcours, écrans, données et droits, exclusions, critères de réussite, design), jamais sur les faits techniques que le dépôt établit, et se termine par un résumé à confirmer. Sans code existant (départ d'une simple idée), l'interview couvre aussi la stack : options, compromis et recommandation, NowStack par défaut quand il convient ; le choix est noté comme décision et la première phase l'installe. Pour ce départ, `riff init` crée lui-même le dépôt Git dans un dossier vide ou inexistant ; un dossier non vide sans Git exige `--git-init` (test RC en fin de fichier). La doc d'installation, qui demande encore un `git init` préalable, sera mise à jour en phase 7. Étendu à `evolve` le même jour, à la demande d'Alexandra. Mis à jour : les deux skills, `discovery.md`, `project-framing.md`, `operating-contract.md`, `evolution.md`.
 - Deux idées reprises de ce guide : des tests proportionnés au changement, et une liste de tics d'écriture typiques de l'IA à éviter. Cette liste vit dans les instructions globales d'Alexandra (`claude-code-private/instructions/global-shared.md`, pour Claude et Codex), pas dans RIFF.
 
 ## Classement
@@ -21,7 +21,7 @@ Chaque règle du skill reçoit un classement :
 - **CLI partielle** : la CLI couvre une partie (souvent seulement les projets inscrits au contrat discovery). Le reste reste une consigne.
 - **Consigne** : rien ne l'applique hors du prompt. La règle reste dans le skill ou dans une référence.
 
-Les tests cités sont dans `test/` : `riff-codex.test.mjs` (RC), `delivery-cli.test.mjs` (DC), `delivery-contract.test.mjs` (DK), `evolve-planning.test.mjs` (EP), `model-advice.test.mjs` (MA), `model-advice-plan.test.mjs` (MAP). Le numéro est la ligne du test.
+Les tests cités sont dans `test/` : `riff-codex.test.mjs` (RC), `delivery-cli.test.mjs` (DC), `delivery-contract.test.mjs` (DK), `evolve-planning.test.mjs` (EP), `evolve-sync.test.mjs` (ES), `model-advice.test.mjs` (MA), `model-advice-plan.test.mjs` (MAP). Le numéro est la ligne du test.
 
 ## `wave` (57 règles)
 
@@ -214,6 +214,42 @@ Comparé ligne à ligne avec `git show main:riff/skills/start/SKILL.md` et `main
 - Seul changement de comportement : l'interview produit (S8, S9), décidée par Alexandra.
 - Taille : 6,6 Ko, comme l'ancien `start` et l'ancien `promote` réunis (6,6 Ko) pour l'ancien `start` et `promote` réunis.
 
+## `evolve` (24 règles)
+
+Comparé ligne à ligne avec `git show main:riff/skills/evolve/SKILL.md`.
+
+| # | Règle | Classement | Où elle est maintenant |
+| --- | --- | --- | --- |
+| E1 | `doctor` et `status` ; exiger `PROJECT.md`, `ROADMAP.yaml` et l'état ; sinon nommer l'étape suivante sans la faire | Consigne | Gardée (étape 1) |
+| E2 | Inspecter la base réelle et l'état CLI avant de modifier | Consigne | Gardée (étapes 1, 2 ; Verify) |
+| E3 | Exploration ou autorisation ; la suggestion d'un collaborateur est une entrée ; une exploration ne modifie rien | Consigne | Gardée (But) |
+| E4 | Problème, utilisateurs, résultat, demandes concurrentes, plus petit périmètre, exclusions ; réutiliser le travail déjà prévu | Consigne | Gardée (Done when) |
+| E5 | `loop` sans question, `guided` avec questions décisives et confirmation | Consigne | Remplacée le 2026-10-04 par décision d'Alexandra : interview produit dans les deux modes, puis résumé à confirmer (étapes 3, 4) |
+| E6 | Lire le goût et les seules références utiles ; réutiliser la carte après contrôle de dérive | Consigne | Gardée (étape 2) |
+| E7 | Expliquer l'actuel et le proposé, conséquences pour utilisateurs, données, droits, parcours, intégrations, reprise ; distinguer preuve, inférence et dépendance | Consigne | Gardée (étapes 3, 4) |
+| E8 | Critères observables pour le nouveau résultat et pour l'existant touché | Consigne | Gardée (Done when) |
+| E9 | Ne modifier que le contenu touché et les phases en attente ; `done_when` et `verify` | CLI partielle | RC 791 pour `done_when` et `verify` ; gardée (Done when) |
+| E10 | Préserver contrats actifs et terminés, preuves, IDs stables, format YAML et champs inconnus | CLI partielle | ES 59 (contrat protégé, historique non supprimable), ES 217 (reçus et champs inconnus) ; format YAML et IDs non recyclés restent des consignes (étape 5) |
+| E11 | Règles de remplacement des phases en attente ; jamais de statut inventé | CLI partielle | ES 217 ; référence `evolution.md` ; gardée (étape 5) |
+| E12 | Conflit avec un travail actif : brouillon hors du dossier vivant jusqu'à une frontière sûre ; ne pas interrompre | CLI partielle | ES 59 protège le contrat actif ; le reste est une consigne (étape 6) |
+| E13 | `wave sync` et `EXPLAIN.simple.md` touchés | Consigne | Gardée (Done when, étape 7) |
+| E14 | Projet inscrit : manifeste, review indépendante, `discovery check` | CLI | EP 78 et DC 101 : une review périmée bloque l'activation ; l'indépendance reste une consigne (Verify) |
+| E15 | Demande explicite de version complète : contrat discovery | Consigne | Gardée (Done when) |
+| E16 | Changement borné d'une application non inscrite : chemin léger, jamais présenté comme discovery | CLI partielle | EP 78 : reste non inscrite ; la présentation reste une consigne (Done when) |
+| E17 | Rapport : résultat, hypothèses, phases, comportement gardé, checks réels, `wave` seulement si prêt | Consigne | Gardée |
+| E18 | S'arrêter après la planification ; jamais d'activation, d'implémentation, d'issue ni de déploiement | Consigne | Gardée (Done when, interdits) |
+| E19 | Règles de blocage et de reprise du contrat d'exécution, pas de second système d'état | Consigne | Gardée (étapes 4, 7) |
+| E20 | Conseil de modèle : la demande seule n'autorise rien, pas d'enregistrement en exploration, pas de changement de modèle ni de pause | CLI partielle | Comme Q2 (MA 48, MAP 27) ; gardée |
+| E21 | Compaction native, travail sans rapport préservé | Consigne | Compaction : référence `execution.md` (vocabulaire Codex, phase 3) ; préservation gardée |
+| E22 | Ne pas refaire la discovery pour ce qui n'est pas touché | Consigne | Gardée (étape 5) |
+| E23 | Analyse du changement enregistrée dans les specs, liée depuis `PROJECT.md` | Consigne | Gardée (Done when) ; détail dans `evolution.md` |
+| E24 | Pas pour la définition initiale, l'ajout simple d'une phase ni l'implémentation | Consigne | Gardée (description, But) |
+
+### Bilan `evolve`
+
+- Aucune garantie perdue. Seul changement de comportement : l'interview produit dans les deux modes (E5), décidée par Alexandra.
+- Taille : 5,8 Ko contre 4,4 Ko. La hausse vient de l'interview et des sections « Done when » et « Verify », absentes de l'ancien texte.
+
 ## Tests ajoutés
 
 Deux tests dans `test/riff-codex.test.mjs` couvrent W18, W28, W36b, W39 et W40, un troisième couvre W58, un quatrième (RC 821) couvre P3 et P4, un cinquième la création du dépôt Git par `riff init`. Suite complète : 60 tests passent (`npm test`).
@@ -235,5 +271,5 @@ Fait et testé (58 tests CLI, 2 tests dashboard) :
 
 Reste :
 
-1. Réécriture au gabarit des autres skills (`start` fait, ton à relire par Alexandra) : `evolve`, `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
+1. Réécriture au gabarit des autres skills (`start` validé ; `evolve` fait, ton à relire par Alexandra) : `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
 2. Avant la fusion dans `main` : `riff resync` dans chaque projet connecté pour créer `.riff-cli` (accord d'Alexandra requis), puis mise à jour de la documentation en phase 7.

@@ -1,24 +1,50 @@
 ---
 name: evolve
-description: Challenge and plan changes to an existing onboarded RIFF product, including interacting requests and roadmap revisions. Use when the user invokes this skill by name or explicitly asks to replan an existing RIFF application; not for initial onboarding, a simple phase append, or implementation.
+description: Plan a change to an existing RIFF product, from one request to several competing ones, and revise the roadmap without losing history. Use when the user invokes this skill by name or asks to replan an existing RIFF application; not for initial definition, a simple phase append or implementation.
 ---
 
 # Evolve an existing product
 
-Use [the evolution contract](../../references/evolution.md) for prerequisites, impact analysis, roadmap preservation, and the planning handoff. Reuse [discovery](../../references/discovery.md) for dossier content and readiness, and [project framing](../../references/project-framing.md) for product synthesis. Do not run initial discovery again for unaffected behavior.
+`riff` means `node .riff-cli/bin/riff.mjs`. The CLI refuses to change the contract of an active or finished phase, to remove a phase with execution history, and, for an enrolled project, to activate a phase until the revised dossier has a fresh passing review.
 
-Run `node .riff-cli/bin/riff.mjs doctor` and `node .riff-cli/bin/riff.mjs status` when installed. Require existing `PROJECT.md`, `ROADMAP.yaml`, and initialized RIFF state. If a prerequisite is missing, report the next explicit step in installation → `onboard` → `evolve` → `wave` skills; do not install or onboard automatically. Inspect the actual baseline and CLI state before changing shared artifacts.
+## Goal
 
-Distinguish an exploration request from authorization to revise the plan. A collaborator's suggestion is input, not automatically a committed feature. Exploration returns options and consequences without changing project artifacts or state. Authorized evolution supports one request or several related requests: identify the underlying problem, users, outcome, competing requests, smallest useful scope, and exclusions before proposing phases. Check whether existing work already covers the outcome.
+Turn an authorized change to an existing application into a verifiable plan the `wave` skill can build from, then stop. First classify the request:
 
-Challenge assumptions that materially affect the product. In `loop`, resolve ordinary ambiguity conservatively and record the decision without a confirmation round. In `guided`, ask only consequential product questions that repository evidence cannot answer and confirm the revised boundary before writing it. Honor an explicitly requested product discussion; do not turn it into a technical interview or mandatory approval queue.
+- Exploration: a question or a collaborator's suggestion that nobody has accepted yet. Answer with options and consequences and change nothing.
+- Planned change: the user asks to plan it. This authorizes targeted edits to the product files and the roadmap.
+- A single, already understood outcome to append belongs to the `add-phase` skill; defining a new product belongs to the `start` skill.
 
-Read the project's taste and only the applicable shared taste, stack, design, and verification references. Reuse a saved map after checking affected code for drift. Explain current versus proposed behavior and consequences for existing users, data, permissions, journeys, integrations, and recovery. Mark evidence, inference, and unresolved external dependencies distinctly. Define observable criteria for both the new outcome and affected existing behavior.
+## Done when
 
-Revise only affected product and specification content and pending roadmap work; each new or revised phase carries `done_when` and `verify` (operating contract). Preserve completed and active contracts, historical evidence, stable IDs, and the original YAML representation and unknown fields. Apply the supported pending replacement rules in the evolution contract; never invent lifecycle statuses. An active-work conflict stays a planning draft outside the live dossier until the owning execution reaches a safe boundary; do not interrupt another task or report readiness prematurely.
+- The change is clear: who it affects, the problem, the observable outcome, the smallest useful scope and the exclusions. Competing requests are grouped or arbitrated, and work already planned is reused, not duplicated.
+- The user confirmed the summary of the change.
+- Only affected product and spec content and pending phases changed. Each new or revised phase has `done_when` and `verify`, with criteria for the new outcome and for the existing behavior it touches.
+- The change analysis is saved in the project's specs (for example `docs/specs/evolutions/<change>.md`), linked from `PROJECT.md`, with the old-to-new phase mapping.
+- `riff wave sync` passed and the affected `EXPLAIN.simple.md` files are refreshed.
+- Enrolled project, or an explicit request to plan the whole next version: the manifest lists the new documents, a fresh independent review covers the revised dossier, and `riff discovery check` passes. A bounded change to an unenrolled application stays light planning; never present it as discovery readiness.
+- No phase is active. Building starts only when the user invokes the `wave` skill.
 
-After the authorized edits, synchronize through `node .riff-cli/bin/riff.mjs wave sync` and refresh affected phase explanations under the [dashboard contract](../../references/dashboard.md). For an enrolled dossier, update affected manifest references, obtain an independent review of the revised candidate, and pass `discovery check`. For an explicit complete-version planning request, establish that same contract. A bounded legacy evolution remains on the light path, with impact and regression criteria checked and a successful sync; do not claim it passed discovery readiness.
+## Verify
 
-Report the outcome, assumptions, added/revised/replaced/deferred phases, retained behavior, actual planning checks, and next invocation of the `wave` skill only when ready. Stop after planning. Never activate a wave, implement a product feature, publish issues, or deploy from evolve. Use the shared operating contract's real blocker and retry rules, not a second state system.
+- Run `riff doctor` and `riff status` before and after the edits.
+- Check the plan against the code and tests around the affected paths, not only the documents.
+- The reviewer of an enrolled dossier is a fresh agent that didn't write the change and judges the coherence of the whole revised version, including the existing behavior affected.
 
-Before planning, follow the [model-advice contract](../../references/model-routing.md) and its single catalog. Advice-only questions do not authorize evolution; read-only exploration does not persist advice without request. Optional advice does not change models, authorize delegation or add a pause in loop mode. Keep native compaction and preserve unrelated work.
+## How to work
+
+1. Run `riff doctor` and `riff status`. Require `PROJECT.md`, `ROADMAP.yaml` and initialized RIFF state; if one is missing, name the next step (install RIFF, then the `onboard` skill) and stop without doing it.
+2. Read the product sources, the affected specs, the project taste and only the applicable references, plus `.riff-data/MAP.md` after checking the affected code for drift. Settle technical facts from the code instead of asking.
+3. Interview the user about the change, whatever the autonomy mode: the mode governs waves, not product definition. Ask a few questions at a time, in the user's language, about what the sources didn't settle: who is affected and what problem they have, the outcome they expect, what stays out, what existing users must keep, and the design reference. Challenge the proposed solution when a simpler one reaches the outcome, offer concrete options with a recommendation, and explain the consequences for existing users, data, permissions, journeys, integrations and recovery. Never ask for technical facts the code settles.
+4. Present the summary, separating evidence, inference and external dependencies, and let the user confirm or correct it before editing shared files. From there, finish without further questions; only a blocker kind from the operating contract stops the work.
+5. Edit the plan following the evolution reference: keep the YAML layout, unknown fields and stable IDs, never recycle an ID or invent a status, revise or replace only ready phases without execution history. Reuse unchanged specs and don't redo discovery for unaffected behavior. A missing promised design stays an external dependency; never invent a substitute.
+6. If an active phase or another session is building against the affected contract, keep the proposal as a draft outside the live dossier, name the phase it waits for and apply it at that phase's safe boundary. Never interrupt or rewrite another task.
+7. Sync, refresh the explanations, then run the review and check when the dossier is enrolled. A failed sync or check means the plan isn't ready: fix the scoped issue under the operating contract's retry rules and never edit RIFF state files by hand.
+
+A request for model advice alone doesn't authorize an evolution, and an exploration records no advice unless asked; optional advice never switches the primary model or adds a pause in `loop` mode. Never implement, publish issues, deploy or relaunch your own host. Preserve unrelated changes.
+
+Report the outcome, assumptions, phases added, revised, replaced or deferred, the behavior kept, the checks actually passed, any scheduling conflict, and the `wave` invocation only when the plan is ready.
+
+## References
+
+Read when the step needs them, under `.riff-cli/references/`: `evolution.md` (baseline, change analysis, roadmap edit rules, active work, readiness), `discovery.md` (dossier content, design handoff, review lifecycle), `project-framing.md`, `operating-contract.md` (modes, blocker kinds, phase contract), `dashboard.md` (`EXPLAIN.simple.md`), `security.md`, `model-routing.md`, `taste.md` and the applicable `taste/` topics.

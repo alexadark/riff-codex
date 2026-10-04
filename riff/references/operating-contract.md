@@ -20,7 +20,7 @@ One roadmap phase is active at a time. Within it, substantial independent implem
 
 ## Autonomy
 
-`loop` is the default. The autonomy mode governs waves; product definition in the `start` skill interviews the user in either mode. In `loop`, RIFF resolves product and technical ambiguity without a human handoff by choosing the smallest reversible option that preserves the explicit product contract, current behavior, user data, least privilege, existing dependencies, and external systems. It records assumptions, avoids speculative scope, and continues automatically through dependency-ready work.
+`loop` is the default. The autonomy mode governs waves; product definition in the `start` and `evolve` skills interviews the user in either mode. In `loop`, RIFF resolves product and technical ambiguity without a human handoff by choosing the smallest reversible option that preserves the explicit product contract, current behavior, user data, least privilege, existing dependencies, and external systems. It records assumptions, avoids speculative scope, and continues automatically through dependency-ready work.
 
 `guided` preserves confirmation at product decision boundaries, before shared artifacts are frozen, and between phases.
 

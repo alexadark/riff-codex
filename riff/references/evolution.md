@@ -8,7 +8,7 @@ The brownfield path is explicit: install RIFF, then the `onboard`, `evolve` and 
 
 Require an installed CLI, initialized state, and existing `PROJECT.md` and `ROADMAP.yaml`. Run doctor and status through the CLI. A missing prerequisite returns its explicit next step without creating artifacts or executing another command's work. A missing installation is not repaired inside evolve. Failed RIFF validation follows the operating contract; do not work around it by editing state files.
 
-Classify the user's intent before writing. An exploratory question or a collaborator's unaccepted suggestion can end with a recommendation and no edits. A request to plan a change authorizes targeted product artifacts under the configured autonomy mode. A request only to append one already-understood independent outcome belongs to the `add-phase` skill; initial product definition belongs to the `start` skill. Evolve never starts implementation.
+Classify the user's intent before writing. An exploratory question or a collaborator's unaccepted suggestion can end with a recommendation and no edits. A request to plan a change authorizes targeted product artifacts after the product interview below. A request only to append one already-understood independent outcome belongs to the `add-phase` skill; initial product definition belongs to the `start` skill. Evolve never starts implementation.
 
 ## Baseline and product decisions
 
@@ -16,7 +16,7 @@ Read existing product sources, relevant specs, project taste, current CLI status
 
 Identify the person affected, present problem, desired observable outcome, and smallest useful change. For a batch of requests, group shared outcomes, expose incompatible demands, and prioritize the committed boundary. Do not assume every meeting suggestion must become a phase. Search current phases and criteria first; an already-covered request references that work and creates no duplicate.
 
-Explain consequential alternatives and their practical costs. In loop, make conservative product and technical decisions within the authorized scope, record assumptions, and continue. In guided, ask only unresolved questions that change the product boundary and confirm before freezing it. Explicitly invited discussion can challenge the user's proposed solution; it does not authorize expanding product scope or adding routine approval steps.
+Explain consequential alternatives and their practical costs. Interview the user about the change in every autonomy mode, because the mode governs waves, not product definition: ask about what the sources did not settle, challenge the proposed solution when a simpler one reaches the outcome, and have the user confirm the summary before editing shared artifacts. Never ask for technical facts the code settles. After the confirmation, finish without further questions. The interview does not authorize expanding product scope or adding routine approval steps.
 
 ## Change analysis
 
