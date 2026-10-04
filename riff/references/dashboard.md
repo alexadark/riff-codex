@@ -13,7 +13,7 @@ Legacy RIFF projects keep their existing `.planning/phases/**/EXPLAIN*.md` artif
 
 ## End-of-work observation triage
 
-The implementing agent owns technical triage at every phase, not only at the end of a wave. Before freezing each phase candidate and before whole-version completion, run `node .riff-codex/bin/riff.mjs observations list` and inspect pending observations against current code and evidence. Prioritize security findings. Do not ask the user to judge whether a technical warning is valid.
+The implementing agent owns technical triage at every phase, not only at the end of a wave. Before freezing each phase candidate and before whole-version completion, run `node .riff-cli/bin/riff.mjs observations list` and inspect pending observations against current code and evidence. Prioritize security findings. Do not ask the user to judge whether a technical warning is valid.
 
 For each observation, record `false_positive` only with a concrete explanation of why the detector does not apply; record `resolved` only after verifying the correction. Include inspected paths and the relevant check or evidence in the note. Repair confirmed problems within the authorized task, then refresh affected validation and reviews if the candidate changed. Never bulk-dismiss a backlog or treat age, repetition, or a passing unrelated review as proof of resolution.
 
@@ -25,4 +25,4 @@ After final checks, list observations once more to account for findings generate
 
 In the dashboard, expand an observation, choose To review, Resolved or False positive, and save the reason or verification result. Processed groups move to a collapsed history section and can be reopened. Decisions persist in the project state via `observations review`; original findings and decision history are preserved. A new occurrence reopens its group. Stale decisions are rejected and must be refreshed. Triage never clears phase blockers, changes review receipts or bypasses security hooks.
 
-CLI equivalent: `node .riff-codex/bin/riff.mjs observations list`, then `observations review --id ID --revision REV --status resolved --note "Verified correction"`. Status values are `pending`, `resolved` and `false_positive`.
+CLI equivalent: `node .riff-cli/bin/riff.mjs observations list`, then `observations review --id ID --revision REV --status resolved --note "Verified correction"`. Status values are `pending`, `resolved` and `false_positive`.

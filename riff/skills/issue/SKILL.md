@@ -5,7 +5,7 @@ description: Publish a framed RIFF product outcome as a grouped GitHub issue on 
 
 # Publish a RIFF GitHub issue
 
-Load `.riff-codex/references/project-framing.md`, `PROJECT.md`, `ROADMAP.yaml`, and the current RIFF state before drafting. This skill is opt-in: never create or update an issue because `$riff:start`, `$riff:add-phase`, or `$riff:wave` ran.
+Load `.riff-cli/references/project-framing.md`, `PROJECT.md`, `ROADMAP.yaml`, and the current RIFF state before drafting. This skill is opt-in: never create or update an issue because `$riff:start`, `$riff:add-phase`, or `$riff:wave` ran.
 
 1. Confirm the user explicitly asked for GitHub issue publication or an issue update. Resolve the repository remote and target repository from the current checkout; do not invent a target.
 2. Group the request by useful user or product outcomes. Include connected stories, acceptance criteria, relevant data and permission boundaries, integrations, dependencies, exclusions, and the validation boundary. Keep one issue per coherent outcome when several outcomes are requested.

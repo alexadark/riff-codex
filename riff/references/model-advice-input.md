@@ -5,9 +5,9 @@ This contract ships inside the RIFF plugin. The public walkthrough is in the rep
 From an initialized project:
 
 ```sh
-node .riff-codex/bin/riff.mjs model-advice show
-node .riff-codex/bin/riff.mjs model-advice recommend --input -
-node .riff-codex/bin/riff.mjs model-advice configure --mode local
+node .riff-cli/bin/riff.mjs model-advice show
+node .riff-cli/bin/riff.mjs model-advice recommend --input -
+node .riff-cli/bin/riff.mjs model-advice configure --mode local
 ```
 
 `catalog` prints the whole shared policy and also works outside an initialized project using the actual CLI path. `show` reads preferences and the last advice without network. `recommend` takes curated JSON from stdin (`-`) or a project-relative regular file, at most 16 KiB. The CLI never scans the repository or creates a phase.

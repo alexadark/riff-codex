@@ -11,8 +11,8 @@ Use native Codex compaction. A focused read does not remove old messages or crea
 Before completion or an interruption, record a checkpoint through the CLI:
 
 ```sh
-node .riff-codex/bin/riff.mjs wave checkpoint phase-id --summary "Verified outcome, decisions and remaining risk" --next "Next action and references to consult"
-node .riff-codex/bin/riff.mjs wave context phase-id
+node .riff-cli/bin/riff.mjs wave checkpoint phase-id --summary "Verified outcome, decisions and remaining risk" --next "Next action and references to consult"
+node .riff-cli/bin/riff.mjs wave context phase-id
 ```
 
 The checkpoint includes the candidate identity and technical evidence pointers. Its prose should reference durable decisions, explain any incomplete work, name the intended next action and preserve relevant environment/target distinctions without secrets. Document substantive decisions in the project dossier; a checkpoint is a recovery aid, not a replacement specification. For enrolled projects, completion requires a checkpoint for the current candidate.

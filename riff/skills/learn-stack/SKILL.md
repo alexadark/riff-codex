@@ -5,11 +5,11 @@ description: Research and persist source-backed stack conventions for the invoki
 
 # Learn stack conventions
 
-Goal: leave concise, verified stack rules that future implementation and review can find and apply. Read `.riff-codex/references/taste.md` for precedence, shared artifacts and autonomy.
+Goal: leave concise, verified stack rules that future implementation and review can find and apply. Read `.riff-cli/references/taste.md` for precedence, shared artifacts and autonomy.
 
 ## Scope and evidence
 
-Infer the requested stack, installed version and useful focus from the request, manifest, lockfile and current outcome. For NowStack, identify the actual starter variant and use `.riff-codex/references/taste/stacks/nowstack.md` as a starting reference. An explicitly named new stack may be researched before it is installed; label that distinction. If no stack can be identified in loop mode, report insufficient task context without inventing one or writing a file.
+Infer the requested stack, installed version and useful focus from the request, manifest, lockfile and current outcome. For NowStack, identify the actual starter variant and use `.riff-cli/references/taste/stacks/nowstack.md` as a starting reference. An explicitly named new stack may be researched before it is installed; label that distinction. If no stack can be identified in loop mode, report insufficient task context without inventing one or writing a file.
 
 Inspect existing project taste and stack notes first. Research only conventions that affect the requested focus, using current maintainer documentation and exemplary repositories. Find the best reference code for the stack at the installed version: official examples and templates, apps maintained by the stack's authors, and well-regarded, actively maintained open-source projects. Prefer recent activity and real production use over stars alone. Read their code for the focus area and turn recurring patterns into rules, citing the repository and file. Verify source links, version applicability and the claims they support. No fixed source count or shortlist approval is required. A maintainer rule can stand alone as `[official]`; a project convention needs local evidence as `[project]`; a pattern seen across reference repositories is `[example]` with its repository and file; an inferred recommendation must be labeled and justified, not presented as consensus. Unsupported claims stay out of the rules. Missing required external access remains a real blocker; a sparse source set is not permission to fabricate guidance.
 

@@ -11,7 +11,7 @@ Use the review artifact shape below with `type: "discovery"` and `candidate` set
 ## Executed validation
 
 ```sh
-node .riff-codex/bin/riff.mjs wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test","package.json"]'
+node .riff-cli/bin/riff.mjs wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test","package.json"]'
 ```
 
 The CLI executes the argv without a shell, with a 60-second limit. Choose a bounded check that fits that limit. Paths must cover exactly the authorized files or directories changed since activation. Tracked unstaged changes are rejected. A command that changes the candidate fails validation. Legacy `--status` declarations remain recordable but cannot satisfy completion. Every executed validation produces `.uxtest/runs/<run-id>/report.html`, `run.json` and `UX-REPORT.md`. The HTML is standalone and includes command output; review output for sensitive content before sharing.
@@ -38,7 +38,7 @@ For changed user journeys, run the actual flow with the installed browser capabi
 }
 ```
 
-Use `pass`, `fail` or `unverified` for each observed step. Never fabricate a screenshot or mark an unavailable journey passed. Attach the manifest with `wave validate ... --verification FILE`. A phase with `verification_required: true` (or `verification.required: true`, or HITL mode) cannot complete without passing verification. For quick work outside a phase, use `node .riff-codex/bin/riff.mjs report --evidence FILE`; this bundles observations but does not itself execute tests or grant a phase receipt.
+Use `pass`, `fail` or `unverified` for each observed step. Never fabricate a screenshot or mark an unavailable journey passed. Attach the manifest with `wave validate ... --verification FILE`. A phase with `verification_required: true` (or `verification.required: true`, or HITL mode) cannot complete without passing verification. For quick work outside a phase, use `node .riff-cli/bin/riff.mjs report --evidence FILE`; this bundles observations but does not itself execute tests or grant a phase receipt.
 
 Existing consumers should run `resync` to install the new local report exclusion; this preserves their project artifacts and preferences.
 
@@ -70,7 +70,7 @@ Review the integrated candidate against the phase's acceptance criteria and pres
 
 After terminal phases, the agent executes the remaining whole-version checks in [execution](execution.md#whole-version-verification) and obtains an independent review with `type: "delivery"`, `candidate: "<git write-tree>"`, the real reviewer identity, observations in `evidence` and any findings. Include actual commands or observed journeys, results, environment/target and references to saved reports. A collection of phase names or an assertion that “all tests passed” is insufficient substantive evidence.
 
-For enrolled projects, record `node .riff-codex/bin/riff.mjs finish --review FILE`, then `finish --check`. The review is bound to the final candidate and preserved as integrity-checked evidence, not a replacement for executed verification. The CLI also checks historical phase evidence and terminal state. A changed final candidate needs an updated final review and the affected checks. A failed final review triggers an in-scope correction phase; preserve completed phase history and follow normal validation/review gates. These commands never publish. See [Git delivery](git-delivery.md) for agent-operated draft publication after a completed phase and final PR readiness after these gates pass. A draft PR is not final delivery evidence.
+For enrolled projects, record `node .riff-cli/bin/riff.mjs finish --review FILE`, then `finish --check`. The review is bound to the final candidate and preserved as integrity-checked evidence, not a replacement for executed verification. The CLI also checks historical phase evidence and terminal state. A changed final candidate needs an updated final review and the affected checks. A failed final review triggers an in-scope correction phase; preserve completed phase history and follow normal validation/review gates. These commands never publish. See [Git delivery](git-delivery.md) for agent-operated draft publication after a completed phase and final PR readiness after these gates pass. A draft PR is not final delivery evidence.
 
 ## Production lifecycle
 

@@ -1,6 +1,6 @@
 # RIFF model advice
 
-[model-profiles.json](model-profiles.json) is the single versioned catalog of profiles, complete definitions, selection rules and research references, for both code and non-code work. Read it in full or use `node .riff-codex/bin/riff.mjs model-advice catalog`. Do not maintain another fixed model/effort table in a skill. The policy is a hypothesis to evaluate on real tasks, not a validated reliability ranking.
+[model-profiles.json](model-profiles.json) is the single versioned catalog of profiles, complete definitions, selection rules and research references, for both code and non-code work. Read it in full or use `node .riff-cli/bin/riff.mjs model-advice catalog`. Do not maintain another fixed model/effort table in a skill. The policy is a hypothesis to evaluate on real tasks, not a validated reliability ranking.
 
 ## Scope and entry points
 
