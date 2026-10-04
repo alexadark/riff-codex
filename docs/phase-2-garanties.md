@@ -184,6 +184,6 @@ Fait et testé (58 tests CLI, 2 tests dashboard) :
 Reste :
 
 1. Validation par Alexandra du ton de `wave` et `quick`.
-2. Comparaison avant/après : le projet de test et le script sont prêts dans le dossier temporaire de la session (`ab/template`, `ab/run-arm.sh`, `ab/analyze.mjs`). Bloquée : la commande `claude` du terminal n'est pas connectée (`claude auth login` à lancer par Alexandra).
+2. Comparaison avant/après : le projet de test et les scripts sont prêts dans `test/ab/` (`run-arm.sh old|new wave|quick N`, puis `node test/ab/analyze.mjs`). Bloquée : la commande `claude` du terminal n'est pas connectée (`claude auth login` à lancer par Alexandra).
 3. Réécriture au gabarit des autres skills : `start`, `evolve`, `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
 4. Avant la fusion dans `main` : `riff resync` dans chaque projet connecté pour créer `.riff-cli` (accord d'Alexandra requis), puis mise à jour de la documentation en phase 7.
