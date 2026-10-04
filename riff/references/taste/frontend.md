@@ -6,6 +6,12 @@ Goal: an intentional, coherent interface that helps its users complete the promi
 
 Inspect the current rendered interface, design references, components and tokens relevant to the task. Preserve exact-parity requirements and an approved visual system. For a new surface, establish a concise direction in project frontend taste: audience and main action, information hierarchy, layout/density, type scale, semantic colors, component language, imagery and restrained motion. Make these choices autonomously from the goal in loop mode. Avoid a generic card grid, decorative gradients or copied starter styling without a product reason.
 
+Avoid these defaults unless an approved design reference or a stated product reason asks for them:
+
+- purple or indigo-to-blue gradients, on backgrounds, buttons or headings;
+- eyebrows: small uppercase, letter-spaced labels above headings;
+- generic marketing copy such as "Unlock", "Seamless", "Elevate" or "Supercharge".
+
 Use realistic content and the actual primary workflow to shape the composition. Carry the same direction across related screens, responsive layouts and loading, empty, error and success states. Reuse accessible primitives while adapting their composition to the product; a component library is not a finished design.
 
 ## Required skill use

@@ -2,6 +2,10 @@
 
 Goal: preserve useful product, design and engineering judgment across tasks without prescribing an implementation script. `PROJECT.md` owns the product goal; taste records how this project delivers it well.
 
+## Code: learn from the best repositories, not from personal rules
+
+RIFF keeps no personal coding preferences. For code, the reference is how the best repositories of each technology are written: official examples, the maintainers' own applications and active, well-regarded open source projects. `$riff:learn-stack` studies them and records rules tagged `[example]` with the repository and file, and [the stack index](taste/stacks/INDEX.md) lists the rules already collected. Project taste records only conventions proven in this project's code; it never invents a house style.
+
 ## Read and resolve
 
 For implementation or review, read the project's `taste.md` when present, then only the topic and stack references relevant to the changed behavior. Read [frontend taste](taste/frontend.md) for visual or interaction work, including when the project has no taste yet. Consult [the stack index](taste/stacks/INDEX.md) when identifying the stack. File patterns are navigation hints, not automatic Codex loading rules.
