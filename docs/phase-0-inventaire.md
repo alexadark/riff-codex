@@ -42,7 +42,7 @@ Chaque dépendance à Codex reçoit un propriétaire :
 | Fichier de hooks | `init` écrit `.codex/hooks.json` | Hooks dans `.claude/settings.json` du projet. |
 | Détection de hooks désactivés | lecture de `.codex/config.toml` et `~/.codex` (`CODEX_HOME`) | `doctor` lit les réglages Claude Code. |
 | Pointeur d'instructions | `AGENTS.md` | `CLAUDE.md`. |
-| Syntaxe d'appel | `$riff:wave`, `$riff:issue`… dans skills et CLI | `/riff-wave` (ou le nom choisi), à injecter par l'hôte plutôt qu'écrit en dur. |
+| Syntaxe d'appel | `$riff:wave`, `$riff:issue`… dans skills et CLI | `/riff:wave` via le plugin `riff`, à injecter par l'hôte plutôt qu'écrit en dur. |
 | Règle « jamais de `codex exec` imbriqué » | `skills/wave/SKILL.md` | Équivalent Claude : jamais de `claude -p` imbriqué hors pont de review. |
 | Compaction native | `references/execution.md` : « Use native Codex compaction » | Formulation neutre ; la compaction Claude est gérée par auto-handoff et M3. |
 | Branches `codex/<change>` | `references/git-delivery.md` | Préfixe configurable par hôte (`claude/`, `codex/`). |
@@ -91,11 +91,14 @@ Proposition :
 
 Ces deux noms n'existent nulle part dans l'ancien RIFF, et ils disent ce qu'ils contiennent.
 
-## Décisions à prendre
+## Décisions
 
-1. Les noms `.riff-cli` et `.riff-data`, ou d'autres.
-2. Le nom des commandes Claude : `/riff-wave`, `/riff-start`… (un préfixe court et lisible), ou `/riff:wave` via un plugin `riff`.
-3. Le projet du pilote réel (question ouverte du plan Astra) : à choisir parmi ceux sans phase active.
+Tranchées le 2026-10-04 :
+
+1. Dossiers : `.riff-cli` (lien vers le framework) et `.riff-data` (état du projet).
+2. Commandes Claude : `/riff:wave`, `/riff:start`… via un plugin `riff`.
+
+Reste ouvert : le projet du pilote réel (question du plan Astra), à choisir parmi ceux sans phase active.
 
 ## Prochaine étape
 
