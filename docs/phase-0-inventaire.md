@@ -100,6 +100,10 @@ Tranchées le 2026-10-04 :
 
 Reste ouvert : le projet du pilote réel (question du plan Astra), à choisir parmi ceux sans phase active.
 
-## Prochaine étape
+## Phase 1 : faite le 2026-10-04
 
-Phase 1 : renommage et cœur neutre. La commande `riff` fonctionne avec l'alias `riff-codex`, un projet de test migre avec sauvegarde et l'ancien état reste lisible. Complexité agent moyenne (beaucoup de chemins, migration à sécuriser) ; validation par toi faible.
+- La commande s'appelle `riff` ; `riff-codex` reste un alias.
+- Les nouvelles installations utilisent `.riff-cli` et `.riff-data`.
+- `riff resync` migre un projet `.riff-codex-state` quand aucune phase n'est active, après une sauvegarde complète dans `.riff-data/backups/`. Sinon il garde l'ancien dossier et le dit.
+- Les anciens noms restent comme liens (`.riff-codex`, `.riff-codex-state`), pour que le dashboard, les hooks Codex, le cockpit et le texte des skills continuent de marcher. Ils disparaîtront quand tous les lecteurs utiliseront les nouveaux noms (phases 2, 3 et 7).
+- Vérifié sur une copie de planazo : état migré, sauvegarde présente, `doctor` et dashboard OK, seul `.codex/hooks.json` change dans Git.
