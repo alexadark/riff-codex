@@ -1,12 +1,25 @@
 ---
 name: dashboard
-description: Open or summarize the RIFF project dashboard. Use when the user invokes this skill by name or asks for a visual view of roadmap and wave state.
+description: Open or summarize the RIFF project dashboard. Use when the user invokes this skill by name or asks for a visual view of the roadmap and wave state.
 ---
 
 # Show the RIFF dashboard
 
-Run `node .riff-cli/bin/riff.mjs dashboard` to register the current project and open the shared local dashboard containing Claude RIFF and RIFF Codex projects. Use `--snapshot` when a terminal summary of only the current project is enough.
+`riff` means `node .riff-cli/bin/riff.mjs`. The dashboard reads the projects' saved state and never calls a model or an agent CLI.
 
-The dashboard reads producer artifacts and never calls a model or agent CLI. Explain stale receipts, parked phases, security findings, and required human action in plain language. Do not mutate roadmap or wave state from the dashboard. Observation decisions may be saved through its triage form; use `.riff-cli/references/dashboard.md` for statuses, history and reopening.
+## Goal
 
-Use the fixed phase columns `Todo`, `In progress`, `Done`, `Blocked`, and `Skipped`. For RIFF Codex projects, render the current `.riff-data/state.json` status rather than the static roadmap status, and show a priority badge only when the roadmap declares one explicitly.
+Show the user the roadmap and wave state, visually or as a short summary, without changing them.
+
+## Done when
+
+- Visual view: `riff dashboard` registered the project and opened the shared local dashboard of Claude RIFF and RIFF Codex projects.
+- Summary of the current project only: `riff dashboard --snapshot` ran and you explained stale receipts, parked phases, security findings and any action the user must take, in plain language.
+
+## Verify
+
+A summary uses the dashboard's columns, `Todo`, `In progress`, `Done`, `Blocked` and `Skipped`, filled from the current `.riff-data/state.json` rather than the roadmap's static status, and shows a priority only when the roadmap declares one.
+
+## How to work
+
+Never change the roadmap or the wave state from the dashboard. The user may record observation decisions through its triage form; `.riff-cli/references/dashboard.md` describes their statuses, history and reopening.
