@@ -161,9 +161,9 @@ test('CLI integration preserves wave state, consent, projections and private inp
 });
 
 test('no provider is preferred by default; Ollama stays opt-in and filters still apply', async () => {
-  const opus = catalog.profiles.filter((p) => p.provider === 'anthropic');
+  const opus = catalog.profiles.filter((p) => p.model === 'claude-opus-5-5');
   assert.deepEqual(opus.map((p) => p.effort), ['low', 'medium', 'high', 'xhigh']);
-  assert.ok(opus.every((p) => p.model === 'claude-opus-5-5'));
+  assert.deepEqual(catalog.profiles.filter((p) => p.provider === 'anthropic' && p.model !== 'claude-opus-5-5').map((p) => p.id), ['sonnet_5_5_low', 'sonnet_5_5_medium', 'sonnet_5_5_high', 'haiku_4_5']);
   assert.deepEqual([...new Set(eligible.map((p) => p.provider))].sort(), ['anthropic', 'openai']);
   const constraints = { providers: ['anthropic'], availableProfiles: ['opus_5_5_medium'] };
   assert.deepEqual(eligibleProfiles(normalizeInput(brief({ constraints }), catalog), catalog).map((p) => p.id), ['opus_5_5_medium']);
