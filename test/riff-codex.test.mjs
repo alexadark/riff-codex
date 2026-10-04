@@ -705,3 +705,44 @@ test('observation decisions persist, reject stale reviews and reopen on a new oc
   assert.equal(JSON.parse(runCli(root, 'observations', 'list'))[0].status, 'pending');
   assert.match(runCliFailure(root, ...args, '--status', 'resolved', '--note', 'Old review'), /changed; reload/);
 });
+
+test('activation refuses unready phases and a second active phase', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [fixturePhase('a', 'P1'), fixturePhase('b', 'P1', ['a']), fixturePhase('c', 'P2')]);
+  assert.match(runCliFailure(root, 'wave', 'activate', 'b'), /b is not ready/);
+  runCli(root, 'wave', 'activate', 'a');
+  assert.match(runCliFailure(root, 'wave', 'activate', 'c'), /a is active; resume or park it first/);
+});
+
+test('completion rejects missing security receipts, stale receipts and passing reviews with blocking findings', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [{ ...fixturePhase('s', 'P1'), sensitive: true }]);
+  runCli(root, 'wave', 'activate', 's');
+  const stage = (text) => {
+    writeFileSync(path.join(root, 'README.md'), text);
+    execFileSync('git', ['add', '--', 'README.md'], { cwd: root });
+    runCli(root, 'wave', 'validate', 's', '--run', '--command', '["node","-e","process.exit(0)"]', '--paths', '["README.md"]');
+    return execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
+  };
+  const review = (type, candidate) => runCli(root, 'wave', 'review', 's', '--type', type, '--status', 'pass', '--summary', `${type} review`, '--evidence', proofFile(root, type, candidate));
+  const commit = (message, ...flags) => execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', message, ...flags], { cwd: root, stdio: 'pipe' });
+  const blockedCommit = (message, reason) => {
+    assert.throws(() => commit(message), reason);
+    commit(message, '--no-verify');
+  };
+  const first = stage('# Fixture\nfirst candidate\n');
+  const blocking = proofFile(root, 'security', first);
+  writeJson(blocking, { ...JSON.parse(readFileSync(blocking, 'utf8')), findings: [{ severity: 'HIGH', summary: 'Synthetic blocking finding' }] });
+  assert.match(runCliFailure(root, 'wave', 'review', 's', '--type', 'security', '--status', 'pass', '--summary', 'Blocked', '--evidence', blocking), /passing review cannot contain blocking findings/);
+  review('functional', first);
+  blockedCommit('Functional only', /sensitive wave needs a fresh passing security receipt/);
+  assert.match(runCliFailure(root, 'wave', 'complete', 's', '--commit', 'HEAD'), /security receipt/);
+  review('security', first);
+  const second = stage('# Fixture\nsecond candidate\n');
+  assert.notEqual(second, first);
+  blockedCommit('Changed after review', /fresh passing functional review receipt/);
+  assert.match(runCliFailure(root, 'wave', 'complete', 's', '--commit', 'HEAD'), /functional receipt/);
+  review('functional', second);
+  review('security', second);
+  assert.match(runCli(root, 'wave', 'complete', 's', '--commit', 'HEAD'), /s completed/);
+});
