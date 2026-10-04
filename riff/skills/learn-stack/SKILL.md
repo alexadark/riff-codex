@@ -1,29 +1,35 @@
 ---
 name: learn-stack
-description: Research and persist source-backed stack conventions for the invoking project. Use when the user invokes this skill by name, asks for stack conventions, or a reusable stack knowledge gap blocks a RIFF outcome; not for incidental technology mentions or one-off API questions.
+description: Research and save source-backed stack conventions for the current project. Use when the user invokes this skill by name, asks for stack conventions, or a reusable stack knowledge gap blocks a RIFF outcome; not for a passing technology mention or a one-off API question.
 ---
 
 # Learn stack conventions
 
-Goal: leave concise, verified stack rules that future implementation and review can find and apply. Read `.riff-cli/references/taste.md` for precedence, shared artifacts and autonomy.
+No RIFF command checks this work: the rules below rest on you. `.riff-cli/references/taste.md` sets precedence between taste sources and the shared artifacts.
 
-## Scope and evidence
+## Goal
 
-Infer the requested stack, installed version and useful focus from the request, manifest, lockfile and current outcome. For NowStack, identify the actual starter variant and use `.riff-cli/references/taste/stacks/nowstack.md` as a starting reference. An explicitly named new stack may be researched before it is installed; label that distinction. If no stack can be identified in loop mode, report insufficient task context without inventing one or writing a file.
+Leave short, verified rules for one stack and focus that later implementation and review can find and apply. Research authorizes no implementation, dependency upgrade, deployment or promotion of the rules to RIFF itself.
 
-Inspect existing project taste and stack notes first. Research only conventions that affect the requested focus, using current maintainer documentation and exemplary repositories. Find the best reference code for the stack at the installed version: official examples and templates, apps maintained by the stack's authors, and well-regarded, actively maintained open-source projects. Prefer recent activity and real production use over stars alone. Read their code for the focus area and turn recurring patterns into rules, citing the repository and file. Verify source links, version applicability and the claims they support. No fixed source count or shortlist approval is required. A maintainer rule can stand alone as `[official]`; a project convention needs local evidence as `[project]`; a pattern seen across reference repositories is `[example]` with its repository and file; an inferred recommendation must be labeled and justified, not presented as consensus. Unsupported claims stay out of the rules. Missing required external access remains a real blocker; a sparse source set is not permission to fabricate guidance.
+## Done when
 
-## Durable result
+- `references/taste/stacks/<stack>.md` exists in the current project, with the stack, version or range, focus, date checked and a precise "Read when" trigger; short actionable conventions tied to their source; gotchas and the patterns that replace them; source links or repository files; and the remaining evidence gaps.
+- `references/taste/stacks/INDEX.md` has one row with the trigger and link, other rows preserved, and the project's `taste.md` links that index (create a minimal index if none exists).
+- Each rule carries its label: `[official]` from maintainer documentation, `[project]` with local evidence, `[example]` with the reference repository and file, or an inferred recommendation labeled and justified as such. Unsupported claims stay out.
 
-Write in the invoking consumer project, not the RIFF installation, another consumer or a symlinked external directory. Use a lowercase hyphenated stack slug matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`; never use raw path-like input. The output is `references/taste/stacks/<stack>.md`, with:
+## Verify
 
-- stack, version/range, focus, date checked and a precise “Read when” trigger;
-- concise actionable conventions, each tied to its source and applicability;
-- relevant gotchas and anti-pattern replacements;
-- verified source links or repository file references, and remaining evidence gaps.
+- Every source link works, applies to the installed version and supports the claim it backs.
+- Local links resolve, existing rules, decisions and sources are preserved, and nothing is duplicated.
+- No fixed source count or shortlist approval is needed, but a thin source set never justifies invented guidance. Missing required external access is a real blocker.
 
-Merge an existing file conservatively and idempotently: preserve unrelated rules, decisions and sources, remove duplication, and correct stale claims only with evidence and a short reason. Retain multiple version/focus sections when needed. Do not ask replace/merge/skip in loop mode. If the target resolves outside the project, preserve it and use a regular project-owned supplement with an explicit index entry instead.
+## How to work
 
-Update `references/taste/stacks/INDEX.md` with one precise trigger/link for the result, preserving other rows. Link that index from project `taste.md`, creating a minimal index if absent, so start/wave/quick/review can discover the rules. Honor the same symlink boundary for both indexes. Existing `.riff-data/stack-notes.md` may supply leads, but reusable verified rules belong in project taste; do not delete unrelated notes.
+1. Infer the stack, installed version and useful focus from the request, manifest, lockfile and current outcome. For NowStack, identify the actual starter variant and start from `.riff-cli/references/taste/stacks/nowstack.md`. A stack the user names before installing it may be researched; say it isn't installed yet. In `loop` mode, if no stack can be identified, report that the task lacks context and write nothing.
+2. Read the project's taste and stack notes first; `.riff-data/stack-notes.md` may give leads, but keep its unrelated notes.
+3. Research only what affects the focus: current maintainer documentation, then the best reference code at the installed version, such as official examples and templates, apps maintained by the stack's authors, and active, well-regarded open-source projects in real production use, rather than the most starred. Read their code for the focus and turn recurring patterns into rules.
+4. Write only in the current project, never in the RIFF installation, another project or a symlinked external folder. Name the file with a lowercase hyphenated slug matching `^[a-z0-9]+(?:-[a-z0-9]+)*$`, never with raw path-like input. If the target resolves outside the project, leave it alone and write a regular project file with its own index entry. The same boundary applies to both indexes.
+5. Merge an existing file conservatively and idempotently: keep unrelated content, keep separate version or focus sections, and correct a stale claim only with evidence and a short reason. In `loop` mode, don't ask whether to replace, merge or skip.
+6. Inside an active wave, include the taste edits in its candidate before the final receipts; otherwise follow the repository's usual local commit policy.
 
-Check local links, source attribution, version/focus and preservation of existing content. Report the paths, key retained rules and unresolved evidence. This research does not authorize implementation, dependency upgrades, deployment or framework-wide promotion. Within an active wave, include taste edits in its candidate before final receipts; otherwise follow the repository's normal local commit policy.
+Report the paths, the key rules kept and the unresolved evidence.
