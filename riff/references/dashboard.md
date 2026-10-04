@@ -2,7 +2,7 @@
 
 The dashboard is an independent application. Roadmap and wave state remain read-only. Observation triage is its only project-state write: it invokes the locked RIFF observations CLI, never a model, SDK, agent CLI or wave command.
 
-RIFF Codex producers write derived display artifacts under `.riff-data/dashboard/phases/<id>-<slug>/`, where `<slug>` is the phase title converted to lowercase kebab-case:
+RIFF producers write derived display artifacts under `.riff-data/dashboard/phases/<id>-<slug>/`, where `<slug>` is the phase title converted to lowercase kebab-case:
 
 - `EXPLAIN.simple.md` describes the demonstrable outcome before implementation in the configured conversation language.
 - `EXPLAIN-POST.simple.md` replaces intent with the verified result after completion and briefly includes validation, review, security, and commit evidence when available.

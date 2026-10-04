@@ -1,6 +1,6 @@
 # Learning across phases
 
-Keep verified lessons in the project's existing `taste.md` and relevant `taste/` topics. These files are the shared memory for planning, implementation and review, including later sessions and Claude RIFF. Lessons are separate from improvement proposals, described below.
+Keep verified lessons in the project's existing `taste.md` and relevant `taste/` topics. These files are the shared memory for planning, implementation and review, including later sessions and the original RIFF framework. Lessons are separate from improvement proposals, described below.
 
 Before a phase or a related bug fix, read the applicable topic and any directly relevant prior incident or phase review. Apply its prevention rule to the current boundary; do not replay the whole history.
 

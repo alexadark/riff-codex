@@ -73,7 +73,7 @@ function parseCodexState(path: string): ProjectState | null {
     const humanReason = typeof state.humanAction?.reason === "string" ? state.humanAction.reason : null;
     return {
       current_position: {
-        command: active ? "$riff:wave" : null,
+        command: active ? "/riff:wave or $riff:wave" : null,
         phase: active ? `${active.id} - ${active.title}` : null,
         stage_step: state.activeWave?.step ?? null,
         status: active?.status ?? (next ? "ready" : "idle"),
@@ -83,7 +83,7 @@ function parseCodexState(path: string): ProjectState | null {
       open_buckets: phases
         .filter((phase: any) => ["parked", "blocked", "awaiting_human"].includes(phase.status))
         .map((phase: any) => `${phase.id} - ${phase.title}: ${phase.reason ?? phase.status}`),
-      resume_command: active ? "$riff:wave" : null,
+      resume_command: active ? "/riff:wave or $riff:wave" : null,
       blockers: humanReason ? [humanReason] : [],
       next_action: humanReason ?? (next ? `Run the next ready phase: ${next.id} - ${next.title}.` : null),
     };

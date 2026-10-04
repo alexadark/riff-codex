@@ -1,4 +1,4 @@
-// Pure rules for the RIFF cockpit: read `riff-codex status --json` and `wave context --json`,
+// Pure rules for the RIFF cockpit: read `riff status --json` and `wave context --json`,
 // decide what the band, the pane tabs and the text commands show.
 // The CLI stays the source of truth; the text parser only serves projects linked to an older CLI.
 

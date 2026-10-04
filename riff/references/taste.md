@@ -8,7 +8,7 @@ RIFF keeps no personal coding preferences. For code, the reference is how the be
 
 ## Read and resolve
 
-For implementation or review, read the project's `taste.md` when present, then only the topic and stack references relevant to the changed behavior. Read [frontend taste](taste/frontend.md) for visual or interaction work, including when the project has no taste yet. Consult [the stack index](taste/stacks/INDEX.md) when identifying the stack. File patterns are navigation hints, not automatic Codex loading rules.
+For implementation or review, read the project's `taste.md` when present, then only the topic and stack references relevant to the changed behavior. Read [frontend taste](taste/frontend.md) for visual or interaction work, including when the project has no taste yet. Consult [the stack index](taste/stacks/INDEX.md) when identifying the stack. File patterns are navigation hints, not automatic loading rules.
 
 Explicit user instructions and repository instructions take precedence. Preserve approved design references, project decisions and established contracts over generic defaults. Resolve an obsolete convention against current repository evidence and verified documentation; record the reason for a targeted correction. Do not silently weaken security or data guarantees to preserve a pattern.
 

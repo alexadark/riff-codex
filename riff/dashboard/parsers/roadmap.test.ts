@@ -22,7 +22,7 @@ afterEach(() => {
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
 });
 
-describe("RIFF Codex roadmap projection", () => {
+describe("RIFF roadmap projection", () => {
   test("uses live Codex state and reads Claude root phase entries", async () => {
     const phases = [
       { id: "1", title: "Complete", outcome: "Done", priority: "P1", status: "ready" },

@@ -35,3 +35,10 @@ Vocabulaire Codex à neutraliser dans la même phase : « RIFF Codex », « nati
 ## Complexité
 
 Agent : moyenne (beaucoup de chemins d'installation, mais le code de fusion et de hash existe). Validation par Alexandra : moyenne, approuver l'installation une fois et vérifier une session réelle dans un projet de test.
+
+## Avancement
+
+- Fait (commits `da27b5f` à `448478f`) : hook `SessionStart` sur `clear`, profils Sonnet 5.5 et Haiku 4.5, plugin `riff` et ses 8 sous-agents, marketplace `riff`, réglages machine dans `.claude/settings.local.json`, contrôles de `doctor`.
+- Cockpit : il lisait déjà `.riff-cli` avec repli sur `.riff-codex` depuis le renommage ; tests et validation repassés.
+- Vocabulaire neutralisé dans les références, les skills `dashboard` et `onboard`, le message de `riff init` et le dashboard : « RIFF Codex » devient « RIFF », « Claude RIFF » devient « le framework RIFF d'origine », la compaction et l'interdiction de relancer l'hôte ne nomment plus Codex. `model-routing.md` explique qu'un profil devient le sous-agent `riff:<profil>` sous Claude Code. Restent propres à Codex, volontairement : `deep-audit`, les fichiers `agents/openai.yaml`, `.codex-plugin/plugin.json` et le marqueur `# RIFF Codex managed wrapper` des hooks Git, qui sert à reconnaître les installations existantes.
+- Reste : essai en vraie session Claude Code (avec l'accord d'Alexandra pour ajouter le marketplace), migration de l'ancien marketplace `riff-claude-code` au moment de la fusion, documentation en phase 7.

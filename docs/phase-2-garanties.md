@@ -196,7 +196,7 @@ Comparé ligne à ligne avec `git show main:riff/skills/start/SKILL.md` et `main
 | S22 | `start` s'arrête et n'active jamais de phase | Consigne | Gardée (But, Done when) |
 | S23 | Pas d'issue ni d'artefact externe sans demande | Consigne | Gardée |
 | S24 | Conseil de modèle : demande seule s'arrête, pas de changement de modèle, pas de pause en `loop` | CLI partielle | Comme Q2 (MA 48, MAP 27) ; gardée |
-| S25 | Compaction native, pas de `codex exec` imbriqué | Consigne | Compaction : référence `execution.md` (vocabulaire Codex, phase 3). `codex exec` devient « ne pas relancer son propre hôte », comme dans `wave` |
+| S25 | Compaction native, pas de `codex exec` imbriqué | Consigne | Compaction : référence `execution.md`, neutre depuis la phase 3 (« compaction native de l’hôte »). `codex exec` devient « ne pas relancer son propre hôte », comme dans `wave` |
 | P1 | `riff promote` pour voir le périmètre ; déjà en production, s'arrêter | CLI | RC 609 ; gardée (étape 6) |
 | P2 | Limites de production dans les trois fichiers partagés, décisions existantes gardées | CLI partielle | La CLI exige les trois fichiers non vides et indexés ; le contenu reste une consigne (étape 6) |
 | P3 | Résoudre les phases actives et les blocages avant | CLI | RC 821 (ajouté le 2026-10-04) ; gardée en une phrase pour éviter le refus |
@@ -241,7 +241,7 @@ Comparé ligne à ligne avec `git show main:riff/skills/evolve/SKILL.md`.
 | E18 | S'arrêter après la planification ; jamais d'activation, d'implémentation, d'issue ni de déploiement | Consigne | Gardée (Done when, interdits) |
 | E19 | Règles de blocage et de reprise du contrat d'exécution, pas de second système d'état | Consigne | Gardée (étapes 4, 7) |
 | E20 | Conseil de modèle : la demande seule n'autorise rien, pas d'enregistrement en exploration, pas de changement de modèle ni de pause | CLI partielle | Comme Q2 (MA 48, MAP 27) ; gardée |
-| E21 | Compaction native, travail sans rapport préservé | Consigne | Compaction : référence `execution.md` (vocabulaire Codex, phase 3) ; préservation gardée |
+| E21 | Compaction native, travail sans rapport préservé | Consigne | Compaction : référence `execution.md`, neutre depuis la phase 3 ; préservation gardée |
 | E22 | Ne pas refaire la discovery pour ce qui n'est pas touché | Consigne | Gardée (étape 5) |
 | E23 | Analyse du changement enregistrée dans les specs, liée depuis `PROJECT.md` | Consigne | Gardée (Done when) ; détail dans `evolution.md` |
 | E24 | Pas pour la définition initiale, l'ajout simple d'une phase ni l'implémentation | Consigne | Gardée (description, But) |

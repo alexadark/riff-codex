@@ -28,7 +28,7 @@ Check every map finding against the current code before relying on it, including
 3. A read-only map reports useful conventions without changing taste and doesn't persist model advice or call paid advice without an explicit request. Save conventions only when asked.
 4. In `loop` mode, settle product and technical questions from repository evidence: preserve behavior and data, minimize scope, permissions, dependencies and external effects, prefer reversible choices, record assumptions and continue. Never create `awaiting_human` for a decision. Stop only for missing credentials or access, impossible third-party verification, an unidentifiable destructive target or a failed RIFF validation. In `guided` mode, ask only product-boundary decisions, each with a recommendation, and confirm before writing the artifacts.
 5. Name technical debt only when it blocks a vertical outcome; mark uncertain later work as fog of war. Don't redesign the application.
-6. `PROJECT.md` and `ROADMAP.yaml` are shared with Claude RIFF: keep existing content, representation, comments, key order and unknown fields unless a targeted replacement is authorized.
+6. `PROJECT.md` and `ROADMAP.yaml` are shared with the original RIFF framework: keep existing content, representation, comments, key order and unknown fields unless a targeted replacement is authorized.
 
 Publish GitHub issues only through the `issue` skill.
 

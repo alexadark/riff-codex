@@ -12,7 +12,7 @@ The complete path plans the entire committed version before implementation. It d
 
 ## Sources and preservation
 
-Inspect the repository, `node .riff-cli/bin/riff.mjs doctor`, configured autonomy, current `PROJECT.md`, `ROADMAP.yaml`, `taste.md`, relevant taste topics and stack references, approved templates, and existing supporting specifications before asking questions. Use repository and user precedence in this order: explicit current user instruction, repository instructions and existing behavior, approved external or project design reference, project taste and stack evidence, then the smallest reversible inference. Do not ask the user for technical facts Codex can establish from those sources.
+Inspect the repository, `node .riff-cli/bin/riff.mjs doctor`, configured autonomy, current `PROJECT.md`, `ROADMAP.yaml`, `taste.md`, relevant taste topics and stack references, approved templates, and existing supporting specifications before asking questions. Use repository and user precedence in this order: explicit current user instruction, repository instructions and existing behavior, approved external or project design reference, project taste and stack evidence, then the smallest reversible inference. Do not ask the user for technical facts you can establish from those sources.
 
 `PROJECT.md` is the product synthesis and index. `ROADMAP.yaml` is the canonical phase list. Existing documents and specs may be reused in place. New detail may live under existing project paths or `docs/specs/` and `docs/diagrams/`; link it from the synthesis. Preserve unrelated content, comments, key order, unknown fields, and existing document paths with targeted edits.
 
@@ -109,4 +109,4 @@ node .riff-cli/bin/riff.mjs discovery check
 
 ## Stop and handoff
 
-After a passing discovery check, `start` may run `node .riff-cli/bin/riff.mjs wave sync` to refresh an enrolled project's derived state, then stops. It never activates a wave, invokes nested `codex exec`, publishes an issue, or deploys an application. External design access, a third-party verification, or an unavailable renderer may be recorded as unverified or pending with a precise reason; do not claim completion beyond the available evidence.
+After a passing discovery check, `start` may run `node .riff-cli/bin/riff.mjs wave sync` to refresh an enrolled project's derived state, then stops. It never activates a wave, relaunches its own host, publishes an issue, or deploys an application. External design access, a third-party verification, or an unavailable renderer may be recorded as unverified or pending with a precise reason; do not claim completion beyond the available evidence.

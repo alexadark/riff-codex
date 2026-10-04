@@ -13,7 +13,7 @@ Show the user the roadmap and wave state, visually or as a short summary, withou
 
 ## Done when
 
-- Visual view: `riff dashboard` registered the project and opened the shared local dashboard of Claude RIFF and RIFF Codex projects.
+- Visual view: `riff dashboard` registered the project and opened the shared local dashboard of RIFF projects, including those of the original RIFF framework.
 - Summary of the current project only: `riff dashboard --snapshot` ran and you explained stale receipts, parked phases, security findings and any action the user must take, in plain language.
 
 ## Verify

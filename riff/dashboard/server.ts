@@ -545,7 +545,7 @@ function sameOriginJson(c: any) {
 app.post("/api/projects/:slug/observations/:id", async (c) => {
   if (!sameOriginJson(c)) return c.json({ error: "Same-origin JSON request required" }, 403);
   const ctx = contexts.get(c.req.param("slug"));
-  if (!ctx || !existsSync(join(ctx.root, ".riff-codex-state", "state.json"))) return c.json({ error: "RIFF Codex project not found" }, 404);
+  if (!ctx || !existsSync(join(ctx.root, ".riff-codex-state", "state.json"))) return c.json({ error: "RIFF project not found" }, 404);
   try {
     const body = await c.req.json();
     if (![body.status, body.revision, body.note].every((value) => typeof value === "string")) return c.json({ error: "Status, revision and reason are required" }, 400);
@@ -646,7 +646,7 @@ app.get("/api/projects/:slug/phase/:id", async (c) => {
 /** Explanation artifacts are produced by RIFF start/wave, never by the dashboard. */
 app.get("/api/projects/:slug/phase/:id/generate", (c) => {
   return c.json(
-    { error: "Dashboard is read-only. Run $riff:start or $riff:wave to produce explanations." },
+    { error: "Dashboard is read-only. Run the RIFF start or wave skill to produce explanations." },
     409,
   );
 });
