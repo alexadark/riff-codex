@@ -10,6 +10,7 @@ Date : 2026-10-04. Plan parent : [plan-riff-claude-astra.md](plan-riff-claude-as
 - Design : seulement trois interdits pour l'instant (copywriting générique, dégradés violets, eyebrows). Le goût design viendra plus tard, avec une validation visuelle.
 - Un seul style de prompt pour tous les modèles (décision du 2026-10-04, d'après le guide d'OpenAI pour GPT-6 Astra du 5 septembre 2026 cité par Alexandra) : but, condition de fin explicite, vérification, peu de règles, descriptions courtes. Le style `guarded` est abandonné ; les profils gardent seulement le modèle et l'effort.
 - Questions de `start` (décision d'Alexandra du 2026-10-04) : `start` mène une interview produit dans les deux modes, `loop` comme `guided`, car il se passe avant le loop. Le mode autonome ne règle que les waves. L'interview porte sur le produit (utilisateurs, parcours, écrans, données et droits, exclusions, critères de réussite, design), jamais sur les faits techniques que le dépôt établit, et se termine par un résumé à confirmer. Sans code existant (départ d'une simple idée), l'interview couvre aussi la stack : options, compromis et recommandation, NowStack par défaut quand il convient ; le choix est noté comme décision et la première phase l'installe. Pour ce départ, `riff init` crée lui-même le dépôt Git dans un dossier vide ou inexistant ; un dossier non vide sans Git exige `--git-init` (test RC en fin de fichier). La doc d'installation, qui demande encore un `git init` préalable, sera mise à jour en phase 7. Étendu à `evolve` le même jour, à la demande d'Alexandra. Mis à jour : les deux skills, `discovery.md`, `project-framing.md`, `operating-contract.md`, `evolution.md`.
+- Questions de `add-phase` (décision d'Alexandra du 2026-10-04) : 1 à 3 questions courtes seulement si le résultat, la priorité ou les critères sont flous, dans les deux modes, quand elle lance le skill elle-même. Aucune question quand une wave ajoute une phase de correction.
 - Deux idées reprises de ce guide : des tests proportionnés au changement, et une liste de tics d'écriture typiques de l'IA à éviter. Cette liste vit dans les instructions globales d'Alexandra (`claude-code-private/instructions/global-shared.md`, pour Claude et Codex), pas dans RIFF.
 
 ## Classement
@@ -250,6 +251,56 @@ Comparé ligne à ligne avec `git show main:riff/skills/evolve/SKILL.md`.
 - Aucune garantie perdue. Seul changement de comportement : l'interview produit dans les deux modes (E5), décidée par Alexandra.
 - Taille : 5,8 Ko contre 4,4 Ko. La hausse vient de l'interview et des sections « Done when » et « Verify », absentes de l'ancien texte.
 
+## `add-phase` (15 règles)
+
+| # | Règle | Classement | Où elle est maintenant |
+| --- | --- | --- | --- |
+| A1 | Un seul résultat compris et indépendant ; sinon `evolve`, jamais d'ajout à l'aveugle | Consigne | Gardée (But) |
+| A2 | Lire `PROJECT.md`, `ROADMAP.yaml`, l'état et le mode ; gros projet : référence de cadrage et réutilisation | Consigne | Gardée (étape 1) |
+| A3 | Dans le périmètre et pas déjà couvert | Consigne | Gardée (Done when) |
+| A4 | `loop` : détails tranchés prudemment, sans question | Consigne | Remplacée le 2026-10-04 par décision d'Alexandra : 1 à 3 questions si le résultat, la priorité ou les critères sont flous, dans les deux modes, seulement quand elle lance le skill ; aucune question pour une phase de correction ajoutée par une wave (étape 2) |
+| A5 | Résultat qui élargit le produit sans autorisation : rien ajouté, signalé, jamais `awaiting_human` | Consigne | Gardée (étape 3) |
+| A6 | `guided` : demander avant un changement produit important | Consigne | Gardée (« guided keeps its confirmations ») et couverte par l'étape 2 |
+| A7 | Phase verticale avec `done_when`, `verify`, priorité P0 à P3 justifiée, dépendances réelles, risques, sensibilité, exclusions | CLI partielle | RC 791 pour `done_when` et `verify` ; la CLI exige une priorité valide (`normalizeRoadmapPriority`) sans test ; la justification reste une consigne (Done when) |
+| A8 | Gros projet : lier aux stories et critères, détailler seulement l'utile | Consigne | Gardée (étape 4) |
+| A9 | Ne pas hériter la priorité des voisines | Consigne | Gardée (Done when) |
+| A10 | Format du roadmap, commentaires, ordre des clés, champs inconnus ; pas de conversion `phase-*` ↔ `phases` ; pas de renumérotation | CLI partielle | RC 231 : `wave sync` ne réécrit aucun des deux formats ; l'édition par l'agent reste une consigne (Verify) |
+| A11 | `wave sync` et dire quand la phase est prête | Consigne | Gardée (Done when) |
+| A12 | S'arrêter seulement pour un blocage dur | Consigne | Gardée |
+| A13 | Projet inscrit : mapping, review indépendante, `discovery check` | CLI | DC 101, EP 78 ; l'indépendance reste une consigne |
+| A14 | Défaut trouvé en vérification finale : phase de correction sans nouvelle approbation, historique intact | CLI partielle | ES 59 protège l'historique ; gardée (étape 5) |
+| A15 | Paquets indépendants nommés, une seule phase active, pas de plan fichier par fichier | CLI partielle | RC « activation refuses… a second active phase » ; gardée (étape 4) |
+
+## `learn-stack` (21 règles)
+
+Aucune commande ne contrôle ce skill : toutes les règles sont des consignes et toutes restent dans le skill. Comparaison ligne à ligne avec `git show main:riff/skills/learn-stack/SKILL.md` :
+
+- Inférence de la stack, variante NowStack, stack nommée pas encore installée, rapport sans fichier en `loop` si rien n'est identifiable : étape 1.
+- Lire goût et notes existants, `stack-notes.md` comme pistes sans supprimer : étape 2.
+- Recherche limitée au sujet, documentation des mainteneurs, meilleur code de référence à la version installée, activité récente et usage réel plutôt que les étoiles : étape 3.
+- Étiquettes `[official]`, `[project]`, `[example]` et inférence signalée, affirmations sans source exclues : Done when.
+- Liens, version et affirmations vérifiés ; pas de nombre fixe de sources ; une source pauvre n'autorise pas l'invention ; accès manquant = blocage : Verify.
+- Écrire seulement dans le projet courant, slug contrôlé, cible hors projet laissée intacte, même frontière pour les deux index : étape 4.
+- Contenu attendu du fichier, ligne d'index, lien depuis `taste.md`, index minimal créé si absent : Done when.
+- Fusion prudente et idempotente, sections par version, correction justifiée, pas de question en `loop` : étape 5.
+- Pas d'implémentation, de mise à jour de dépendance, de déploiement ni de promotion dans RIFF : But.
+- Dans une wave active, les modifications du goût entrent dans le candidat avant les reçus : étape 6.
+- Rapport des chemins, règles clés et lacunes : fin du skill.
+
+## `issue` (8 règles)
+
+Aucune commande RIFF ne publie sur GitHub : toutes les règles sont des consignes et restent dans le skill. Publication seulement sur demande explicite, jamais parce que `start`, `add-phase` ou `wave` a tourné (But, étape 1) ; dépôt déduit du remote, jamais deviné (étape 2) ; regroupement par résultat avec stories, critères, frontières, intégrations, dépendances, exclusions et validation (Done when) ; exclusions de contenu (étape 3) ; `gh auth status`, recherche de doublon, blocage si accès absent (étapes 2, 4) ; relecture du titre, du dépôt, du numéro et de l'URL, rapport séparé (Verify) ; aucune phase ajoutée, aucun état modifié, aucun contrôle contourné (Done when, fin). Changement : un nouveau périmètre renvoie à `add-phase` ou `evolve`, au lieu de `add-phase` seul.
+
+## `status` et `dashboard`
+
+- `status` : rapport de la phase active, du nombre terminé, de la suivante, du travail parqué ou bloqué, des preuves périmées et de l'action attendue (Done when) ; détails par l'instantané du dashboard et `events.ndjson` (étape 2) ; ne jamais faire avancer le roadmap (étape 3, et `riff status` ne fait que lire). Ajout : lire `riff status --json`, car la sortie texte ne montre ni les phases parquées ni la validité des reviews ; ne rapporter que ce que montrent les commandes.
+- `dashboard` : aucun appel de modèle (en-tête) ; ne jamais modifier roadmap ou état, décisions d'observation par le formulaire (fin) ; colonnes fixes, statut lu dans l'état et non le roadmap, badge de priorité seulement si déclarée (Verify, pour un résumé en texte ; l'interface les applique déjà dans `dashboard/public/app.js`). `--snapshot` ne fait que lire.
+
+### Bilan des cinq derniers skills
+
+- Aucune garantie perdue. Un seul changement de comportement : les questions de `add-phase` (A4), décidées par Alexandra.
+- Tailles (avant, après) : `add-phase` 2,8 → 3,2 Ko, `learn-stack` 4,0 → 3,7 Ko, `issue` 1,9 → 2,1 Ko, `status` 0,5 → 1,1 Ko, `dashboard` 1,1 → 1,3 Ko. Les petits skills grossissent un peu avec les sections du gabarit.
+
 ## Tests ajoutés
 
 Deux tests dans `test/riff-codex.test.mjs` couvrent W18, W28, W36b, W39 et W40, un troisième couvre W58, un quatrième (RC 821) couvre P3 et P4, un cinquième la création du dépôt Git par `riff init`. Suite complète : 60 tests passent (`npm test`).
@@ -271,5 +322,5 @@ Fait et testé (58 tests CLI, 2 tests dashboard) :
 
 Reste :
 
-1. Réécriture au gabarit des autres skills (`start` validé ; `evolve` fait, ton à relire par Alexandra) : `add-phase`, `learn-stack`, `issue`, `status`, `dashboard`.
+1. Réécriture au gabarit : faite pour tous les skills. `start` et `evolve` validés ; `add-phase`, `learn-stack`, `issue`, `status` et `dashboard` à relire par Alexandra.
 2. Avant la fusion dans `main` : `riff resync` dans chaque projet connecté pour créer `.riff-cli` (accord d'Alexandra requis), puis mise à jour de la documentation en phase 7.
