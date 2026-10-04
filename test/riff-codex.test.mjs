@@ -222,7 +222,8 @@ test('resync keeps pre-rename state in place while a phase is active', () => {
 
   assert.equal(lstatSync(path.join(root, '.riff-codex-state')).isDirectory(), true);
   assert.equal(existsSync(path.join(root, '.riff-data')), false);
-  assert.equal(existsSync(path.join(root, '.riff-cli')), false);
+  assert.equal(realpathSync(path.join(root, '.riff-cli')), PLUGIN_ROOT, 'skills name .riff-cli even before the state moves');
+  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).includes('.riff-cli'), false);
   assert.match(readFileSync(path.join(root, '.codex', 'hooks.json'), 'utf8'), /\.riff-codex\/bin\/riff\.mjs/);
   assert.match(runCli(root, 'status'), /0\/1 phases completed/);
 });
@@ -785,4 +786,20 @@ test('improvement pass caps proposals, skips duplicates, feeds the idea box and 
   assert.match(runCli(root, 'improve', 'decide', '--id', projectItems[0].id, '--status', 'dismissed', '--note', 'Not needed'), /dismissed/);
   assert.equal(JSON.parse(runCli(root, 'improve', 'list'))[0].status, 'dismissed');
   assert.match(runCliFailure(root, 'improve', 'decide', '--id', projectItems[0].id, '--status', 'applied'), /taken or dismissed/);
+});
+
+test('phase done_when and verify reach wave context and doctor flags phases without them', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [
+    { ...fixturePhase('specified', 'P1'), done_when: ['A visitor can filter products by size', ' '], verify: ['npm test -- filters', 'Filter by size in a real browser at 375px'] },
+    fixturePhase('vague', 'P2'),
+  ]);
+  const context = JSON.parse(runCli(root, 'wave', 'context', 'specified'));
+  assert.deepEqual(context.phase.done_when, ['A visitor can filter products by size']);
+  assert.deepEqual(context.phase.verify, ['npm test -- filters', 'Filter by size in a real browser at 375px']);
+  assert.equal(context.phase.improvementPassRecorded, false);
+  assert.deepEqual(JSON.parse(runCli(root, 'wave', 'context', 'vague')).phase.done_when, []);
+  const doctor = spawnSync(process.execPath, [CLI, 'doctor'], { cwd: root, encoding: 'utf8', env: { ...process.env, HOME: path.join(root, '.home') } });
+  assert.match(doctor.stdout, /WARN  phase contracts: vague lack done_when or verify/);
+  assert.doesNotMatch(doctor.stdout, /specified lack/);
 });

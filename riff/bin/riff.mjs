@@ -421,6 +421,8 @@ function ensureFrameworkLink(root, name = frameworkDirFor(root)) {
 }
 
 function ensureCompatibilityLinks(root) {
+  // Skills name .riff-cli, so projects that still keep pre-rename state get the link too.
+  if (!pathExists(path.join(root, FRAMEWORK_DIR))) ensureFrameworkLink(root, FRAMEWORK_DIR);
   if (stateDirFor(root) !== STATE_DIR) return;
   if (!pathExists(path.join(root, CODEX_FRAMEWORK_DIR))) ensureFrameworkLink(root, CODEX_FRAMEWORK_DIR);
   if (!pathExists(path.join(root, CODEX_STATE_DIR))) symlinkSync(STATE_DIR, path.join(root, CODEX_STATE_DIR));
@@ -473,7 +475,7 @@ function excludeLocalState(root) {
   const current = existsSync(exclude) ? readFileSync(exclude, 'utf8') : '';
   const lines = new Set(current.split('\n'));
   // Links are files to Git, so they need bare patterns. Exclusion never hides a tracked link.
-  const entries = stateDirFor(root) === STATE_DIR ? [`${STATE_DIR}/`, FRAMEWORK_DIR, CODEX_STATE_DIR, CODEX_FRAMEWORK_DIR] : [`${CODEX_STATE_DIR}/`];
+  const entries = stateDirFor(root) === STATE_DIR ? [`${STATE_DIR}/`, FRAMEWORK_DIR, CODEX_STATE_DIR, CODEX_FRAMEWORK_DIR] : [`${CODEX_STATE_DIR}/`, FRAMEWORK_DIR];
   const missing = [...entries, '.uxtest/runs/'].filter((line) => !lines.has(line));
   if (missing.length) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF worktree-local state\n${missing.join('\n')}\n`);
 }
@@ -710,6 +712,8 @@ function normalizePhase(id, phase, canonical) {
     sensitive: Boolean(phase.sensitive || SENSITIVE_WORDS.test(`${title} ${outcome} ${risks.join(' ')}`)),
     verificationRequired: Boolean(phase.smoke_test === true || phase.verification_required || phase.verification?.required || (Array.isArray(phase.mode) ? phase.mode : [phase.mode]).includes('HITL')),
     status: normalizeRoadmapStatus(phase.status, id),
+    done_when: normalizeStringArray(phase.done_when),
+    verify: normalizeStringArray(phase.verify),
   };
 }
 
@@ -1262,7 +1266,7 @@ function cmdContext(tokens) {
   const discovery = currentDiscovery(root, state);
   process.stdout.write(`${JSON.stringify({
     schema: 'riff.wave-context/1',
-    phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome, verificationRequired: phase.verificationRequired ?? null } : null,
+    phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome, done_when: phase.done_when ?? [], verify: phase.verify ?? [], verificationRequired: phase.verificationRequired ?? null, improvementPassRecorded: Boolean(phase.improvementPass) } : null,
     checkpoint,
     modelAdvice: phase && state.modelAdvice?.phase === phase.id ? state.modelAdvice : null,
     modelAdvicePlan: phase && state.modelAdvicePlan?.phase === phase.id ? state.modelAdvicePlan : null,
@@ -1403,6 +1407,8 @@ function doctor(root, recordApproval = false) {
   catch (error) { add('error', 'configuration', error.message); }
   try { state = readJson(files.state); validateState(state); add('ok', 'state', `${state.phases.length} phases`); }
   catch (error) { add('error', 'state', error.message); }
+  const unspecified = (state?.phases ?? []).filter((phase) => !TERMINAL_PHASE_STATES.has(phase.status) && (!phase.done_when?.length || !phase.verify?.length)).map((phase) => phase.id);
+  if (unspecified.length) add('warn', 'phase contracts', `${unspecified.join(', ')} lack done_when or verify in ROADMAP.yaml; the agent will infer them from outcome and demo`);
   if (existsSync(files.roadmap)) {
     try { const roadmap = readRoadmap(root); add('ok', 'roadmap', `${roadmap.phases.length} phases parse correctly`); }
     catch (error) { add('error', 'roadmap', error.message); }
