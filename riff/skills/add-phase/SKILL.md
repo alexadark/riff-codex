@@ -1,16 +1,38 @@
 ---
 name: add-phase
-description: Add one justified vertical phase to an existing RIFF roadmap. Use when the user invokes this skill by name or approves a newly discovered product outcome.
+description: Add one justified vertical phase to an existing RIFF roadmap. Use when the user invokes this skill by name or approves a newly discovered product outcome, or when a wave needs a correction phase.
 ---
 
 # Add a roadmap phase
 
-Use this for one already-understood independent outcome. When the request needs product reconsideration, impact analysis across existing behavior, or several interacting roadmap changes, use the `evolve` skill and its [evolution contract](../../references/evolution.md) before adding phases. Do not reduce such a request to a blind append.
+`riff` means `node .riff-cli/bin/riff.mjs`. The CLI refuses to change or remove a phase with execution history, keeps a second phase from becoming active, and, for an enrolled project, refuses to activate work until the revised dossier has a fresh passing review.
 
-Read `PROJECT.md`, `ROADMAP.yaml`, the current state, and the configured autonomy mode. If this is a large project, also read `.riff-cli/references/project-framing.md` and reuse its stories, criteria, data boundaries, rights, integrations, decisions, and prior answers. Confirm the new outcome is in product scope and is not already covered. In default `loop` mode, choose conservative product and technical details automatically. If a discovered outcome would widen the product contract without explicit user authorization, keep the existing scope and report that no phase was added instead of creating `awaiting_human`. In `guided` mode, ask before a material product change and recommend a course.
+## Goal
 
-Add one vertical, demonstrable phase with `done_when`, `verify`, one explicit justified P0-P3 priority and only real dependencies, blocking edges, risks, sensitivity, and exclusions. For a large project, connect it to the stories and criteria it advances and deepen only the phase-specific data, permission, integration, recovery, and validation boundaries that are useful now. Do not inherit a default priority from neighboring phases. Preserve the existing Codex or Claude roadmap representation, comments, key order, and every unknown field with a targeted edit. Never convert top-level `phase-*` entries into a `phases` array, or the reverse, and never renumber completed phases. Run `node .riff-cli/bin/riff.mjs wave sync` and report when the phase becomes ready.
+Add one already understood, independent outcome to the roadmap as one phase the `wave` skill can build. A request that needs product reconsideration, impact analysis across existing behavior or several interacting roadmap changes belongs to the `evolve` skill; never reduce it to a blind append.
 
-In `loop`, stop only for missing credentials or external access, impossible third-party verification, an unidentifiable destructive target, or failed RIFF validation. Never stop for a product or technical choice. `guided` retains its confirmation behavior.
+## Done when
 
-For a project enrolled through `docs/specs/readiness.json`, update the dossier's story/phase mapping and references affected by the added outcome. Obtain an independent discovery review for the revised digest and pass `discovery check` before activating further work. A defect found by whole-version verification can become an in-scope correction phase without another product approval; preserve completed phases and their historical receipts. Identify useful independent work packages within the phase, but do not activate multiple phases or invent file-by-file future plans.
+- The outcome is in product scope and no existing phase already covers it.
+- One vertical, demonstrable phase is added with `done_when`, `verify`, an explicit P0 to P3 priority justified for this phase rather than copied from its neighbors, and only real dependencies, blocking edges, risks, sensitivity and exclusions.
+- `riff wave sync` passed and you reported when the phase becomes ready.
+- Enrolled project: the dossier's story-to-phase mapping and affected references are updated, a fresh independent review covers the revised digest and `riff discovery check` passes before further work is activated.
+
+## Verify
+
+- `riff doctor` flags no phase without `done_when` or `verify`.
+- The roadmap keeps its format, comments, key order and unknown fields: a targeted edit, never a conversion between top-level `phase-*` entries and a `phases` array, never a renumbering of completed phases.
+
+## How to work
+
+1. Read `PROJECT.md`, `ROADMAP.yaml`, `riff status` and the configured mode. On a large project, read the project-framing reference and reuse its stories, criteria, data boundaries, rights, integrations, decisions and earlier answers.
+2. When the user invoked the skill and the outcome, priority or criteria are unclear, ask one to three short questions with a recommendation, in either mode. When a wave adds a correction phase, ask nothing.
+3. If the outcome would widen the product contract without the user's explicit authorization, keep the existing scope and report that no phase was added; never create `awaiting_human` for it.
+4. On a large project, connect the phase to the stories and criteria it advances and detail only the data, permission, integration, recovery and validation boundaries useful now. Name independent work packages inside the phase, but don't plan file by file or activate anything.
+5. A defect found by whole-version verification becomes an in-scope correction phase without another product approval; completed phases and their receipts stay untouched.
+
+Stop only for a blocker kind from the operating contract, never for a product or technical choice. `guided` mode keeps its confirmations.
+
+## References
+
+Read when the step needs them, under `.riff-cli/references/`: `project-framing.md`, `evolution.md` (when the request is larger than one phase), `discovery.md` (enrolled dossier review), `operating-contract.md` (modes, blocker kinds, phase contract).
