@@ -1,20 +1,38 @@
 ---
 name: quick
-description: Deliver a small bounded change with RIFF safety and evidence but no roadmap phase. Use when the user invokes $riff:quick for work too small to justify a phase.
+description: Make a small, bounded change with RIFF checks but no roadmap phase. Use for $riff:quick or a quick fix that leaves the roadmap unchanged.
 ---
 
 # Run a quick RIFF change
 
-Follow the [model-advice contract](../../references/model-routing.md) before execution. Use its single catalog for bounded work, never a mandatory worker. An advice-only question must stop before implementation. Advice is optional, preserves explicit model choices and does not switch the primary model.
+`riff` means `node .riff-cli/bin/riff.mjs`. The CLI records nothing for a quick change apart from the Git hooks, so these checks rest on you.
 
-Read `.riff-codex/references/taste.md` and applicable project conventions. For UI changes, use the relevant design skills and scoped rendered checks from `.riff-codex/references/taste/frontend.md`. Merge a proven reusable lesson before final review; keep this proportional to the change.
+## Goal
 
-Use only for a bounded change that does not alter the product roadmap. Read `.riff-codex/references/git-delivery.md` and establish or reconcile this change's scoped branch before implementation. Inspect the affected boundary, implement with one writer, validate only changed behavior, and perform a fresh functional review. Load `.riff-codex/references/security.md` if the boundary is sensitive.
+Make one bounded change that leaves the product roadmap unchanged, on its own branch, in one atomic commit.
 
-Follow `.riff-codex/references/learning.md` for selective reuse and deduplicated learning in the project's existing taste topics.
+## Done when
 
-For changed user journeys, capture observed browser results and screenshots, then generate the HTML report using `.riff-codex/references/evidence.md` and link it in the result. Nonvisual checks need their observed results, not invented screenshots.
+- The changed behavior works and was checked once.
+- A fresh agent that didn't write the change reviewed it, adding a security review when the boundary is sensitive.
+- Observations from the change are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review`, nothing unverified marked resolved.
+- The change is one atomic commit on its branch. The draft PR is created or updated only when publication is authorized; otherwise the result stays local.
 
-Before finishing, perform agent-owned observation triage under `.riff-codex/references/dashboard.md#end-of-work-observation-triage`. Inspect current code and evidence, repair confirmed in-scope problems, and record justified decisions through `observations review`. Do not delegate technical validity judgments to the user or mark unverified findings resolved.
+## Verify
 
-Create one atomic commit and append a concise event with `node .riff-codex/bin/riff.mjs hook` only through normal hooks. Follow the Git delivery reference to create or update this bounded change's PR when publication is authorized; otherwise prepare and report the local result. Verify and return the PR URL and actual checks, without claiming merge or deployment. If scope expands or a product decision appears, stop and recommend `$riff:add-phase` instead.
+- Check only the changed behavior and its regression boundary, and report the real output.
+- For a changed user journey, exercise it in a real browser, capture screenshots and generate the HTML report with `riff report --evidence FILE`. Nonvisual checks report observed results; never invent screenshots.
+
+## How to work
+
+1. Establish or reconcile the change's scoped branch.
+2. Read the project taste and only the relevant topics and lessons. For UI work, apply the design skills listed in the frontend taste. Read the security reference for a sensitive boundary.
+3. Work as a single writer: inspect the affected boundary, implement, verify, review, commit. Let the Git hooks record the commit; don't call `riff hook` yourself.
+4. Merge a proven reusable lesson into taste, in proportion to the change.
+5. If the scope grows or a product decision appears, stop and recommend `$riff:add-phase`.
+
+Model advice is optional and never switches the primary model; a request for advice alone stops before implementation. Report the outcome, commit, checks and PR URL or local-only status. Never claim a merge or a deployment.
+
+## References
+
+Read when the step needs them, under `.riff-cli/references/`: `git-delivery.md`, `evidence.md` (browser evidence and reports), `learning.md`, `security.md`, `dashboard.md` (observation triage), `model-routing.md`, `taste.md` and `taste/frontend.md`.
