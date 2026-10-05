@@ -28,7 +28,7 @@ const dir = path.dirname(process.argv[1]);
 const plan = JSON.parse(fs.readFileSync(path.join(dir, 'fake-plan.json'), 'utf8'));
 const model = args[args.indexOf(via === 'codex' ? '-m' : '--model') + 1];
 const prompt = fs.readFileSync(0, 'utf8');
-fs.appendFileSync(path.join(dir, 'fake-calls.log'), via + ':' + model + ' ' + (prompt.includes('Review type: ') ? 'prompt-ok' : 'prompt-missing') + '\\n');
+fs.appendFileSync(path.join(dir, 'fake-calls.log'), via + ':' + model + ' ' + (prompt.includes('Review type: ') ? 'prompt-ok' : 'prompt-missing') + (prompt.includes('Already deferred to a human security expert') ? ' deferred' : '') + '\\n');
 const behavior = plan[via + ':' + model] || 'pass';
 if (behavior === 'quota') { console.error("ERROR: You've hit your usage limit."); process.exit(1); }
 const verdicts = {
@@ -116,7 +116,7 @@ test('a functional review from Astra produces an artifact the existing wave revi
   assert.equal(receipt.model, 'codex:gpt-6-astra');
 });
 
-test('a blocking finding fails the review even when the model says pass, without falling back, and the parked phase gets no silent advisory review', () => {
+test('a blocking finding fails the review even when the model says pass, without falling back or parking the phase, and the unchanged candidate cannot be re-reviewed', () => {
   const root = fixture();
   plan(root, { 'codex:gpt-6-astra': 'pass-with-high' });
   validatedCandidate(root);
@@ -128,8 +128,8 @@ test('a blocking finding fails the review even when the model says pass, without
   assert.match(result.record, /--severity HIGH --what-could-happen/);
   const recorded = record(root, result.record.replace(/'<[^']*>'/g, "'Fixture detail'"));
   assert.equal(recorded.status, 0, recorded.text);
-  // The failed security review parked the phase: no silent advisory run on it.
-  rejected(root, /no active phase/, 'review', 'run', '--type', 'security');
+  assert.equal(read(root, '.riff-data/state.json').phases[0].status, 'active');
+  rejected(root, /failed on this unchanged candidate/, 'review', 'run', '--type', 'security');
   assert.equal(calls(root).length, 1);
 });
 
@@ -179,4 +179,35 @@ test('discovery and delivery artifacts are accepted by their record commands, an
   const recorded = record(fresh, delivery.record);
   assert.equal(recorded.status, 0, recorded.text);
   assert.equal(read(fresh, '.riff-data/state.json').deliveryReview.reviewer.id, 'codex:gpt-6-astra@high');
+});
+
+test('a finding deferred to a security expert lets phases continue, is passed to later reviewers and blocks delivery until decided', () => {
+  const root = fixture();
+  enroll(root);
+  assert.equal(record(root, review(root, '--type', 'discovery').record).status, 0);
+  git(root, 'add', '--', 'docs/specs/readiness.json');
+  commit(root, 'Dossier');
+  plan(root, { 'codex:gpt-6-astra': 'pass-with-high' });
+  validatedCandidate(root);
+  const failed = review(root, '--type', 'security');
+  assert.equal(record(root, failed.record.replace(/'<[^']*>'/g, "'Needs a threat model'")).status, 0);
+  const finding = JSON.parse(ok(root, 'observations', 'list')).find((item) => item.status === 'pending' && item.severity === 'HIGH');
+  ok(root, 'observations', 'review', '--id', finding.id, '--revision', finding.revision, '--status', 'expert_review', '--note', 'Threat model decision for a security expert');
+  plan(root, {});
+  write(root, 'README.md', 'feature reworked\n');
+  git(root, 'add', '--', 'README.md');
+  ok(root, 'wave', 'validate', 'a', '--run', '--command', JSON.stringify([process.execPath, '-e', 'process.exit(0)']), '--paths', '["README.md"]');
+  assert.equal(record(root, review(root, '--type', 'security').record).status, 0);
+  assert.match(calls(root).at(-1), / deferred$/);
+  assert.equal(record(root, review(root, '--type', 'functional').record).status, 0);
+  commit(root);
+  ok(root, 'wave', 'checkpoint', 'a', '--summary', 'Feature verified', '--next', 'Verify delivery');
+  write(root, '.riff-data/a-improvements.json', []);
+  ok(root, 'improve', 'record', '--phase', 'a', '--file', '.riff-data/a-improvements.json');
+  ok(root, 'wave', 'complete', 'a', '--commit', 'HEAD');
+  assert.equal(record(root, review(root, '--type', 'delivery').record).status, 0);
+  rejected(root, /await a security expert/, 'finish', '--check');
+  const deferred = JSON.parse(ok(root, 'observations', 'list')).find((item) => item.id === finding.id);
+  ok(root, 'observations', 'review', '--id', deferred.id, '--revision', deferred.revision, '--status', 'resolved', '--note', 'Security expert accepted the threat model');
+  assert.doesNotMatch(cli(root, {}, 'finish', '--check').text, /security expert/);
 });

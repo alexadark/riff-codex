@@ -64,7 +64,7 @@ The artifact shape, whichever reviewer wrote it:
 }
 ```
 
-Record it with `wave review phase-1 --type functional --status pass --summary "Observed outcome" --evidence FILE`. Use `security` for required security reviews; record findings with severity and evidence. A passing artifact cannot contain HIGH or CRITICAL findings. The CLI stores an immutable content-hashed copy. Reviewer independence is a recorded attestation, not a cryptographic guarantee; never invent another reviewer identity. Changing the tree requires fresh validation and review. The security review command itself parks blocking findings.
+Record it with `wave review phase-1 --type functional --status pass --summary "Observed outcome" --evidence FILE`. Use `security` for required security reviews; record findings with severity and evidence. A passing artifact cannot contain HIGH or CRITICAL findings. The CLI stores an immutable content-hashed copy. Reviewer independence is a recorded attestation, not a cryptographic guarantee; never invent another reviewer identity. Changing the tree requires fresh validation and review. A failed security review records its findings as observations without parking the phase; correct and review again, as described in the [security reference](security.md).
 
 Review the integrated candidate against the phase's acceptance criteria and preserved behavior, including component/service reuse and applicable design references. Functional and security reviewers may work in parallel on that frozen tree; implementers cannot change it underneath them. A repeated review of the unchanged failed candidate is not a correction. A fresh review must identify what was actually inspected and cannot merely repeat the implementer's conclusion.
 

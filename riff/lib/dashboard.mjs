@@ -41,7 +41,7 @@ export function observationList(state) {
 }
 
 export function reviewObservation(state, { id, revision, status, note }) {
-  if (!['pending', 'resolved', 'false_positive'].includes(status)) throw new Error('Invalid observation status');
+  if (!['pending', 'resolved', 'false_positive', 'expert_review'].includes(status)) throw new Error('Invalid observation status');
   if (typeof note !== 'string' || note.trim().length < 3 || note.length > 2000) throw new Error('A reason between 3 and 2000 characters is required');
   const finding = observationList(state).find((entry) => entry.id === id);
   if (!finding) throw new Error('Observation not found');

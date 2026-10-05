@@ -713,6 +713,7 @@
       el("option", { value: "pending" }, "To review"),
       el("option", { value: "resolved" }, "Resolved"),
       el("option", { value: "false_positive" }, "False positive"),
+      el("option", { value: "expert_review" }, "Security expert at the end"),
     ]);
     status.value = finding.status;
     const note = el("textarea", { id: `note-${finding.id}`, required: true, minlength: "3", maxlength: "2000", rows: "2", placeholder: "Why is it resolved or a false positive?" });
@@ -731,7 +732,7 @@
         await loadProject(slug);
       } catch (error) { message.textContent = error.message; button.disabled = false; }
     } }, [
-      finding.review ? el("p", { class: "small" }, `${finding.reopened ? "New occurrence since the previous decision. " : ""}Previous decision: ${({ pending: "To review", resolved: "Resolved", false_positive: "False positive" })[finding.review.status]} · ${finding.review.at} · ${finding.review.note}`) : null,
+      finding.review ? el("p", { class: "small" }, `${finding.reopened ? "New occurrence since the previous decision. " : ""}Previous decision: ${({ pending: "To review", resolved: "Resolved", false_positive: "False positive", expert_review: "Security expert at the end" })[finding.review.status]} · ${finding.review.at} · ${finding.review.note}`) : null,
       el("label", { for: status.id }, "Status"), status,
       el("label", { for: note.id }, "Reason / verification"), note, button, message,
     ]);

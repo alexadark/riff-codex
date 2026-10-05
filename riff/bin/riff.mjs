@@ -1202,13 +1202,9 @@ function recordReview(root, state, phase, options) {
   writeJson(localPath(root, path.join(pathsFor(root).receipts, `${phase.id}-${type}.json`)), receipt);
   state.reviews[type] = receipt;
   if (options.model) state.model = { name: options.model, reasoning: options.reasoning ?? null, fast_available: options.fast_available === 'true' };
-  if (type === 'security' && status === 'fail') {
-    state.securityFindings.push(receipt);
-    if (severity === 'HIGH' || severity === 'CRITICAL') {
-      markPhase(root, state, phase, 'parked', receipt.decision_reason, 'validation-failure');
-      return receipt;
-    }
-  }
+  // A failed security review never parks the phase: the agent corrects and reviews a new candidate.
+  // The finding stays an observation until it is resolved or deferred to a security expert.
+  if (type === 'security' && status === 'fail') state.securityFindings.push(receipt);
   saveState(root, state);
   event(root, `${type}_review`, { phase: phase.id, status, severity, candidate: receipt.candidate, summary: receipt.summary });
   return receipt;
@@ -1343,7 +1339,10 @@ function reviewTarget(root, state, type, options) {
   const previous = receiptFor(root, phase, type);
   if (previous?.status === 'fail' && previous.candidate === candidate) throw new Error(`the last ${type} review failed on this unchanged candidate; correct it first`);
   requireValidation(root, phase, candidate);
-  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)])}` };
+  // Deferred findings wait for a human security expert at delivery; re-reporting them would block every round.
+  const deferred = observationList(state).filter((finding) => finding.status === 'expert_review' && finding.phase === phase.id);
+  const deferredText = deferred.length ? `\n\nAlready deferred to a human security expert before delivery (don't report these again unless this candidate makes them worse):\n${deferred.map((finding) => `- ${finding.severity}: ${finding.summary}${finding.what_could_happen ? `. ${finding.what_could_happen}` : ''}`).join('\n')}` : '';
+  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}${deferredText}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)])}` };
 }
 
 function reviewRecordCommand(type, target, artifact, file) {
@@ -2136,6 +2135,8 @@ function cmdFinish(tokens) {
   }
   if (!options.check) throw new Error('finish requires --check or --review FILE; Git publication remains an explicit separate action');
   checkTerminalPhaseEvidence(root, state);
+  const expert = observationList(state).filter((finding) => finding.status === 'expert_review');
+  if (expert.length) throw new Error(`${expert.length} finding(s) await a security expert before delivery: ${expert.map((finding) => `${finding.id.slice(0, 12)} ${finding.severity} ${finding.summary}`).join('; ')}. Record the expert decision with riff observations review --status resolved|false_positive`);
   if (discoveryEnrolled(root, state)) {
     discoveryGate(root, state);
     const candidate = run('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root });
@@ -2337,7 +2338,7 @@ else if (command === 'observations') {
       process.stdout.write(JSON.stringify(review) + '\n');
     });
     else if (!tokens.length || tokens[0] === 'list') process.stdout.write(JSON.stringify(observationList(readState(root))) + '\n');
-    else throw new Error('Use observations list or observations review --id ID --revision REV --status pending|resolved|false_positive --note REASON');
+    else throw new Error('Use observations list or observations review --id ID --revision REV --status pending|resolved|false_positive|expert_review --note REASON');
   } catch (error) { fail(error.message); }
 }
 else if (command === 'wave') {
