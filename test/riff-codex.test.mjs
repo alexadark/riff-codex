@@ -896,3 +896,16 @@ test('init installs Claude Code settings locally, preserves user choices and sta
   runCli(fresh, 'init', '--project-root', fresh, '--non-interactive');
   assert.equal(JSON.parse(readFileSync(path.join(fresh, '.claude', 'settings.local.json'), 'utf8')).autoCompactWindow, 400000);
 });
+
+test('resync refuses a pre-rename state link to another checkout instead of creating empty state', () => {
+  const owner = preRenameProject();
+  const root = fixture();
+  symlinkSync(path.join(owner, '.riff-codex-state'), path.join(root, '.riff-codex-state'));
+
+  assert.match(runCliFailure(root, 'resync'), /\.riff-codex-state links to .*another checkout.*not supported/);
+
+  assert.equal(existsSync(path.join(root, '.riff-data')), false);
+  assert.equal(lstatSync(path.join(root, '.riff-codex-state')).isSymbolicLink(), true);
+  assert.match(runCliFailure(root, 'init', '--project-root', root, '--non-interactive'), /not supported/);
+  assert.equal(existsSync(path.join(root, '.riff-data')), false);
+});

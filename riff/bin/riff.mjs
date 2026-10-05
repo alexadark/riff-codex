@@ -297,7 +297,17 @@ function gitHooksDir(root) {
   return directory;
 }
 
+// After migration .riff-codex-state links to this checkout's .riff-data; a link elsewhere would split state.
+function refuseForeignStateLink(root) {
+  const link = path.join(root, CODEX_STATE_DIR);
+  if (pathExists(path.join(root, STATE_DIR)) || !pathExists(link) || !lstatSync(link).isSymbolicLink()) return;
+  const target = path.resolve(root, readlinkSync(link));
+  if (target === path.join(root, STATE_DIR)) return;
+  throw new Error(`${CODEX_STATE_DIR} links to ${target}; state shared with another checkout is not supported. Copy that state into this checkout as ${STATE_DIR} or remove the link, then run resync again`);
+}
+
 function installationPreflight(root) {
+  refuseForeignStateLink(root);
   const directory = gitHooksDir(root);
   for (const name of [stateDirFor(root), '.codex', '.claude', '.agents', '.agents/skills']) {
     const target = localPath(root, name);
