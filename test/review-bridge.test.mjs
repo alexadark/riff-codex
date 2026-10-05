@@ -181,7 +181,7 @@ test('discovery and delivery artifacts are accepted by their record commands, an
   assert.equal(read(fresh, '.riff-data/state.json').deliveryReview.reviewer.id, 'codex:gpt-6-astra@high');
 });
 
-test('a finding deferred to a security expert lets phases continue, is passed to later reviewers and blocks delivery until decided', () => {
+test('a finding deferred to a security expert lets phases and delivery continue, is passed to later reviewers and is listed at the end', () => {
   const root = fixture();
   enroll(root);
   assert.equal(record(root, review(root, '--type', 'discovery').record).status, 0);
@@ -192,7 +192,7 @@ test('a finding deferred to a security expert lets phases continue, is passed to
   const failed = review(root, '--type', 'security');
   assert.equal(record(root, failed.record.replace(/'<[^']*>'/g, "'Needs a threat model'")).status, 0);
   const finding = JSON.parse(ok(root, 'observations', 'list')).find((item) => item.status === 'pending' && item.severity === 'HIGH');
-  ok(root, 'observations', 'review', '--id', finding.id, '--revision', finding.revision, '--status', 'expert_review', '--note', 'Threat model decision for a security expert');
+  ok(root, 'observations', 'review', '--id', finding.id, '--revision', finding.revision, '--status', 'expert_review', '--note', 'Interim: deny cross-user access by default; expert to confirm the threat model');
   plan(root, {});
   write(root, 'README.md', 'feature reworked\n');
   git(root, 'add', '--', 'README.md');
@@ -206,8 +206,5 @@ test('a finding deferred to a security expert lets phases continue, is passed to
   ok(root, 'improve', 'record', '--phase', 'a', '--file', '.riff-data/a-improvements.json');
   ok(root, 'wave', 'complete', 'a', '--commit', 'HEAD');
   assert.equal(record(root, review(root, '--type', 'delivery').record).status, 0);
-  rejected(root, /await a security expert/, 'finish', '--check');
-  const deferred = JSON.parse(ok(root, 'observations', 'list')).find((item) => item.id === finding.id);
-  ok(root, 'observations', 'review', '--id', deferred.id, '--revision', deferred.revision, '--status', 'resolved', '--note', 'Security expert accepted the threat model');
-  assert.doesNotMatch(cli(root, {}, 'finish', '--check').text, /security expert/);
+  assert.match(ok(root, 'finish', '--check'), /Security points for an expert.*\n- HIGH .*Interim: deny cross-user access by default/);
 });

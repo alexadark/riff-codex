@@ -2135,15 +2135,16 @@ function cmdFinish(tokens) {
   }
   if (!options.check) throw new Error('finish requires --check or --review FILE; Git publication remains an explicit separate action');
   checkTerminalPhaseEvidence(root, state);
-  const expert = observationList(state).filter((finding) => finding.status === 'expert_review');
-  if (expert.length) throw new Error(`${expert.length} finding(s) await a security expert before delivery: ${expert.map((finding) => `${finding.id.slice(0, 12)} ${finding.severity} ${finding.summary}`).join('; ')}. Record the expert decision with riff observations review --status resolved|false_positive`);
   if (discoveryEnrolled(root, state)) {
     discoveryGate(root, state);
     const candidate = run('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root });
     if (!storedReviewValid(root, state.deliveryReview, 'delivery', candidate)) throw new Error('enrolled project requires an intact passing final delivery review for the current candidate');
   }
   if (run('git', ['status', '--porcelain'], { cwd: root })) throw new Error('commit or preserve pending project changes before finishing');
-  process.stdout.write(`Ready for explicit Git finalization at ${run('git', ['rev-parse', 'HEAD'], { cwd: root })}.\nNo push, merge or deployment performed.\n`);
+  // Expert-review findings never block delivery: they ship with the agent's documented interim decision and stay listed.
+  const expert = observationList(state).filter((finding) => finding.status === 'expert_review');
+  const expertText = expert.length ? `Security points for an expert when one is available (${expert.length}), shipped with the interim decision in each note:\n${expert.map((finding) => `- ${finding.severity} ${finding.summary}: ${finding.review.note}`).join('\n')}\n` : '';
+  process.stdout.write(`Ready for explicit Git finalization at ${run('git', ['rev-parse', 'HEAD'], { cwd: root })}.\n${expertText}No push, merge or deployment performed.\n`);
 }
 
 function cmdPromote(tokens) {
