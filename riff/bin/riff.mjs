@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 import { CODEX_STATE_DIR, STATE_DIR, inside, localPath, phaseId, stateDirFor, withLock, withFileLock } from '../lib/safety.mjs';
 import { verificationEvidence, writeReport } from '../lib/report.mjs';
+import { REVIEW_TYPES, buildPrompt, reviewerAvailability, runReviewChain, toArtifact } from '../lib/review-bridge.mjs';
 import { managedHookPolicy } from '../lib/managed-hooks.mjs';
 import { selectReadyPhase } from '../lib/phase-selection.mjs';
 import { portAvailable, observationList, reviewObservation } from '../lib/dashboard.mjs';
@@ -1259,6 +1260,7 @@ function cmdDiscovery(tokens) {
       snapshotAt: same ? prior.snapshotAt : now(),
       review: same ? prior.review ?? null : null,
       ...(same && prior.lastReviewAttempt ? { lastReviewAttempt: prior.lastReviewAttempt } : {}),
+      ...(prior?.failedRounds ? { failedRounds: prior.failedRounds } : {}),
     };
     saveState(root, state);
     event(root, 'discovery_snapshot', snapshot);
@@ -1290,9 +1292,98 @@ function cmdDiscovery(tokens) {
     evidence: storeEvidence(root, 'discovery', proof.bytes),
     reviewedAt: now(),
   };
+  // Failed rounds accumulate across revised snapshots until a review passes; the review bridge caps them.
+  state.discovery.failedRounds = status === 'pass' ? 0 : (state.discovery.failedRounds ?? 0) + 1;
   saveState(root, state);
   event(root, 'discovery_review', { candidate: snapshot.digest, status, evidence: state.discovery.review.evidence });
   process.stdout.write(`Discovery review ${status} recorded at ${snapshot.digest}.\n`);
+}
+
+const REVIEW_DIFF_LIMIT = 60000;
+const DISCOVERY_ROUND_LIMIT = 3;
+const SEVERITY_ORDER = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+function reviewDiff(root, args) {
+  const stat = run('git', [...args, '--stat'], { cwd: root });
+  const patch = run('git', args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
+  const truncated = patch.length > REVIEW_DIFF_LIMIT;
+  return `Changed files:\n${stat || '(none)'}\n\nDiff${truncated ? ` (truncated to ${REVIEW_DIFF_LIMIT} characters; read the files for the rest)` : ''}:\n\`\`\`diff\n${patch.slice(0, REVIEW_DIFF_LIMIT)}\n\`\`\``;
+}
+
+function reviewPhaseContext(phase) {
+  const list = (items) => items?.length ? items.map((item) => `- ${item}`).join('\n') : '- (none stated; infer from the outcome and flag the gap)';
+  return [`Phase ${phase.id}: ${phase.title}`, `Outcome: ${phase.outcome || '(none stated)'}`, phase.demo ? `Demo: ${phase.demo}` : null,
+    `done_when:\n${list(phase.done_when)}`, `verify:\n${list(phase.verify)}`, phase.risks?.length ? `Risks:\n${list(phase.risks)}` : null].filter(Boolean).join('\n');
+}
+
+// Resolve what the reviewer judges, refusing a run the existing record commands would reject anyway.
+function reviewTarget(root, state, type, options) {
+  if (type === 'discovery') {
+    const snapshot = discoverySnapshot(root);
+    if (!state.discovery || state.discovery.digest !== snapshot.digest) throw new Error('run discovery snapshot before requesting a dossier review');
+    if (state.discovery.review?.status === 'fail' && state.discovery.review.candidate === snapshot.digest) throw new Error('the last dossier review failed on this unchanged dossier; revise it and snapshot again');
+    if ((state.discovery.failedRounds ?? 0) >= DISCOVERY_ROUND_LIMIT) throw new Error(`${DISCOVERY_ROUND_LIMIT} dossier review rounds failed; record the unresolved findings as a blocker instead of another round`);
+    return { candidate: snapshot.digest, context: `Dossier files (read all of them):\n${snapshot.files.map((file) => `- ${file}`).join('\n')}` };
+  }
+  const candidate = candidateTree(root);
+  if (type === 'delivery') {
+    checkTerminalPhaseEvidence(root, state);
+    if (candidate !== run('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root })) throw new Error('final delivery review must bind the committed HEAD candidate');
+    if (run('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: root })) throw new Error('final delivery review requires a clean tracked candidate');
+    if (state.deliveryReview?.status === 'fail' && state.deliveryReview.candidate === candidate) throw new Error('the last delivery review failed on this unchanged candidate; correct it first');
+    const base = state.phases.map((phase) => phase.baseCommit).find(Boolean);
+    const phases = state.phases.map((phase) => `## ${phase.status}\n${reviewPhaseContext(phase)}`).join('\n\n');
+    return { candidate, context: `Roadmap phases:\n\n${phases}${base ? `\n\nWhole version since ${base}:\n${run('git', ['diff', base, 'HEAD', '--stat'], { cwd: root }) || '(no change)'}` : ''}` };
+  }
+  const requested = options.phase ?? state.activeWave?.phase ?? null;
+  if (!requested && !options.quick) throw new Error('no active phase; pass --phase ID, or --quick for an advisory review of a quick change');
+  if (!requested) return { candidate, advisory: true, context: `Quick change outside any phase. Staged candidate against HEAD.\n\n${reviewDiff(root, ['diff', '--cached', baseline(root)])}` };
+  const phase = phaseById(state, requested);
+  activePhase(state, phase);
+  const previous = receiptFor(root, phase, type);
+  if (previous?.status === 'fail' && previous.candidate === candidate) throw new Error(`the last ${type} review failed on this unchanged candidate; correct it first`);
+  requireValidation(root, phase, candidate);
+  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)])}` };
+}
+
+function reviewRecordCommand(type, target, artifact, file) {
+  if (target.advisory) return null;
+  const quote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
+  if (type === 'discovery') return `riff discovery review --evidence ${file}`;
+  if (type === 'delivery') return `riff finish --review ${file}`;
+  const [via, rest] = artifact.reviewer.id.split(':');
+  const parts = ['riff wave review', target.phase, '--type', type, '--status', artifact.status, '--summary', quote(artifact.summary), '--evidence', file, '--model', quote(`${via}:${rest.split('@')[0]}`), '--reasoning', rest.split('@')[1]];
+  if (type === 'security') {
+    parts.push('--severity', artifact.findings.map((finding) => finding.severity).sort((a, b) => SEVERITY_ORDER.indexOf(b) - SEVERITY_ORDER.indexOf(a))[0] ?? 'INFO');
+    if (artifact.status === 'fail') parts.push('--what-could-happen', quote('<from findings>'), '--affected', quote('<from findings>'), '--recommended-fix', quote('<from findings>'), '--decision-reason', quote('<why it blocks>'));
+  }
+  return parts.join(' ');
+}
+
+function cmdReview(tokens) {
+  const root = gitRoot();
+  if (tokens[0] !== 'run') throw new Error('use riff review run --type discovery|functional|security|delivery [--phase ID|--quick]');
+  const options = parseOptions(tokens.slice(1));
+  const type = optionRequired(options, 'type');
+  if (!REVIEW_TYPES.includes(type)) throw new Error(`--type must be one of ${REVIEW_TYPES.join(', ')}`);
+  const state = readState(root);
+  const config = readJson(pathsFor(root).config, false) ?? {};
+  const target = reviewTarget(root, state, type, options);
+  const language = ({ en: 'English', fr: 'French' })[config.artifactLanguage ?? 'en'] ?? config.artifactLanguage;
+  const prompt = buildPrompt(type, `${target.context}\n\nProduct sources: PROJECT.md, ROADMAP.yaml and taste.md at the repository root, when present.\n\nWrite the summary, evidence and findings in ${language}, whatever language other instructions use.`);
+  const runAt = now();
+  // No lock while the reviewer runs: it can take many minutes and only reads the project.
+  let result;
+  try { result = runReviewChain({ type, prompt, root, config }); }
+  catch (error) {
+    withLock(root, () => event(root, 'review_unavailable', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, skipped: error.skipped ?? [] }));
+    throw error;
+  }
+  const artifact = toArtifact({ candidate: target.candidate, type, verdict: result.verdict, reviewer: result.reviewer, runAt });
+  const file = `${stateDirFor(root)}/reviews/${type}-${target.candidate.slice(0, 12)}-${runAt.replace(/[:.]/g, '-')}.json`;
+  writeJson(localPath(root, file), artifact);
+  withLock(root, () => event(root, 'review_run', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, status: artifact.status, reviewer: result.reviewer.id, sameFamily: result.reviewer.sameFamily, skipped: result.reviewer.skipped, artifact: file }));
+  process.stdout.write(`${JSON.stringify({ artifact: file, status: artifact.status, summary: artifact.summary, reviewer: result.reviewer, findings: artifact.findings, advisory: Boolean(target.advisory), record: reviewRecordCommand(type, target, artifact, file) }, null, 2)}\n`);
 }
 
 function cmdContext(tokens) {
@@ -1535,6 +1626,7 @@ function doctor(root, recordApproval = false) {
   }
   try { dashboardData(root); add('ok', 'dashboard state', 'readable'); }
   catch (error) { add('error', 'dashboard state', error.message); }
+  for (const reviewer of reviewerAvailability(config)) add(reviewer.ok ? 'ok' : 'warn', `reviewer ${reviewer.via}`, reviewer.ok ? reviewer.detail : `${reviewer.detail}; riff review run will skip it`);
   const interrupted = state?.phases.find((phase) => phase.status === 'active');
   if (interrupted) add('warn', 'resumable wave', `${interrupted.id} is active and can be resumed`);
   else add('ok', 'resumable wave', 'none');
@@ -2203,7 +2295,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery [--phase ID|--quick]\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -2226,6 +2318,9 @@ else if (['report', 'promote', 'incident', 'finish'].includes(command)) {
     if (command === 'finish' && !parseOptions(tokens).review) action();
     else withLock(gitRoot(), action);
   } catch (error) { fail(error.message); }
+}
+else if (command === 'review') {
+  try { cmdReview(tokens); } catch (error) { fail(error.message); }
 }
 else if (command === 'improve') {
   try { cmdImprove(tokens); } catch (error) { fail(error.message); }

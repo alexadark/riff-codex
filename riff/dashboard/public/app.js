@@ -782,6 +782,14 @@
     const human = data.human_action;
     const findings = Array.isArray(data.security_findings) ? data.security_findings : [];
     const events = Array.isArray(data.events) ? data.events : [];
+    // A same-family reviewer or a fallback stays visible next to the verdict.
+    const reviewLine = (receipt) => {
+      if (!receipt) return "None";
+      const reviewer = receipt.reviewer || {};
+      const notes = [reviewer.id, reviewer.sameFamily ? "same model family" : null,
+        reviewer.skipped?.length ? `fallback after ${reviewer.skipped.map((s) => `${s.id} (${s.reason})`).join(", ")}` : null].filter(Boolean);
+      return `${receipt.status}: ${receipt.summary || ""}${notes.length ? `\n${notes.join(" · ")}` : ""}`;
+    };
     const item = (label, value, cls = "") =>
       el("div", { class: `status-item ${cls}`.trim() }, [
         el("div", { class: "status-label" }, label),
@@ -793,8 +801,8 @@
       item("Next ready", data.next_ready || "None"),
       item("Last commit", data.last_commit ? String(data.last_commit).slice(0, 12) : "None", "mono"),
       item("Last validation", validation ? `${validation.status}: ${validation.summary || ""}` : "None"),
-      item("Functional review", review ? `${review.status}: ${review.summary || ""}` : "None"),
-      item("Security review", security ? `${security.status}: ${security.summary || ""}` : "None"),
+      item("Functional review", reviewLine(review), review?.reviewer?.sameFamily ? "same-family" : ""),
+      item("Security review", reviewLine(security), security?.reviewer?.sameFamily ? "same-family" : ""),
       item("Model", model ? `${model.name || "Unknown"} · ${model.reasoning || "reasoning not recorded"}` : "Not recorded"),
       item("Parked", data.parked?.length ? data.parked.join("\n") : "None"),
       item("Blocked", data.blocked?.length ? data.blocked.join("\n") : "None"),

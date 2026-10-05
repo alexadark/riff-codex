@@ -18,14 +18,14 @@ Deliver the selected phase as a complete outcome a user can demonstrate, then co
 - The improvement pass is recorded with `riff improve record`: zero to three proposals for the project or RIFF.
 - The reviewed tree is committed, `riff wave complete <phase> --commit HEAD` succeeded and `EXPLAIN-POST.simple.md` is written.
 
-After the last phase, the connected journeys of the whole version are verified, a delivery review is recorded with `riff finish --review FILE`, and `riff finish --check` passes. Fix in-scope defects through an explicit correction phase.
+After the last phase, the connected journeys of the whole version are verified, a delivery review from `riff review run --type delivery` is recorded with `riff finish --review FILE`, and `riff finish --check` passes. Fix in-scope defects through an explicit correction phase.
 
 ## Verify
 
 - Run each `verify` item. Size the tests to the change: the changed behavior and its regression boundary, not an exhaustive matrix. Reuse checks that already passed on the same candidate.
 - For UI work, exercise the journey in a real browser at desktop and narrow widths and attach screenshots to the verification manifest. A build, a DOM snapshot or an HTTP 200 doesn't prove a screen works.
 - Verify the assembled result, not only subagent outputs.
-- Reviews come from a fresh agent that didn't write the code. They check product criteria, regressions, reuse, design fidelity and observations, and can run in parallel on the frozen candidate.
+- Reviews come from `riff review run --type functional|security`, which runs the configured reviewer (another model family when available) read-only on the frozen candidate and writes the artifact; record it with the command it prints. They check product criteria, regressions, reuse, design fidelity and observations, and can run in parallel. Only if the bridge reports that no reviewer could run, use a fresh native subagent that didn't write the code and say so in the summary.
 
 ## How to work
 

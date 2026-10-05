@@ -1395,6 +1395,10 @@ button {
   font-size: 13px;
 }
 
+.status-item.same-family {
+  border-left: 3px solid var(--warning);
+}
+
 .status-warning {
   margin-top: 10px;
   border: 1px solid var(--warning, #d89b32);

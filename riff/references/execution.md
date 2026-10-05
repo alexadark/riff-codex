@@ -6,7 +6,7 @@ Use this contract during waves. [Operating contract](operating-contract.md) owns
 
 At each phase boundary, read `wave context [phase-id]`, the `PROJECT.md` index, the selected roadmap phase and only the linked stories, acceptance criteria, data/API contracts, taste topics and design references needed for that outcome. Discover existing components, types, services and tests before assigning implementation. Search for behavior as well as names; one unsuccessful search does not prove that code is absent.
 
-Use the host's native compaction. A focused read does not remove old messages or create a fresh context. RIFF must never claim to clear its own conversation, force a context reset at a phase boundary, or survive a stopped execution through an automatic relaunch. Never relaunch your own host (such as `codex exec` or `claude -p`) or introduce a scheduler. Native independent review agents can use a fresh, bounded context without moving the main task.
+Use the host's native compaction. A focused read does not remove old messages or create a fresh context. RIFF must never claim to clear its own conversation, force a context reset at a phase boundary, or survive a stopped execution through an automatic relaunch. Never relaunch your own host to do work, and never introduce a scheduler. The one exception is the review bridge: `riff review run` calls another host's CLI (`codex exec`, `claude -p`) read-only, without a persistent session, only for the reviewer role. Native independent review agents remain the fallback when the whole reviewer chain is unavailable.
 
 Before completion or an interruption, record a checkpoint through the CLI:
 

@@ -14,7 +14,7 @@ Make one bounded change that leaves the product roadmap unchanged, on its own br
 ## Done when
 
 - The changed behavior works and was checked once.
-- A fresh agent that didn't write the change reviewed it, adding a security review when the boundary is sensitive.
+- The staged change was reviewed with `riff review run --type functional --quick` (advisory, no receipt), adding `--type security` when the boundary is sensitive. Fix HIGH or CRITICAL findings before committing.
 - Observations from the change are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review`, nothing unverified marked resolved.
 - The change is one atomic commit on its branch. The draft PR is created or updated only when publication is authorized; otherwise the result stays local.
 

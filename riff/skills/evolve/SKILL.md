@@ -29,7 +29,7 @@ Turn an authorized change to an existing application into a verifiable plan the 
 
 - Run `riff doctor` and `riff status` before and after the edits.
 - Check the plan against the code and tests around the affected paths, not only the documents.
-- The reviewer of an enrolled dossier is a fresh agent that didn't write the change and judges the coherence of the whole revised version, including the existing behavior affected.
+- An enrolled dossier is reviewed with `riff review run --type discovery`; the reviewer judges the coherence of the whole revised version, including the existing behavior affected. Three failed rounds at most before recording a blocker.
 
 ## How to work
 

@@ -28,7 +28,7 @@ A risk probe may use a small isolated prototype; it never becomes product code o
 ## Verify
 
 - `riff doctor` flags no phase without `done_when` or `verify`.
-- The dossier reviewer is a fresh agent that didn't write it and reads the whole dossier, not a subset. Fix its findings, snapshot again and get a new review. Its evidence attests what it checked; it doesn't prove the product claims.
+- The dossier review comes from `riff review run --type discovery`, whose reviewer reads the whole dossier, not a subset; record it with the command it prints. Fix its findings, snapshot again and get a new review, three failed rounds at most before recording a blocker. Its evidence attests what it checked; it doesn't prove the product claims.
 - A design reference counts as received only at a verifiable local path or an immutable capture. Until then it stays `pending_external`, and the dossier can't pass.
 
 ## How to work

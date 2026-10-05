@@ -48,7 +48,9 @@ Reports embed the image bytes, remain readable without a server and appear in th
 
 ## Fresh review artifact
 
-After executed validation, a fresh independent reviewer inspects the staged candidate and writes:
+After executed validation, run `node .riff-cli/bin/riff.mjs review run --type functional` (or `security`, `discovery`, `delivery`). The review bridge checks the candidate the same way the record commands do, builds an adversarial prompt from `references/review-prompts/` with the phase criteria and diff, and runs the first available reviewer of the chain read-only without a persistent session: by default `gpt-6-astra`, then `gpt-6.1-sol` through `codex exec`, then a fresh Claude through `claude -p`. It skips a reviewer only when it can't run (missing CLI, not logged in, model unavailable, quota, timeout, output invalid twice), never because the verdict is negative. A HIGH or CRITICAL finding forces `fail`. It writes the artifact under `.riff-data/reviews/` and prints the record command; run it. `reviewer.skipped` and `reviewer.sameFamily` show any fallback and a reviewer from the builder's own model family. Override the chain, effort per type or timeout with a `reviewers` object in `.riff-data/config.json`. With `--quick` outside a phase, the artifact is advisory and has no record command. If no reviewer can run, use a fresh native subagent and say so.
+
+The artifact shape, whichever reviewer wrote it:
 
 ```json
 {
