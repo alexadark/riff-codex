@@ -14,24 +14,40 @@ This page keeps installation internals and contributor references out of the get
 | `ROADMAP.yaml` | Shared phases, explicit priorities, prerequisites, and exclusions. |
 | `taste.md`, `taste/` | Shared project conventions, selective topic loading and frontend direction. |
 | `references/taste/stacks/` | Project-owned, source-backed stack research from `learn-stack`. |
-| `.riff-codex` | Symlink to the permanent checkout's `riff/` directory. |
-| `.agents/skills/riff-codex-*` | Project-local links to RIFF Codex skills. |
-| `.codex/hooks.json` | RIFF hooks merged with existing Codex hooks. |
-| `.riff-codex-state/config.json` | Project preferences and recorded hook approval. |
-| `.riff-codex-state/state.json` | Current phase state, written only through the RIFF CLI. |
-| `.riff-codex-state/events.ndjson` | Short append-only event stream. |
-| `.riff-codex-state/receipts/` | Validation and review evidence tied to the reviewed Git tree. |
-| `.riff-codex-state/dashboard/phases/` | Derived explanations displayed by the dashboard. |
+| `.riff-cli` | Symlink to the permanent checkout's `riff/` directory. Projects migrated from the old name keep `.riff-codex` as a compatibility link. |
+| `.claude/settings.local.json` | Claude Code: RIFF hooks merged with existing ones, `autoCompactWindow: 400000`, and the `riff` and `riff-cockpit` plugins enabled. Machine-local, excluded from Git. |
+| `.agents/skills/riff-codex-*` | Codex: project-local links to the RIFF skills. |
+| `.codex/hooks.json` | Codex: RIFF hooks merged with existing Codex hooks. |
+| `.riff-data/config.json` | Project preferences, recorded Codex hook approval, and the optional `reviewers` setting. |
+| `.riff-data/state.json` | Current phase state, written only through the RIFF CLI. |
+| `.riff-data/events.ndjson` | Short append-only event stream. |
+| `.riff-data/receipts/` | Validation and review evidence tied to the reviewed Git tree. |
+| `.riff-data/reviews/` | Review artifacts written by `riff review run`, before the agent records them. |
+| `.riff-data/MAP.md` | Reusable current-system map from `onboard`, when it was saved. |
+| `.riff-data/dashboard/phases/` | Derived explanations displayed by the dashboard. |
+| `.riff-data/backups/` | Backups made when `resync` moved an older `.riff-codex-state/`. |
 
-Initialization excludes `.riff-codex-state/` and generated `.uxtest/runs/` through Git's local `info/exclude`. It also installs Git `pre-commit` and `commit-msg` wrappers that chain existing hooks. The shared dashboard registry is at `~/.config/riff-dashboard/registry.json`.
+Initialization excludes `.riff-data/`, `.riff-cli`, `.claude/settings.local.json` and generated `.uxtest/runs/` through Git's local `info/exclude`. It also installs Git `pre-commit` and `commit-msg` wrappers that chain existing hooks. The shared dashboard registry is at `~/.config/riff-dashboard/registry.json`.
 
-The native plugin definition lives at [`riff/.codex-plugin/plugin.json`](../riff/.codex-plugin/plugin.json). It exposes `$riff:*` skills; it is not a separate execution engine.
+## Hosts
 
-Newly registered skills are exposed through the normal `riff-codex init` and `riff-codex resync` paths. Existing Codex sessions keep the instructions loaded when they opened, so a newly exposed skill requires a fresh session. There is no separate consumer migration step.
+`riff init` and `riff resync` install both hosts in every project. Their files are machine-local and excluded from Git, so switching hosts needs no reinstall.
+
+| | Claude Code | Codex |
+| --- | --- | --- |
+| Skills | Plugin `riff` from the marketplace in [`riff/.claude-plugin/marketplace.json`](../riff/.claude-plugin/marketplace.json), called as `/riff:wave`. Registered once per machine with `claude plugin marketplace add <checkout>/riff`. | Project links under `.agents/skills/`, or the native plugin [`riff/.codex-plugin/plugin.json`](../riff/.codex-plugin/plugin.json), called as `$riff:wave`. |
+| Model profiles | Each Anthropic profile is a subagent in [`riff/agents/`](../riff/agents/), such as `riff:opus-5-5-medium`, with model and effort fixed. | Applied through native launch tools. |
+| Hooks | `.claude/settings.local.json` | `.codex/hooks.json`, approved through `/hooks`, unless system-managed. |
+| Context injection | `SessionStart` on startup, resume, `clear` and `compact`. RIFF never edits the project's `CLAUDE.md`. | `SessionStart` hook. |
+| Compaction | `autoCompactWindow` set to 400,000 tokens; `doctor` warns when it's missing or higher. | Native Codex compaction. |
+| Cockpit | Plugin `riff-cockpit` from the same marketplace. | None. |
+| Not available | `deep-audit`, which routes to Codex Security. | None. |
+
+The plugin definitions expose skills; they aren't separate execution engines. Newly registered skills are exposed through the normal `riff init` and `riff resync` paths. Existing sessions keep the instructions loaded when they opened, so a newly exposed skill requires a fresh session. There is no separate consumer migration step.
 
 ## Hook safeguards
 
-RIFF keeps six Codex event handlers and two chained Git hooks. Post-tool hooks collect focused warnings and validation needs; they don't run tests or typechecks after every edit. Validation and candidate-bound review remain workflow checkpoints.
+RIFF keeps six event handlers in each host (`SessionStart`, `PreCompact`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionEnd`) and two chained Git hooks. Post-tool hooks collect focused warnings and validation needs; they don't run tests or typechecks after every edit. Validation and candidate-bound review remain workflow checkpoints.
 
 Installation rejects hook directories outside the project or its Git common directory. Existing hook sources are preserved through local backups and atomic wrapper replacement; an external symlink target is never overwritten. State mutations use a process lock.
 
@@ -45,44 +61,70 @@ Run these from an initialized application, unless noted otherwise.
 
 | Command | Purpose |
 | --- | --- |
-| `riff-codex init` | Connect the project and choose initial preferences. |
-| `riff-codex init --configure` | Revisit preferences. |
-| `riff-codex resync` | Refresh managed links and hooks. |
-| `riff-codex doctor` | Check installation, configuration, hooks, dependencies, and state. |
-| `riff-codex doctor --record-hooks-approved` | Record actual prior approval of the current hooks, then check setup. |
-| `riff-codex status` | Print saved project progress. |
-| `riff-codex discovery snapshot` | Inspect dossier coverage and its content digest. |
-| `riff-codex discovery review --evidence FILE` | Record an independent discovery review for that digest. |
-| `riff-codex discovery check` | Verify current dossier and review integrity. |
-| `riff-codex wave context [phase-id]` | Read phase references, checkpoint and candidate freshness. |
-| `riff-codex wave checkpoint phase-id --summary TEXT --next TEXT` | Persist a phase recovery checkpoint through the CLI. |
-| `riff-codex finish --review FILE` | Record the independent review of whole-version verification. |
-| `riff-codex finish --check` | Verify local completion and, for enrolled projects, final delivery evidence. |
-| `riff-codex dashboard` | Start or attach to the shared local dashboard. |
-| `riff-codex dashboard --snapshot` | Print a dashboard data snapshot. |
-| `riff-codex --help` | List mechanical commands, including internal wave operations. |
+| `riff init` | Connect the project for both hosts and choose initial preferences. |
+| `riff init --configure` | Revisit preferences. |
+| `riff resync` | Refresh managed links, hooks and Claude Code settings; move an older `.riff-codex-state/` to `.riff-data/` when no phase is active. |
+| `riff doctor` | Check installation, configuration, hooks for both hosts, reviewer CLIs, dependencies, and state. |
+| `riff doctor --record-hooks-approved` | Record actual prior approval of the current Codex hooks, then check setup. |
+| `riff status` | Print saved project progress. |
+| `riff discovery snapshot` | Inspect dossier coverage and its content digest. |
+| `riff discovery review --evidence FILE` | Record an independent discovery review for that digest. |
+| `riff discovery check` | Verify current dossier and review integrity. |
+| `riff review run --type discovery\|functional\|security\|delivery [--phase ID\|--quick]` | Run the reviewer chain read-only on the current candidate, write the artifact to `.riff-data/reviews/`, and print the command that records it. |
+| `riff observations list` | List technical and security observations with their status. |
+| `riff wave context [phase-id]` | Read phase references, checkpoint and candidate freshness. |
+| `riff wave checkpoint phase-id --summary TEXT --next TEXT` | Persist a phase recovery checkpoint through the CLI. |
+| `riff finish --review FILE` | Record the independent review of whole-version verification. |
+| `riff finish --check` | Verify local completion and, for enrolled projects, final delivery evidence. Lists `expert_review` security points with their interim decisions. |
+| `riff dashboard` | Start or attach to the shared local dashboard. |
+| `riff dashboard --snapshot` | Print a dashboard data snapshot. |
+| `riff --help` | List mechanical commands, including internal wave operations. |
 
-The conversation skill `$riff:wave` orchestrates building. Terminal subcommands such as `riff-codex wave sync` manage its state; they are not a replacement for the conversation skill. There is no `riff-codex next` command.
+`riff-codex` remains an alias of `riff`. The conversation skill `wave` orchestrates building. Terminal subcommands such as `riff wave sync` manage its state; they aren't a replacement for the conversation skill. There is no `riff next` command.
 
 ## Roadmaps, reviews, and autonomy
 
-New Codex roadmaps use `version`, `project`, `phases`, and `out_of_scope`. The parser also accepts existing Claude roadmaps with top-level `phase-*` entries. Preserve the current layout, comments, and unknown fields rather than converting the file unnecessarily.
+New roadmaps use `version`, `project`, `phases`, and `out_of_scope`. The parser also accepts existing Claude roadmaps with top-level `phase-*` entries. Preserve the current layout, comments, and unknown fields rather than converting the file unnecessarily.
 
 Ready work is selected by priority after its prerequisites are complete. Review receipts apply only to the exact recorded Git tree. A changed candidate needs fresh evidence. See the [operating contract](../riff/references/operating-contract.md) for the state definitions, retry budget, and completion rules.
 
 `loop` is the default. `guided` retains planning confirmations and pauses between phases. Loop mode records conservative assumptions and continues rather than stopping for ordinary product decisions. Its blocker kinds are `credentials-or-access`, `third-party-verification`, `destructive-target`, and `validation-failure`. External publication still follows the user's explicit authorization.
 
-`$riff:evolve` is the conversation skill for product changes that need a current-system impact analysis or several interacting roadmap changes. It checks the installed and onboarded prerequisites, reuses map findings while checking affected areas for drift, challenges the need, and updates only affected specifications and future phases. It preserves completed and active phase contracts, repoints dependencies before synchronization, and ends at planning readiness. It never activates a wave. A legacy bounded evolution does not silently enroll an existing project; a complete-version request follows the full discovery contract, and an enrolled changed dossier needs a fresh discovery review and check. Use only supported lifecycle states when replacing or deferring pending work.
+`evolve` is the conversation skill for product changes that need a current-system impact analysis or several interacting roadmap changes. It checks the installed and onboarded prerequisites, reuses onboarding map findings while checking affected areas for drift, challenges the need, and updates only affected specifications and future phases. It preserves completed and active phase contracts, repoints dependencies before synchronization, and ends at planning readiness. It never activates a wave. A legacy bounded evolution does not silently enroll an existing project; a complete-version request follows the full discovery contract, and an enrolled changed dossier needs a fresh discovery review and check. Use only supported lifecycle states when replacing or deferring pending work.
 
-## Using RIFF with Claude Code
+## Review bridge
 
-Both frameworks may share `PROJECT.md` and `ROADMAP.yaml` in an application. Claude owns `.riff` and `.riff-state/`; Codex owns `.riff-codex` and `.riff-codex-state/`. Only one runtime should execute a given phase at a time.
+`riff review run` is implemented in [`riff/lib/review-bridge.mjs`](../riff/lib/review-bridge.mjs), with prompt templates and the output schema in [`riff/references/review-prompts/`](../riff/references/review-prompts/).
 
-Initialization migrates old Codex paths only when both the framework link and configuration prove ownership by this exact Codex checkout. Foreign Claude paths are preserved, and existing hooks are chained. Do not manually rename or overwrite them.
+- **Candidate.** `functional` and `security` review the staged tree of the active phase, or the phase named by `--phase`. `--quick` reviews a staged change outside any phase; the result is advisory and prints no record command. `discovery` reviews the dossier digest from `discovery snapshot`. `delivery` reviews the committed `HEAD` tree with a clean worktree.
+- **Chain.** By default: `codex:gpt-6-astra`, `codex:gpt-6.1-sol`, then a fresh `claude:opus`. Codex runs as `codex exec --ignore-user-config -s read-only --ephemeral --output-schema`; Claude runs as `claude -p --no-session-persistence --tools Read,Grep,Glob --json-schema`. Effort is `medium`, `high` for `security` and `delivery`.
+- **Fallback.** The next reviewer runs only on real unavailability: CLI missing, not logged in, model unavailable, quota or rate limit, timeout, or an error. Output that doesn't match the schema is retried once, then counts as unavailable. A negative review never triggers the next reviewer.
+- **Verdict.** A HIGH or CRITICAL finding forces `fail`. The bridge refuses a run on a candidate whose last review of that type failed, and stops a dossier after three failed rounds.
+- **Artifact.** `.riff-data/reviews/<type>-<candidate>-<time>.json`, with `reviewer.id` such as `codex:gpt-6-astra@high`, `family`, `sameFamily`, the CLI version, and `skipped` reviewers with their reasons. The printed command (`riff wave review ...`, `riff discovery review --evidence FILE` or `riff finish --review FILE`) is run by the agent; the bridge records nothing itself.
+- **Same family.** The builder's family comes from the host running the command (`anthropic` under Claude Code, `openai` under Codex), or from `reviewers.builderFamily`. The dashboard labels a same-family review.
+- **Security deferral.** Phase-scoped findings already marked `expert_review` are passed to the reviewer so they aren't reported again unless the candidate makes them worse.
+
+Optional settings in `.riff-data/config.json`. Without a `reviewers` key, the defaults apply; `init` and `resync` don't write one.
+
+```json
+"reviewers": {
+  "chain": [{ "via": "codex", "model": "gpt-6-astra" }, { "via": "codex", "model": "gpt-6.1-sol" }, { "via": "claude", "model": "opus", "fresh": true }],
+  "effort": { "default": "medium", "security": "high", "delivery": "high" },
+  "timeoutSeconds": 1200
+}
+```
+
+`riff doctor` checks that each CLI in the chain answers `--version`, and that Codex is logged in, without calling a model.
+
+## Coexisting with the original RIFF framework
+
+Both frameworks may share `PROJECT.md` and `ROADMAP.yaml` in an application. The original framework owns `.riff` and `.riff-state/`; this one owns `.riff-cli` and `.riff-data/`, plus the older `.riff-codex` and `.riff-codex-state/` names in projects that haven't been migrated yet. Only one should execute a given phase at a time.
+
+Initialization never creates or replaces the original framework's paths. Old paths of this framework are migrated only when the framework link and configuration prove ownership by this checkout. Existing hooks are chained. Don't manually rename or overwrite them.
 
 ## Dashboard
 
-The dashboard is a separate Bun application. It reads registered projects and their display files; it does not invoke Codex, Claude, an AI API, or wave commands. Its default address is `http://127.0.0.1:4000`.
+The dashboard is a separate Bun application. It reads registered projects and their display files; it doesn't invoke Codex, Claude, an AI API, or wave commands. Its status view shows who reviewed the functional and security work, labels a same-family reviewer, and notes any fallback. Its default address is `http://127.0.0.1:4000`.
 
 Read the [dashboard README](../riff/dashboard/README.md) and [projection contract](../riff/references/dashboard.md) for configuration and display-file rules.
 
@@ -95,13 +137,14 @@ Read the [dashboard README](../riff/dashboard/README.md) and [projection contrac
 - [Taste](../riff/references/taste.md): selective conventions, learning and Claude coexistence.
 - [Frontend taste](../riff/references/taste/frontend.md): required design skills and rendered acceptance.
 - [NowStack](../riff/references/taste/stacks/nowstack.md): starter conventions and version-aware evidence.
-- [Security](../riff/references/security.md): sensitive boundaries and required review.
+- [Security](../riff/references/security.md): sensitive boundaries, required review, and `expert_review` deferral.
+- [Evidence](../riff/references/evidence.md): review artifacts and the review bridge as their normal source.
 - [Model routing](../riff/references/model-routing.md): when and how to use additional agents.
-- [Start](../riff/skills/start/SKILL.md), [onboard](../riff/skills/onboard/SKILL.md), and [wave](../riff/skills/wave/SKILL.md): core workflows.
+- [Start](../riff/skills/start/SKILL.md), [onboard](../riff/skills/onboard/SKILL.md), [evolve](../riff/skills/evolve/SKILL.md) and [wave](../riff/skills/wave/SKILL.md): core workflows.
 - [Quick](../riff/skills/quick/SKILL.md), [debug](../riff/skills/debug/SKILL.md), and [add phase](../riff/skills/add-phase/SKILL.md): everyday changes.
-- [Map](../riff/skills/map/SKILL.md), [evolve](../riff/skills/evolve/SKILL.md), [learn stack](../riff/skills/learn-stack/SKILL.md), [incident](../riff/skills/incident/SKILL.md), [deep audit](../riff/skills/deep-audit/SKILL.md), and [promote](../riff/skills/promote/SKILL.md): less frequent workflows.
+- [Status](../riff/skills/status/SKILL.md), [dashboard](../riff/skills/dashboard/SKILL.md), [learn stack](../riff/skills/learn-stack/SKILL.md), [issue](../riff/skills/issue/SKILL.md) and [deep audit](../riff/skills/deep-audit/SKILL.md) (Codex only): less frequent workflows.
 
-For framework code changes, the existing test command is `npm test` from the RIFF Codex checkout. Documentation changes need link, content, and rendering checks rather than a full application test run.
+For framework code changes, the existing test command is `npm test` from the RIFF checkout. Documentation changes need link, content, and rendering checks rather than a full application test run.
 
 ## Executed evidence and production lifecycle
 
@@ -115,7 +158,7 @@ stored record predates that field, not that verification passed or was waived.
 After confirming this legacy boundary, use:
 
 ```sh
-riff-codex wave sync --preserve-legacy-verification
+riff wave sync --preserve-legacy-verification
 ```
 
 This explicit compatibility mode preserves the entire terminal record and its

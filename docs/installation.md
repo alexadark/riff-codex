@@ -105,6 +105,8 @@ Open a new Claude Code session in the project. On the first session, Claude Code
 - subagents named after RIFF's model profiles, such as `riff:sonnet-5-5-medium`, each with its model and effort fixed. RIFF uses them when a wave delegates work;
 - the RIFF context, injected automatically when a session starts, resumes, or restarts after `/clear` or a compaction.
 
+Every skill is available except `deep-audit`, which routes to Codex Security and stays in Codex.
+
 Try a first request. Use start for a new idea, or onboard for an existing app:
 
 ```text
@@ -123,6 +125,8 @@ When a phase, a dossier or the final version is ready, RIFF runs `riff review ru
 
 Security findings are corrected during the wave and never stop it. A point that needs a security expert's judgment rather than a code fix gets the most cautious interim decision that keeps the app working, documented in its note. Delivery isn't blocked: `riff finish --check` lists these points so you can show them to an expert when one is available.
 
+Reviews run the same way whichever host builds. A review files its result under `.riff-data/reviews/`, and the dashboard shows which reviewer ran, with a label when it comes from the same model family as the builder.
+
 `riff doctor` shows whether the Codex and Claude reviewers are available. To change the order, the models or the effort, add a `reviewers` object to `.riff-data/config.json`, for example:
 
 ```json
@@ -131,6 +135,8 @@ Security findings are corrected during the wave and never stop it. A point that 
   "effort": { "default": "medium", "security": "high", "delivery": "high" }
 }
 ```
+
+The [technical reference](technical-reference.md#review-bridge) details the chain, the fallback rules and every setting.
 
 [Continue with the everyday guide](usage.md).
 

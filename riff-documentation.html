@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="How to install RIFF for Codex, plan a project, run checked work, and resume it later.">
-<title>RIFF for Codex</title>
+<meta name="description" content="How to install RIFF in Claude Code or Codex, plan a project, run checked and independently reviewed work, and resume it later.">
+<title>RIFF field manual</title>
 <style>
 @font-face {
   font-family: 'Fraunces';
@@ -613,7 +613,7 @@ details>div{padding-top:18px}
 <a class="skip" href="#main">Skip to content</a>
 <header class="masthead">
  <div class="masthead-inner">
-  <div><div class="brand-eyebrow">RIFF for Codex</div><h1 class="brand-title">RIFF<span class="dot">.</span></h1><p class="brand-tag">Build like a band of six. Ship like one.</p></div>
+  <div><div class="brand-eyebrow">For Claude Code and Codex</div><h1 class="brand-title">RIFF<span class="dot">.</span></h1><p class="brand-tag">Build like a band of six. Ship like one.</p></div>
   <div class="masthead-meta"><pre class="masthead-ascii" aria-label="RIFF ASCII logo">██████╗ ██╗███████╗███████╗
 ██╔══██╗██║██╔════╝██╔════╝
 ██████╔╝██║█████╗  █████╗
@@ -629,72 +629,86 @@ details>div{padding-top:18px}
  <button class="tab" id="tab-workflow" type="button" role="tab" aria-controls="workflow" aria-selected="false" tabindex="-1"><span class="num">03</span>Workflow</button>
  <button class="tab" id="tab-roles" type="button" role="tab" aria-controls="roles" aria-selected="false" tabindex="-1"><span class="num">04</span>Roles &amp; models</button>
  <button class="tab" id="tab-checks" type="button" role="tab" aria-controls="checks" aria-selected="false" tabindex="-1"><span class="num">05</span>Checks &amp; failures</button>
- <button class="tab" id="tab-commands" type="button" role="tab" aria-controls="commands" aria-selected="false" tabindex="-1"><span class="num">06</span>Commands</button>
- <button class="tab" id="tab-progress" type="button" role="tab" aria-controls="progress" aria-selected="false" tabindex="-1"><span class="num">07</span>Progress &amp; resume</button>
- <button class="tab" id="tab-reference" type="button" role="tab" aria-controls="reference" aria-selected="false" tabindex="-1"><span class="num">08</span>Reference</button>
+ <button class="tab" id="tab-reviews" type="button" role="tab" aria-controls="reviews" aria-selected="false" tabindex="-1"><span class="num">06</span>Reviews</button>
+ <button class="tab" id="tab-commands" type="button" role="tab" aria-controls="commands" aria-selected="false" tabindex="-1"><span class="num">07</span>Commands</button>
+ <button class="tab" id="tab-progress" type="button" role="tab" aria-controls="progress" aria-selected="false" tabindex="-1"><span class="num">08</span>Progress &amp; resume</button>
+ <button class="tab" id="tab-reference" type="button" role="tab" aria-controls="reference" aria-selected="false" tabindex="-1"><span class="num">09</span>Reference</button>
 </div>
 </nav>
 <main id="main">
 <section id="overview" class="panel active" role="tabpanel" aria-labelledby="tab-overview" tabindex="0">
 <div class="section-head"><span class="section-num">№ 01</span><h2 class="section-title">What RIFF does</h2></div>
-<p class="lede">RIFF helps Codex turn your request into a clear plan, build it in useful steps, check the results, and remember where to continue.</p>
-<p>You describe the application or improvement you want. Codex does the work. RIFF provides the instructions and progress records that keep that work connected to the goal. You can use it for a new idea or an application that already exists.</p>
+<p class="lede">RIFF helps your coding agent, in Claude Code or Codex, turn your request into a clear plan, build it in useful steps, have another model review the results, and remember where to continue.</p>
+<p>You describe the application or improvement you want. The agent in your host does the work, and a model from another family reviews it. RIFF provides the instructions, reviews and progress records that keep that work connected to the goal. You can use it for a new idea or an application that already exists.</p>
+<p>RIFF runs in two coding tools, called hosts: Claude Code and Codex. Connecting a project sets it up for both, so you can switch hosts without reinstalling. The skills are the same; only the way you call them changes, <code>/riff:wave</code> in Claude Code and <code>$riff:wave</code> in Codex. This manual shows both.</p>
 <div class="grid grid-2">
  <div class="card"><h4>The project brief</h4><p><code>PROJECT.md</code> says what you are building, who it is for, what matters, and what is outside the current scope. It gives future work the same starting point, even after a break.</p></div>
  <div class="card"><h4>The roadmap</h4><p><code>ROADMAP.yaml</code> divides the goal into steps you can try. Each step has a priority and lists anything that must be completed first. RIFF calls a step a <strong>phase</strong>.</p></div>
 </div>
 <p>For a recipe app, a useful first phase is “save a recipe and find it again.” A later phase might add search. Each phase should deliver a usable result, rather than leaving you with several disconnected pieces of an unfinished feature.</p>
 <h3 class="subhead">Your first conversation</h3>
-<p>For a new idea, choose <code>$riff:start</code>. For an existing application, install RIFF, use <code>$riff:map</code>, then <code>$riff:onboard</code>. Once onboarded, use <code>$riff:evolve</code> to plan a product change. Describe the result you want in ordinary language.</p>
-<div class="command"><div class="command-bar"><span>In Codex</span><button class="copy-button" type="button" data-copy="first-request">Copy</button></div><pre id="first-request">$riff:start I want a recipe app where I can save a recipe,
+<p>For a new idea, choose <code>/riff:start</code>. For an existing application, install RIFF, then use <code>/riff:onboard</code>, which maps the current system and establishes its baseline. Once onboarded, use <code>/riff:evolve</code> to plan a product change. Describe the result you want in ordinary language. In Codex, replace <code>/riff:</code> with <code>$riff:</code>.</p>
+<div class="command"><div class="command-bar"><span>In Claude Code</span><button class="copy-button" type="button" data-copy="first-request">Copy</button></div><pre id="first-request">/riff:start I want a recipe app where I can save a recipe,
 find it later, and read the ingredients while cooking.</pre><span class="copy-status" role="status"></span></div>
-<p>For a production application, start prepares the complete version dossier: stories and success criteria, journeys, data and access rules, architecture, diagrams, and design. An independent review must pass before building. Scratch work stays lightweight. Use <code>$riff:wave</code> separately to begin implementation; start, onboard, and evolve stop after planning.</p>
+<p>For a production application, start prepares the complete version dossier: stories and success criteria, journeys, data and access rules, architecture, diagrams, and design. An independent review must pass before building. Scratch work stays lightweight. Use the wave skill separately to begin implementation; start, onboard, and evolve stop after planning.</p>
 <h3 class="subhead">How much you direct</h3>
 <div class="table-wrap"><table><thead><tr><th>Mode</th><th>What happens</th></tr></thead><tbody>
 <tr><td>Loop, the default</td><td>RIFF makes conservative choices, records assumptions, and continues through ready work. It preserves existing behavior and data and avoids adding speculative scope.</td></tr>
 <tr><td>Guided</td><td>RIFF asks about the current planning decisions and pauses between phases so you can direct what happens next.</td></tr>
 </tbody></table></div>
-<p>You choose the mode during installation and can change it with <code>riff-codex init --configure</code>. Both modes still require the relevant checks. Uploading code to GitHub or putting the application online needs your instruction.</p>
+<p>You choose the mode during installation and can change it with <code>riff init --configure</code>. Both modes still require the relevant checks. Uploading code to GitHub or putting the application online needs your instruction.</p>
 <p><a href="#installation" data-section-link="installation">Install RIFF</a> or <a href="#workflow" data-section-link="workflow">follow the complete workflow</a>.</p>
 </section>
 
 <section id="installation" class="panel" role="tabpanel" aria-labelledby="tab-installation" tabindex="0">
 <div class="section-head"><span class="section-num">№ 02</span><h2 class="section-title">Installation</h2></div>
-<p>Install RIFF once in a permanent folder, then connect each application you want to use it in. Each application keeps its own plan and progress.</p>
+<p>Install RIFF once in a permanent folder, then connect each application you want to use it in. Each application keeps its own plan and progress, and each connection sets up both hosts.</p>
 <h3 class="subhead">1. Check what you need</h3>
 <ul>
-<li>Codex, installed and signed in.</li>
+<li>Claude Code or Codex, installed and signed in. This is where you talk to RIFF.</li>
 <li>Git, which keeps the history of changes to your application.</li>
 <li>Node.js 20 or newer, with npm included. These run and install RIFF.</li>
 <li>Bun, which runs the dashboard and is required by the full setup check.</li>
 <li>A GitHub account with access to the private <code>alexadark/riff-codex</code> repository.</li>
+<li>Recommended, even if you build in Claude Code: the Codex CLI signed in to ChatGPT with <code>codex login</code>. It runs the default reviewer, GPT-6 Astra. Without it, reviews fall back to a fresh Claude session and are labeled same-family.</li>
 </ul>
-<p>In Terminal, <code>git --version</code>, <code>node --version</code>, <code>npm --version</code>, and <code>bun --version</code> tell you whether those tools are available. Install any missing tool before continuing.</p>
+<p>In Terminal, <code>git --version</code>, <code>node --version</code>, <code>npm --version</code>, <code>bun --version</code>, <code>claude --version</code>, <code>codex --version</code> and <code>codex login status</code> tell you whether those tools are available. Install any missing tool before continuing.</p>
 <h3 class="subhead">2. Download RIFF</h3>
 <div class="command"><div class="command-bar"><span>In Terminal, once</span><button class="copy-button" type="button" data-copy="install-code">Copy</button></div><pre id="install-code">git clone https://github.com/alexadark/riff-codex.git ~/riff-codex
 cd ~/riff-codex
 npm install
 npm link</pre><span class="copy-status" role="status"></span></div>
-<p>Keep this folder in place: your projects will refer to it. If you already downloaded RIFF, use that folder and run <code>npm install</code> and <code>npm link</code> there. You do not need another copy.</p>
-<h3 class="subhead">3. Connect your application</h3>
+<p>Keep this folder in place: your projects will refer to it. <code>npm link</code> makes the <code>riff</code> command available; the older name <code>riff-codex</code> still works as an alias. If you already downloaded RIFF, use that folder and run <code>npm install</code> and <code>npm link</code> there. You don't need another copy.</p>
+<h3 class="subhead">3. Register the Claude Code plugin</h3>
+<p>Claude Code finds the RIFF skills and subagents through a plugin. Register its marketplace once per computer. Skip this step if you only use Codex.</p>
+<div class="command"><div class="command-bar"><span>In Terminal, once per computer</span><button class="copy-button" type="button" data-copy="marketplace-code">Copy</button></div><pre id="marketplace-code">claude plugin marketplace add ~/riff-codex/riff</pre><span class="copy-status" role="status"></span></div>
+<h3 class="subhead">4. Connect your application</h3>
 <p>Replace the example path with your application's folder. It must already use Git. For a completely new folder, run <code>git init</code> there first.</p>
 <div class="command"><div class="command-bar"><span>In your project's Terminal</span><button class="copy-button" type="button" data-copy="init-code">Copy</button></div><pre id="init-code">cd /path/to/your-project
-riff-codex init</pre><span class="copy-status" role="status"></span></div>
-<p>RIFF asks about project scope, conversation language, document language, explanation level, and loop or guided mode. Press Enter to accept a suggested choice. This connects the tools; it does not write your product plan yet.</p>
-<h3 class="subhead">4. Make the skills available in Codex</h3>
-<p>Open the application in a fresh Codex session. Initialization adds RIFF entries to the project's skill picker. Choose the RIFF start, onboard, wave, or other skill there.</p>
-<p>The exact <code>$riff:...</code> names in this manual are provided by the native RIFF plugin in the checkout's <code>riff/</code> folder. <code>npm link</code> and <code>riff-codex init</code> do not enable the plugin themselves. If those names are unavailable, select the corresponding installed project skill. See the <a href="docs/installation.md#make-the-skills-available">installation guide</a> for the distinction.</p>
-<h3 class="subhead">5. Approve the automatic checks</h3>
-<p>Run <code>riff-codex doctor</code> first. If it reports matching system-managed hooks, reload Codex configuration or restart the app; no individual hook approval is required. Otherwise, open <code>/hooks</code> in Codex, review RIFF's project checks, and approve them. Hooks are checks triggered automatically at certain moments while work happens. After you have actually approved them, record that approval:</p>
-<div class="command"><div class="command-bar"><span>In your project's Terminal</span><button class="copy-button" type="button" data-copy="doctor-code">Copy</button></div><pre id="doctor-code">riff-codex doctor --record-hooks-approved</pre><span class="copy-status" role="status"></span></div>
-<p>This records your approval and checks the setup; it cannot approve the hooks for you. Read any reported error or warning. A roadmap that has not been created yet is normal before your first start or onboard request.</p>
-<p>Now choose start for a new product, or map then onboard for an existing application. Evolve prepares subsequent product changes. Use <code>$riff:wave</code> when the plan is ready.</p>
+riff init
+riff doctor</pre><span class="copy-status" role="status"></span></div>
+<p>RIFF asks about project scope, conversation language, document language, explanation level, and loop or guided mode. Press Enter to accept a suggested choice. This connects the tools; it doesn't write your product plan yet. Read any error or warning from <code>riff doctor</code>. A roadmap that hasn't been created yet is normal before your first start or onboard request.</p>
+<div class="table-wrap"><table><thead><tr><th>What init sets up</th><th>Claude Code</th><th>Codex</th></tr></thead><tbody>
+<tr><td>Skills</td><td>The <code>riff</code> plugin, switched on for the project. Called as <code>/riff:wave</code>.</td><td>Project entries under <code>.agents/skills/riff-codex-*</code>, or the native plugin's <code>$riff:wave</code> names.</td></tr>
+<tr><td>Automatic checks</td><td>Hooks in <code>.claude/settings.local.json</code>.</td><td>Hooks in <code>.codex/hooks.json</code>, approved in <code>/hooks</code> unless system-managed.</td></tr>
+<tr><td>Model profiles</td><td>Subagents such as <code>riff:sonnet-5-5-medium</code>, with model and effort fixed.</td><td>Applied through native launch tools.</td></tr>
+<tr><td>Long sessions</td><td>Compaction at 400,000 tokens. RIFF's context is injected again after a compaction or <code>/clear</code>.</td><td>Native Codex compaction. RIFF's context is injected at start, on resume and after a compaction.</td></tr>
+</tbody></table></div>
+<p>Both hosts share <code>.riff-cli</code>, a link to your RIFF folder, and <code>.riff-data/</code>, the project's RIFF state. These files are specific to your computer and stay out of Git. RIFF never edits your project's <code>CLAUDE.md</code>.</p>
+<h3 class="subhead">5a. Open the project in Claude Code</h3>
+<p>Start a new Claude Code session in the project. On the first session, Claude Code installs the RIFF plugin by itself. Every skill is available except <code>deep-audit</code>, which routes to Codex Security and stays in Codex. If <code>/riff:wave</code> is missing, run <code>riff doctor</code>, register the marketplace if it reports it missing, then open a new session.</p>
+<h3 class="subhead">5b. Open the project in Codex and approve the checks</h3>
+<p>Open the application in a fresh Codex session. Initialization adds RIFF entries to the project's skill picker. The exact <code>$riff:...</code> names are provided by the native RIFF plugin in the checkout's <code>riff/</code> folder; <code>npm link</code> and <code>riff init</code> don't enable that plugin themselves. If those names are unavailable, select the corresponding installed project skill. See the <a href="docs/installation.md#use-riff-in-codex">installation guide</a> for the distinction.</p>
+<p>Run <code>riff doctor</code> first. If it reports matching system-managed hooks, reload Codex configuration or restart the app; no individual hook approval is required. Otherwise, open <code>/hooks</code> in Codex, review RIFF's project checks, and approve them. Hooks are checks triggered automatically at certain moments while work happens. After you have actually approved them, record that approval:</p>
+<div class="command"><div class="command-bar"><span>In your project's Terminal</span><button class="copy-button" type="button" data-copy="doctor-code">Copy</button></div><pre id="doctor-code">riff doctor --record-hooks-approved</pre><span class="copy-status" role="status"></span></div>
+<p>This records your approval and checks the setup; it can't approve the hooks for you.</p>
+<p>Now choose start for a new product, or onboard for an existing application. Evolve prepares subsequent product changes. Use the wave skill when the plan is ready.</p>
 <details><summary>Update RIFF or change preferences</summary><div>
-<p>To revisit the setup choices, run <code>riff-codex init --configure</code> in the application. To update RIFF, finish active work first, check that its permanent folder has no uncommitted edits, then run <code>git pull --ff-only</code> and <code>npm install</code> there. Run <code>riff-codex resync</code> and <code>riff-codex doctor</code> in each application afterward.</p>
-<p>Model advice has a separate project preference and defaults to <code>local</code>, which means advice written by the current Codex agent from RIFF's catalogue. It is not on-device inference. Use <code>riff-codex model-advice configure --mode jev --allow-jev-summary</code> to permit curated decision summaries to reach Jev through OpenRouter, or choose <code>local</code> or <code>off</code> to revoke that persistent permission. Configuration does not call a provider or change the active model.</p>
-<p><strong>For this release, resync each connected project once.</strong> This refreshes local installation files, including newly available skills such as evolve and the hook configuration, while preserving its brief, roadmap and preferences.</p>
-<p>Projects linked to the same RIFF folder already read its updated files. They do not need separate Git pulls or reinstalls. Start a fresh Codex session to load the updated skills. For model-routing-only changes, a fresh session is enough when the links are intact. Another checkout, machine or separately installed plugin copy needs its own update.</p>
-<p>If doctor reports matching system-managed hooks, reload Codex configuration; individual approval is not required. Otherwise, review changed project hooks before recording approval. Restart an already-running dashboard process and reload its page to load server changes. The <a href="docs/installation.md#update-riff">update guide</a> explains the steps.</p>
+<p>To revisit the setup choices, run <code>riff init --configure</code> in the application. To update RIFF, finish active work first, check that its permanent folder has no uncommitted edits, then run <code>git pull --ff-only</code> and <code>npm install</code> there. Run <code>riff resync</code> and <code>riff doctor</code> in each application afterward.</p>
+<p>Model advice has a separate project preference and defaults to <code>local</code>, which means advice written by the current agent from RIFF's catalogue. It isn't on-device inference. Use <code>riff model-advice configure --mode jev --allow-jev-summary</code> to permit curated decision summaries to reach Jev through OpenRouter, or choose <code>local</code> or <code>off</code> to revoke that persistent permission. Configuration doesn't call a provider or change the active model.</p>
+<p><strong>For this release, resync each connected project once.</strong> This refreshes local installation files for both hosts, while preserving its brief, roadmap and preferences. Projects connected before the rename have <code>.riff-codex</code> and <code>.riff-codex-state/</code>: when no phase is active, <code>riff resync</code> moves the state to <code>.riff-data/</code> after a full backup in <code>.riff-data/backups/</code>, and keeps the old names as links. If a phase is active, the move waits and resync says so.</p>
+<p>Projects linked to the same RIFF folder already read its updated files. They don't need separate Git pulls or reinstalls. Start a fresh session to load the updated skills. Another checkout, machine or separately installed plugin copy needs its own update.</p>
+<p>If doctor reports matching system-managed Codex hooks, reload Codex configuration; individual approval isn't required. Otherwise, review changed Codex project hooks before recording approval. Restart an already-running dashboard process and reload its page to load server changes. The <a href="docs/installation.md#update-riff">update guide</a> explains the steps.</p>
 </div></details>
 </section>
 
@@ -707,19 +721,19 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <li><button type="button" data-step="1" aria-pressed="true" aria-controls="step-explanation"><span>1</span><span><strong>Your request</strong>Describe the result you want.</span></button></li>
 <li><button type="button" data-step="2" aria-pressed="false" aria-controls="step-explanation"><span>2</span><span><strong>Prepare and review the plan</strong>Define the version, design, and success criteria.</span></button></li>
 <li><button type="button" data-step="3" aria-pressed="false" aria-controls="step-explanation"><span>3</span><span><strong>Select or resume a phase</strong>Choose work whose earlier steps are complete.</span></button></li>
-<li><button type="button" data-step="4" aria-pressed="false" aria-controls="step-explanation"><span>4</span><span><strong>Codex builds</strong>Implement one usable result.</span></button></li>
-<li><button type="button" data-step="5" aria-pressed="false" aria-controls="step-explanation"><span>5</span><span><strong>Check and review</strong>Verify the changed behavior.</span></button></li>
+<li><button type="button" data-step="4" aria-pressed="false" aria-controls="step-explanation"><span>4</span><span><strong>The agent builds</strong>Implement one usable result.</span></button></li>
+<li><button type="button" data-step="5" aria-pressed="false" aria-controls="step-explanation"><span>5</span><span><strong>Check and review</strong>Verify, then have another model review.</span></button></li>
 <li><button type="button" data-step="6" aria-pressed="false" aria-controls="step-explanation"><span>6</span><span><strong>Commit and update the PR</strong>Publish validated progress when authorized.</span></button></li>
 <li><button type="button" data-step="7" aria-pressed="false" aria-controls="step-explanation"><span>7</span><span><strong>Continue, then verify the version</strong>Check connected journeys before final delivery.</span></button></li>
 </ol>
 <div id="step-explanation" class="flow-info card" aria-live="polite" aria-atomic="true">
-<h3 class="subhead">Your request</h3><p>Describe what someone should be able to do and why. Codex can investigate the application and the technical choices.</p><code>“Let me save a recipe and find it later.”</code>
+<h3 class="subhead">Your request</h3><p>Describe what someone should be able to do and why. The agent can investigate the application and the technical choices.</p><code>“Let me save a recipe and find it later.”</code>
 </div>
 </div>
 <div class="flow-connections">
 <div><h3 class="subhead">5 fails → correction → check again</h3><p>A formal failed check permits a focused correction and one repeat. If it still fails, RIFF records a blocker instead of completing the phase.</p></div>
 <div><h3 class="subhead">7 → 3: the work loop</h3><p>Loop mode selects the next ready phase, even after updating a draft PR. Guided mode pauses between phases. After the last phase, RIFF verifies the connected whole version and completes the final review.</p></div>
-<div class="display-path"><h3 class="subhead">Brief + roadmap + progress ⇢ dashboard</h3><p>The dashboard reads the planned work, saved state, and short explanations of intended and verified results. Completed phases and blockers both appear there.</p><p>This is a one-way display path. The dashboard does not start Codex, run a phase, or change the plan.</p></div>
+<div class="display-path"><h3 class="subhead">Brief + roadmap + progress ⇢ dashboard</h3><p>The dashboard reads the planned work, saved state, and short explanations of intended and verified results. Completed phases and blockers both appear there.</p><p>This is a one-way display path. The dashboard doesn't start an agent, run a phase, or change the plan.</p></div>
 </div>
 </div>
 <h3 class="subhead">What makes a phase ready</h3>
@@ -730,14 +744,13 @@ riff-codex init</pre><span class="copy-status" role="status"></span></div>
 <p>You can hand the wireframes to another design model. Its returned design and tokens join the dossier before implementation. A promised reference that has not arrived keeps the plan incomplete; RIFF does not invent a substitute. An independent review checks the complete dossier, and <code>discovery check</code> verifies that the review matches its current content.</p>
 <p>Scratch work and bounded changes can stay light. Existing projects are not silently enrolled in complete discovery. Once enrolled, a changed dossier needs a fresh review. The plan covers the committed version, not every possible future feature or file.</p>
 <h3 class="subhead">Evolve an existing application</h3>
-<div class="command"><div class="command-bar"><span>After installation, in Codex</span><button class="copy-button" type="button" data-copy="evolve-path">Copy</button></div><pre id="evolve-path">$riff:map Understand the existing application and save its map.
-$riff:onboard Reuse the map and establish the current product baseline.
-$riff:evolve Plan team invitations while preserving individual accounts.
-$riff:wave</pre><span class="copy-status" role="status"></span></div>
-<p>Run these as separate requests. Map records the existing system; onboard reuses it without inventing historical phases. Evolve challenges the need, checks the current code and consequences, and revises the affected phases. It never installs or onboards a project automatically and never starts a wave.</p>
+<div class="command"><div class="command-bar"><span>After installation, in Claude Code</span><button class="copy-button" type="button" data-copy="evolve-path">Copy</button></div><pre id="evolve-path">/riff:onboard Map the existing application and establish its baseline.
+/riff:evolve Plan team invitations while preserving individual accounts.
+/riff:wave</pre><span class="copy-status" role="status"></span></div>
+<p>Run these as separate requests, with <code>$riff:</code> in Codex. Onboard maps the existing system, saves the map in <code>.riff-data/MAP.md</code> when it will be reused, and establishes the baseline without inventing historical phases. Evolve challenges the need, checks the current code and consequences, and revises the affected phases. It never installs or onboards a project automatically and never starts a wave.</p>
 <p>For team invitations, the plan explains who can invite, what members can access, how removal works, and how existing private data stays private. Related suggestions, such as shared billing, are evaluated rather than automatically accepted. An exploratory discussion can end without changing the roadmap.</p>
 <p>Completed history and active phase contracts stay intact. If a change conflicts with active work, its proposal stays outside the live dossier until a safe boundary. Future phases can be revised or replaced with an explicit mapping and updated dependencies. A bounded legacy evolution stays light; an enrolled dossier needs a new planning review.</p>
-<p>Use <code>$riff:add-phase</code> for one already-understood independent outcome, and <code>$riff:quick</code> for a small separate implementation.</p>
+<p>Use add-phase for one already-understood independent outcome, and quick for a small separate implementation.</p>
 <h3 class="subhead">One change, one branch, one pull request</h3>
 <p>Wave establishes one integration branch and one PR for the coherent evolution or initial version. After the first validated phase, it opens a draft PR when publication is authorized. Later phases update the same PR. Creating or updating a draft does not pause loop mode.</p>
 <p>After whole-version verification, independent delivery review, and the applicable <code>finish --check</code> gates, RIFF marks the PR ready for review and returns its verified URL. A standalone quick change uses its own branch and PR with bounded checks. Without publication authorization, RIFF completes local work and prepares the PR description first. Merge and deployment require their own authorization.</p>
@@ -745,17 +758,17 @@ $riff:wave</pre><span class="copy-status" role="status"></span></div>
 
 <section id="roles" class="panel" role="tabpanel" aria-labelledby="tab-roles" tabindex="0">
 <div class="section-head"><span class="section-num">№ 04</span><h2 class="section-title">Who does the work</h2></div>
-<p>Codex coordinates the work using RIFF's instructions. It can use additional agents for useful, separate assignments. These are responsibilities that the work needs, rather than a fixed group of agents launched for every request.</p>
+<p>The agent in your host, Claude Code or Codex, coordinates the work using RIFF's instructions. It can use additional agents for useful, separate assignments. These are responsibilities that the work needs, rather than a fixed group of agents launched for every request.</p>
 <div class="table-wrap"><table><thead><tr><th>Responsibility</th><th>What it contributes</th></tr></thead><tbody>
 <tr><td>You</td><td>The goal, important preferences, corrections to direction, and authorization for publication.</td></tr>
-<tr><td>Codex coordinating</td><td>Reads the project, chooses the next valid action, keeps work within scope, combines results, and reports what happened.</td></tr>
+<tr><td>Your host's agent, coordinating</td><td>Reads the project, chooses the next valid action, keeps work within scope, combines results, and reports what happened.</td></tr>
 <tr><td>Planning</td><td>Turns the request into a product brief and demonstrable phases, with priorities and prerequisites.</td></tr>
 <tr><td>Implementation</td><td>Builds the selected outcome and handles ordinary development feedback. An independent assignment can be given to a worker with clear ownership.</td></tr>
-<tr><td>Functional review</td><td>Takes a fresh look at whether the actual change satisfies the request and relevant project rules.</td></tr>
-<tr><td>Security review</td><td>Examines sensitive changes such as access rights, user data, payments, or migrations. It focuses on the changed boundary.</td></tr>
+<tr><td>Functional review</td><td>Another model, run read-only by <code>riff review run</code>, takes a fresh look at whether the actual change satisfies the request and relevant project rules.</td></tr>
+<tr><td>Security review</td><td>The same reviewer examines sensitive changes such as access rights, user data, payments, or migrations. It focuses on the changed boundary. <a href="#reviews" data-section-link="reviews">How reviews work</a>.</td></tr>
 <tr><td>Diagnosis</td><td>Investigates a concrete failure before choosing a focused correction.</td></tr>
 </tbody></table></div>
-<p>RIFF's automatic checks and dashboard are software tools, not extra AI teammates. The original “band of six” slogan is retained as RIFF's signature; it does not prescribe an agent count in RIFF Codex.</p>
+<p>RIFF's automatic checks and dashboard are software tools, not extra AI teammates. The original “band of six” slogan is retained as RIFF's signature; it doesn't prescribe an agent count.</p>
 <h3 class="subhead">When work can happen in parallel</h3>
 <p>Separate research or review tasks may run alongside implementation when useful. Editing assignments need explicit, separate ownership so two agents do not overwrite the same work. The coordinating task still owns integration and the final judgment. Parallel work is optional, not a quota.</p>
 <h3 class="subhead">Optional model advice</h3>
@@ -764,11 +777,12 @@ $riff:wave</pre><span class="copy-status" role="status"></span></div>
 <tr><td>Luna</td><td>Bounded work with clear inputs and observable checks.</td></tr>
 <tr><td>Sol</td><td>Well-scoped work with several connected steps and controlled dependencies.</td></tr>
 <tr><td>Astra</td><td>Planning, coordination, architecture, or long runs where later steps depend heavily on earlier judgment.</td></tr>
+<tr><td>Haiku, Sonnet, Opus</td><td>The Anthropic side of the catalogue: Haiku for simple reading and exact extraction, Sonnet for bounded changes and exploration, Opus as the default for coding and long work. Under Claude Code, each profile is a subagent such as <code>riff:opus-5-5-medium</code>.</td></tr>
 </tbody></table></div>
 <p>High and XHigh reasoning are reserved for a concrete difficulty, not task length alone. The versioned profile catalogue is a decision policy, not a performance leaderboard. Probabilities returned by Jev are a distribution over the supplied choices, not success rates.</p>
 <p><strong>The primary model remains manual.</strong> After settling the wave's work packages, RIFF advises profiles for the primary agent and already planned subagents. The coordinating agent applies verified subagent profiles through native launch tools when supported and authorized. Advice itself does not start workers or add a mandatory loop pause. The model actually used remains unknown unless the runtime or the user supplies evidence.</p>
 <p>With Jev enabled for the project or explicitly requested for the wave, roles needing advice share one request. Unchanged role decisions are reused; a materially changed package can be reevaluated without paying again for the other roles. This is a wave workflow, not a hook on every action. No project is opted in automatically.</p>
-<p>The default <code>local</code> mode means the current Codex agent applies the portable catalogue; it does not mean local inference. Optional <code>jev</code> mode sends a curated summary to Jev through OpenRouter only after explicit consent. OpenAI use remains on the Codex subscription. Conditional DeepSeek profiles use Ollama Cloud, require separate availability and data permission, and are never represented as local.</p>
+<p>The default <code>local</code> mode means the current agent applies the portable catalogue; it does not mean local inference. Optional <code>jev</code> mode sends a curated summary to Jev through OpenRouter only after explicit consent. OpenAI use remains on the Codex subscription. Conditional DeepSeek profiles use Ollama Cloud, require separate availability and data permission, and are never represented as local.</p>
 <p>RIFF reuses unchanged results, including provider failures, when the phase, structured constraints, and policy version are unchanged. Ordinary file edits do not trigger a new consultation. Provider failures stay explicit, with no paid automatic retry or silent provider switch. Changed decision facts cause reevaluation; deliberately refreshing unchanged facts requires a stated reason. Read the <a href="docs/model-advice.md">model advice guide</a> for modes, privacy controls, natural-language examples, and the advanced CLI.</p>
 </section>
 
@@ -777,7 +791,7 @@ $riff:wave</pre><span class="copy-status" role="status"></span></div>
 <p>A phase is complete when its promised result has been checked, the required reviews have passed, and the reviewed code has been saved in Git. Selecting a phase or finishing an edit does not meet that standard on its own.</p>
 <div class="table-wrap"><table><thead><tr><th>Check</th><th>What it answers</th><th>Recipe app example</th></tr></thead><tbody>
 <tr><td>Changed behavior</td><td>Does the feature actually work in the conditions the phase promises?</td><td>Save a recipe, return to the list, and open the saved recipe.</td></tr>
-<tr><td>Functional review</td><td>Does the change satisfy the request and the project's rules?</td><td>Check that saving works and that the empty or error state remains understandable.</td></tr>
+<tr><td>Functional review, by another model</td><td>Does the change satisfy the request and the project's rules?</td><td>Check that saving works and that the empty or error state remains understandable.</td></tr>
 <tr><td>Focused security review</td><td>Could a sensitive change expose data or give someone access they should not have?</td><td>If recipes are private, check that another account cannot read them.</td></tr>
 <tr><td>Completion record</td><td>Do the saved code and progress refer to the same reviewed result?</td><td>Record the checked recipe feature as complete, with its local Git commit.</td></tr>
 </tbody></table></div>
@@ -785,14 +799,14 @@ $riff:wave</pre><span class="copy-status" role="status"></span></div>
 <p>RIFF records which exact set of files was reviewed. If those files change afterward, the old approval no longer describes the new result. The changed version needs fresh evidence before completion. The technical records are kept in the project's local RIFF state.</p>
 <h3 class="subhead">What automatic checks do</h3>
 <p>Hooks run at specific points in the workflow. They can flag a concern for review or block a high-confidence destructive or security problem. Warnings about possible access or input issues are not, by themselves, proof of a vulnerability.</p>
-<p>RIFF avoids running a full test suite after every edit. It collects what needs checking and validates the affected behavior at the appropriate point. A credible high or critical security finding stops the phase until corrected.</p>
+<p>RIFF avoids running a full test suite after every edit. It collects what needs checking and validates the affected behavior at the appropriate point. A credible high or critical security finding must be corrected before the phase completes; the agent corrects it during the wave rather than stopping. Hooks that detect a destructive migration or a committed secret with certainty still stop the phase.</p>
 <h3 class="subhead">Evidence you can inspect</h3>
 <p>Phase completion requires executed validation for the version being delivered. Required browser and smoke checks need recorded outcomes. RIFF saves local verification reports with the checks and available screenshots; a missing external check stays unverified.</p>
 <h3 class="subhead">Who handles observations</h3>
 <p>The implementing agent reviews technical warnings before finishing. It fixes confirmed issues within scope and records the evidence for resolved items or false positives. Unverified and out-of-scope items stay pending with a reason. You can inspect decisions in the dashboard, expand processed history, and reopen an item. A new occurrence reopens its group automatically. Triage never clears a phase blocker or replaces required checks.</p>
 <h3 class="subhead">If a check fails</h3>
 <ol>
-<li>Codex can correct ordinary errors while building the feature.</li>
+<li>The agent can correct ordinary errors while building the feature.</li>
 <li>Once a formal RIFF check fails, the workflow permits one focused correction and one repeat of that failed check.</li>
 <li>If the correction still fails, the phase is recorded as blocked from completion. Independent ready work may continue.</li>
 </ol>
@@ -801,117 +815,164 @@ $riff:wave</pre><span class="copy-status" role="status"></span></div>
 <li>Required credentials or access are missing.</li>
 <li>A required check depends on an outside service and cannot be completed.</li>
 <li>A destructive action is authorized, but its exact target cannot be identified safely.</li>
-<li>A required check or review has failed and the permitted correction did not resolve it.</li>
+<li>A required check or review has failed and the permitted correction did not resolve it. A security finding is the exception: it's corrected and reviewed again, or deferred to an expert with an interim decision.</li>
 </ul>
 <p>Ordinary product or technical choices are handled conservatively in loop mode. Guided mode also pauses for the requested decisions. A missing service check is recorded as missing evidence, not reported as a successful result.</p>
 <h3 class="subhead">Local completion and publication</h3>
 <p>A local commit saves reviewed work. With publication authorization, wave pushes that completed phase and creates or updates the same draft PR while continuing ready work. Final verification makes the PR ready for review; an open PR is not a merge or a deployment. RIFF verifies GitHub status separately from local checks and does not infer merge or deployment authorization from permission to open a PR.</p>
 </section>
 
-<section id="commands" class="panel" role="tabpanel" aria-labelledby="tab-commands" tabindex="0">
-<div class="section-head"><span class="section-num">№ 06</span><h2 class="section-title">Commands</h2></div>
-<p>Use the <code>$riff:...</code> commands in a Codex conversation, or select their corresponding project skills. Add the result you want in your own words. Terminal commands are listed separately below.</p>
-<div class="table-wrap"><table><thead><tr><th>In Codex</th><th>When to use it</th><th>What it does</th></tr></thead><tbody>
-<tr><td><code>$riff:start</code></td><td>A new product idea</td><td>Prepares the scoped plan; production applications get a complete dossier and independent readiness review. Stops before building.</td></tr>
-<tr><td><code>$riff:onboard</code></td><td>An existing application</td><td>Reuses the map to establish the existing product baseline without inventing past phases.</td></tr>
-<tr><td><code>$riff:evolve</code></td><td>A change to an onboarded product</td><td>Challenges the request, analyzes impacts, and revises the affected plan. Stops before implementation.</td></tr>
-<tr><td><code>$riff:wave</code></td><td>Ready to build or continue</td><td>Builds and verifies ready phases, maintains the authorized evolution PR, then verifies the whole version.</td></tr>
-<tr><td><code>$riff:status</code></td><td>You need an update</td><td>Reports current progress, blockers, and the next action.</td></tr>
-<tr><td><code>$riff:dashboard</code></td><td>You want a visual overview</td><td>Opens the local progress dashboard.</td></tr>
-<tr><td><code>$riff:quick</code></td><td>A small separate change</td><td>Builds, checks, reviews, and commits a change that does not need a new roadmap phase.</td></tr>
-<tr><td><code>$riff:debug</code></td><td>Something is broken</td><td>Investigates the failure and aims for a focused correction.</td></tr>
-<tr><td><code>$riff:add-phase</code></td><td>One clear independent outcome</td><td>Adds one justified phase without broader replanning.</td></tr>
-<tr><td><code>$riff:map</code></td><td>You need to understand existing code</td><td>Maps application behavior, structure, and boundaries.</td></tr>
-<tr><td><code>$riff:learn-stack</code></td><td>Reusable stack conventions need evidence</td><td>Researches version-aware rules and merges them into project taste. NowStack has a dedicated baseline; frontend work uses design skills and rendered browser checks. <a href="docs/usage.md#keep-design-and-engineering-conventions">Taste and stack research</a>.</td></tr>
-<tr><td><code>$riff:incident</code></td><td>An application incident is active</td><td>Contains and investigates the incident within project boundaries.</td></tr>
-<tr><td><code>$riff:deep-audit</code></td><td>You explicitly want an exhaustive security audit</td><td>Routes the audit to Codex Security, when available.</td></tr>
-<tr><td><code>$riff:promote</code></td><td>You explicitly request promotion to production</td><td>Handles the promotion boundary and required evidence.</td></tr>
-<tr><td><code>$riff:issue</code></td><td>You explicitly want a GitHub issue</td><td>Publishes grouped work from the current project plan. It is not an automatic wave step.</td></tr>
+<section id="reviews" class="panel" role="tabpanel" aria-labelledby="tab-reviews" tabindex="0">
+<div class="section-head"><span class="section-num">№ 06</span><h2 class="section-title">Independent reviews</h2></div>
+<p class="lede">The agent that builds a phase doesn't judge it alone. RIFF asks a model from another family to attack the work, read-only, and records which reviewer actually ran.</p>
+<p>When a phase, a dossier or the final version is ready, the agent runs <code>riff review run</code>. The reviewer receives the phase criteria and the diff, reads the repository itself without changing anything, and is asked to contest the approach and its assumptions, not only to look for bugs. A review takes about a minute.</p>
+<div class="command"><div class="command-bar"><span>Run by the agent, in Terminal</span><button class="copy-button" type="button" data-copy="review-code">Copy</button></div><pre id="review-code">riff review run --type functional --phase phase-2</pre><span class="copy-status" role="status"></span></div>
+<div class="table-wrap"><table><thead><tr><th>Type</th><th>What it reviews</th><th>Recorded with</th></tr></thead><tbody>
+<tr><td><code>discovery</code></td><td>The whole planning dossier, after <code>riff discovery snapshot</code>.</td><td><code>riff discovery review --evidence FILE</code></td></tr>
+<tr><td><code>functional</code></td><td>The staged change of the active phase, or the phase named by <code>--phase</code>.</td><td><code>riff wave review</code></td></tr>
+<tr><td><code>security</code></td><td>The same candidate, focused on sensitive boundaries.</td><td><code>riff wave review</code></td></tr>
+<tr><td><code>delivery</code></td><td>The whole committed version, with a clean worktree.</td><td><code>riff finish --review FILE</code></td></tr>
 </tbody></table></div>
-<div class="command"><div class="command-bar"><span>Fix a specific problem in Codex</span><button class="copy-button" type="button" data-copy="debug-example">Copy</button></div><pre id="debug-example">$riff:debug I click Save after entering a recipe, but it never
+<p>A quick change outside any phase uses <code>--quick</code>. That review is advisory: the agent fixes what it finds, and no receipt is recorded.</p>
+<h3 class="subhead">Who reviews</h3>
+<div class="table-wrap"><table><thead><tr><th>Order</th><th>Reviewer</th><th>Runs through</th></tr></thead><tbody>
+<tr><td>1</td><td><span class="badge b-codex">GPT-6 Astra</span></td><td>The Codex CLI, as <code>codex exec</code> in a read-only sandbox, with no saved session.</td></tr>
+<tr><td>2</td><td><span class="badge b-codex">GPT-6.1 Sol</span></td><td>The Codex CLI, the same way.</td></tr>
+<tr><td>3</td><td><span class="badge b-opus">Claude Opus, fresh</span></td><td>The Claude CLI, as <code>claude -p</code> with read-only tools and no saved session.</td></tr>
+</tbody></table></div>
+<p>Effort is medium by default and high for security and delivery reviews. RIFF moves to the next reviewer only when one can't run: the CLI is missing or not signed in, the model isn't available on your plan, a quota or rate limit is reached, the call times out, or its output still doesn't match the expected format after one retry. <strong>A negative review is never a reason to try another reviewer.</strong></p>
+<p>The builder's model family comes from the host. A fresh Claude reviewer in a Claude Code project is therefore labeled <strong>same family</strong>, in the review record and on the dashboard, so you can see that the second opinion came from the same kind of model.</p>
+<h3 class="subhead">From review to receipt</h3>
+<ol>
+<li>RIFF checks that the candidate is frozen and that a new review is allowed. A review that failed can't be repeated on the unchanged candidate, and a dossier gets three failed rounds at most before RIFF records a blocker.</li>
+<li>The reviewer returns a verdict, its evidence and its findings. A HIGH or CRITICAL finding always makes the verdict a failure, whatever the model chose.</li>
+<li>RIFF writes the artifact to <code>.riff-data/reviews/</code>, with the reviewer that ran, such as <code>codex:gpt-6-astra@high</code>, its CLI version, the reviewers skipped and why.</li>
+<li>RIFF prints the command that records the review. The agent runs it itself, corrects what the reviewer found, and asks for a new review of the corrected candidate. You aren't asked to approve anything.</li>
+</ol>
+<p>If no reviewer in the chain can run, the agent uses a fresh subagent that didn't write the code and says so in its summary.</p>
+<h3 class="subhead">Security findings during a wave</h3>
+<p>A security finding never stops the wave. The agent corrects it, reviews again on the new candidate, and marks the earlier observation resolved. A plain code defect is always corrected.</p>
+<div class="note"><p>Some points need a security expert's judgment rather than a code fix: a threat model, a compliance requirement, a cryptographic or infrastructure choice, a configuration outside the repository. The agent records them as <code>expert_review</code>, applies the most cautious interim decision that keeps the app working, such as denying by default or narrowing access, and writes that decision in the note. These points don't block phases or delivery. Later reviewers are told about them, and <code>riff finish --check</code> lists them with their interim decisions for the final report. A finding that survives three corrections also goes to the expert, with its history.</p></div>
+<h3 class="subhead">Check and adjust the reviewers</h3>
+<p><code>riff doctor</code> shows whether the Codex and Claude CLIs in the chain are available, and whether Codex is signed in, without calling a model. A warning on <code>reviewer codex</code> means reviews will fall back to Claude until you install the Codex CLI or run <code>codex login</code>.</p>
+<p>To change the order, the models, the effort or the time limit, add a <code>reviewers</code> object to <code>.riff-data/config.json</code>. Without it, the defaults above apply; <code>init</code> and <code>resync</code> don't write one.</p>
+<div class="command"><div class="command-bar"><span>In .riff-data/config.json</span><button class="copy-button" type="button" data-copy="reviewers-config">Copy</button></div><pre id="reviewers-config">"reviewers": {
+  "chain": [{ "via": "codex", "model": "gpt-6-astra" }, { "via": "claude", "model": "opus" }],
+  "effort": { "default": "medium", "security": "high", "delivery": "high" },
+  "timeoutSeconds": 1200
+}</pre><span class="copy-status" role="status"></span></div>
+<p>The <a href="docs/technical-reference.md#review-bridge">technical reference</a> details the exact CLI calls and every setting.</p>
+</section>
+
+<section id="commands" class="panel" role="tabpanel" aria-labelledby="tab-commands" tabindex="0">
+<div class="section-head"><span class="section-num">№ 07</span><h2 class="section-title">Commands</h2></div>
+<p>Use the skills in the conversation: <code>/riff:...</code> in Claude Code, <code>$riff:...</code> in Codex, where you can also select the corresponding project skills. Add the result you want in your own words. Terminal commands are listed separately below.</p>
+<div class="table-wrap"><table><thead><tr><th>Skill</th><th>When to use it</th><th>What it does</th></tr></thead><tbody>
+<tr><td><code>/riff:start</code></td><td>A new product idea</td><td>Prepares the scoped plan; production applications get a complete dossier and independent readiness review. Also turns a prototype into a production project. Stops before building.</td></tr>
+<tr><td><code>/riff:onboard</code></td><td>An existing application</td><td>Maps the application and establishes the existing product baseline without inventing past phases. Replaces the former map skill.</td></tr>
+<tr><td><code>/riff:evolve</code></td><td>A change to an onboarded product</td><td>Challenges the request, analyzes impacts, and revises the affected plan. Stops before implementation.</td></tr>
+<tr><td><code>/riff:wave</code></td><td>Ready to build or continue</td><td>Builds and verifies ready phases, maintains the authorized evolution PR, then verifies the whole version.</td></tr>
+<tr><td><code>/riff:status</code></td><td>You need an update</td><td>Reports current progress, blockers, and the next action.</td></tr>
+<tr><td><code>/riff:dashboard</code></td><td>You want a visual overview</td><td>Opens the local progress dashboard.</td></tr>
+<tr><td><code>/riff:quick</code></td><td>A small separate change</td><td>Builds, checks, reviews, and commits a change that does not need a new roadmap phase.</td></tr>
+<tr><td><code>/riff:debug</code></td><td>Something is broken</td><td>Investigates the failure, including a live production incident, and aims for a focused correction. Replaces the former incident skill.</td></tr>
+<tr><td><code>/riff:add-phase</code></td><td>One clear independent outcome</td><td>Adds one justified phase without broader replanning.</td></tr>
+<tr><td><code>/riff:learn-stack</code></td><td>Reusable stack conventions need evidence</td><td>Researches version-aware rules and merges them into project taste. NowStack has a dedicated baseline; frontend work uses design skills and rendered browser checks. <a href="docs/usage.md#keep-design-and-engineering-conventions">Taste and stack research</a>.</td></tr>
+<tr><td><code>$riff:deep-audit</code></td><td>You explicitly want an exhaustive security audit</td><td>Routes the audit to Codex Security, when available. Codex only.</td></tr>
+<tr><td><code>/riff:issue</code></td><td>You explicitly want a GitHub issue</td><td>Publishes grouped work from the current project plan. It is not an automatic wave step.</td></tr>
+</tbody></table></div>
+<div class="command"><div class="command-bar"><span>Fix a specific problem in Claude Code</span><button class="copy-button" type="button" data-copy="debug-example">Copy</button></div><pre id="debug-example">/riff:debug I click Save after entering a recipe, but it never
 appears in the list. I expected to see it immediately.</pre><span class="copy-status" role="status"></span></div>
-<p>For a small change, try <code>$riff:quick Make the empty list explain how to add a recipe.</code> For one clear outcome, try <code>$riff:add-phase Let me share a recipe with a friend.</code></p>
+<p>For a small change, try <code>/riff:quick Make the empty list explain how to add a recipe.</code> For one clear outcome, try <code>/riff:add-phase Let me share a recipe with a friend.</code> In Codex, start them with <code>$riff:</code>.</p>
 <h3 class="subhead">In Terminal</h3>
 <div class="table-wrap"><table><thead><tr><th>Command</th><th>Purpose</th></tr></thead><tbody>
-<tr><td><code>riff-codex init</code></td><td>Connect the current Git project to RIFF.</td></tr>
-<tr><td><code>riff-codex init --configure</code></td><td>Revisit languages, explanations, scope, and autonomy.</td></tr>
-<tr><td><code>riff-codex model-advice configure --mode local|jev|off</code></td><td>Set this project's optional advice mode. Persistent Jev mode also requires <code>--allow-jev-summary</code>.</td></tr>
-<tr><td><code>riff-codex model-advice recommend --input FILE|-</code></td><td>Validate a curated decision summary and record or reuse advice without scanning the repository or starting work.</td></tr>
-<tr><td><code>riff-codex model-advice show</code></td><td>Show the project's advice preference and last recorded advice.</td></tr>
-<tr><td><code>riff-codex model-advice catalog</code></td><td>Print the portable canonical profile grid as JSON.</td></tr>
-<tr><td><code>riff-codex doctor</code></td><td>Check the installation without recording new approval.</td></tr>
-<tr><td><code>riff-codex resync</code></td><td>Refresh the managed links and hooks after an update.</td></tr>
-<tr><td><code>riff-codex status</code></td><td>Read saved project progress.</td></tr>
-<tr><td><code>riff-codex dashboard</code></td><td>Open the shared local dashboard, normally on port 4000.</td></tr>
-<tr><td><code>riff-codex dashboard --snapshot</code></td><td>Print the dashboard's data snapshot.</td></tr>
-<tr><td><code>riff-codex --help</code></td><td>List the available terminal operations.</td></tr>
+<tr><td><code>riff init</code></td><td>Connect the current Git project to RIFF, for both hosts.</td></tr>
+<tr><td><code>riff init --configure</code></td><td>Revisit languages, explanations, scope, and autonomy.</td></tr>
+<tr><td><code>riff model-advice configure --mode local|jev|off</code></td><td>Set this project's optional advice mode. Persistent Jev mode also requires <code>--allow-jev-summary</code>.</td></tr>
+<tr><td><code>riff model-advice recommend --input FILE|-</code></td><td>Validate a curated decision summary and record or reuse advice without scanning the repository or starting work.</td></tr>
+<tr><td><code>riff model-advice show</code></td><td>Show the project's advice preference and last recorded advice.</td></tr>
+<tr><td><code>riff model-advice catalog</code></td><td>Print the portable canonical profile grid as JSON.</td></tr>
+<tr><td><code>riff doctor</code></td><td>Check the installation for both hosts and the reviewer CLIs, without recording new approval.</td></tr>
+<tr><td><code>riff resync</code></td><td>Refresh the managed links, hooks and Claude Code settings after an update, and migrate older state.</td></tr>
+<tr><td><code>riff status</code></td><td>Read saved project progress.</td></tr>
+<tr><td><code>riff review run --type discovery|functional|security|delivery [--phase ID|--quick]</code></td><td>Run the independent reviewer and print the command that records its result. The agent normally runs it.</td></tr>
+<tr><td><code>riff observations list</code></td><td>List technical and security observations, including <code>expert_review</code> points.</td></tr>
+<tr><td><code>riff finish --check</code></td><td>Verify local completion and list security points waiting for an expert.</td></tr>
+<tr><td><code>riff dashboard</code></td><td>Open the shared local dashboard, normally on port 4000.</td></tr>
+<tr><td><code>riff dashboard --snapshot</code></td><td>Print the dashboard's data snapshot.</td></tr>
+<tr><td><code>riff --help</code></td><td>List the available terminal operations.</td></tr>
 </tbody></table></div>
-<p>Terminal wave operations manage RIFF's records. The conversation skill <code>$riff:wave</code> coordinates the actual build. This repository has no <code>riff-codex next</code> command.</p>
+<p><code>riff-codex</code> still works as an alias of <code>riff</code>. Terminal wave operations manage RIFF's records. The conversation skill wave coordinates the actual build. There is no <code>riff next</code> command.</p>
 </section>
 
 <section id="progress" class="panel" role="tabpanel" aria-labelledby="tab-progress" tabindex="0">
-<div class="section-head"><span class="section-num">№ 07</span><h2 class="section-title">Progress and resuming work</h2></div>
+<div class="section-head"><span class="section-num">№ 08</span><h2 class="section-title">Progress and resuming work</h2></div>
 <p>The roadmap describes the work. RIFF's local state records where that work stands. Short explanations make the intended and verified results readable in the dashboard.</p>
 <div class="table-wrap"><table><thead><tr><th>Dashboard column</th><th>Meaning</th></tr></thead><tbody>
 <tr><td>Todo</td><td>Planned work. A phase can only be selected once the earlier work it needs is complete.</td></tr>
 <tr><td>In progress</td><td>The phase is active. It has not yet met the completion checks.</td></tr>
 <tr><td>Done</td><td>The required checks and reviews passed and the reviewed result was committed.</td></tr>
 <tr><td>Blocked</td><td>A recorded problem prevents completion. The underlying state can be parked, blocked, or awaiting action.</td></tr>
-<tr><td>Skipped</td><td>A status supported for imported older roadmaps. RIFF Codex does not silently skip committed work.</td></tr>
+<tr><td>Skipped</td><td>A status supported for imported older roadmaps. RIFF doesn't silently skip committed work.</td></tr>
 </tbody></table></div>
 <h3 class="subhead">Return to the same project</h3>
-<div class="command"><div class="command-bar"><span>First, in Codex</span><button class="copy-button" type="button" data-copy="resume-status">Copy</button></div><pre id="resume-status">$riff:status</pre><span class="copy-status" role="status"></span></div>
+<div class="command"><div class="command-bar"><span>First, in Claude Code</span><button class="copy-button" type="button" data-copy="resume-status">Copy</button></div><pre id="resume-status">/riff:status</pre><span class="copy-status" role="status"></span></div>
 <p>Read what is active or blocked. Once a real blocker is cleared, continue with the same wave command:</p>
-<div class="command"><div class="command-bar"><span>Then, in Codex</span><button class="copy-button" type="button" data-copy="resume-wave">Copy</button></div><pre id="resume-wave">$riff:wave</pre><span class="copy-status" role="status"></span></div>
-<p>RIFF resumes active work or chooses the next ready phase using the saved state. You do not need to recreate the plan or edit a progress file yourself.</p>
+<div class="command"><div class="command-bar"><span>Then, in Claude Code</span><button class="copy-button" type="button" data-copy="resume-wave">Copy</button></div><pre id="resume-wave">/riff:wave</pre><span class="copy-status" role="status"></span></div>
+<p>In Codex, use <code>$riff:status</code> and <code>$riff:wave</code>. The saved state is the same in both hosts, so you can resume in the other one. RIFF resumes active work or chooses the next ready phase. You don't need to recreate the plan or edit a progress file yourself.</p>
+<h3 class="subhead">Long sessions and compaction</h3>
+<p>Each phase keeps a checkpoint with decisions, evidence pointers and the next action. The host compacts the conversation when it grows. In Claude Code, RIFF sets compaction at 400,000 tokens for the project instead of the default near the full context, and <code>riff doctor</code> warns when the setting is missing or higher. After a compaction or a <code>/clear</code>, a hook injects the active phase, its checkpoint and the next action again, read from the saved state. RIFF doesn't start a new session per phase or relaunch a stopped one.</p>
 <h3 class="subhead">What the dashboard reads</h3>
-<p>The shared dashboard is a local Bun application. It reads registered projects, their plans, and saved progress. It also shows explanations written before a phase and updated with verified results after completion. It does not call Codex or Claude, use an AI API, or execute a wave.</p>
+<p>The shared dashboard is a local Bun application. It reads registered projects, their plans, and saved progress. It also shows explanations written before a phase and updated with verified results after completion. It doesn't call Codex or Claude, use an AI API, or execute a wave. For the functional and security reviews, it shows the reviewer that ran, a <strong>same model family</strong> label when the reviewer shares the builder's family, and any fallback.</p>
 <p>The usual address is <code>http://127.0.0.1:4000</code>. This documentation page is a separate manual; it is not the live project dashboard.</p>
 <h3 class="subhead">Resume the same delivery</h3>
 <p>Wave checkpoints preserve the phase context, next action, and references. On resume, RIFF reconciles the actual branch, remote head, and PR identity before continuing. It reuses the same open PR for the same change and never automatically reopens a closed PR. A completed local phase does not imply its PR was merged.</p>
 <h3 class="subhead">What is saved where</h3>
-<p><code>PROJECT.md</code> and <code>ROADMAP.yaml</code> live with the application. Progress, review records, events, and dashboard explanations live in <code>.riff-codex-state/</code>. That local folder is excluded from Git.</p>
+<p><code>PROJECT.md</code> and <code>ROADMAP.yaml</code> live with the application. Progress, review records, events, and dashboard explanations live in <code>.riff-data/</code>. That local folder is excluded from Git. Projects connected before the rename keep <code>.riff-codex-state/</code> until <code>riff resync</code> moves it.</p>
 <p>Returning to the same working folder preserves that local context. A clone on another computer does not automatically contain those progress records. Do not treat the dashboard as a backup, or edit the saved state to mark work complete.</p>
-<h3 class="subhead">Using Claude RIFF in the same application</h3>
-<p>Claude RIFF and RIFF Codex can share the project brief and roadmap. Their tools and progress folders remain separate: Claude owns <code>.riff</code> and <code>.riff-state/</code>; Codex owns <code>.riff-codex</code> and <code>.riff-codex-state/</code>. Only one should execute a given phase at a time.</p>
-<p>The Claude manual explains a different runner, with different commands and roles. This page retains the useful explanation topics but describes this RIFF Codex repository's actual behavior.</p>
+<h3 class="subhead">Using the original RIFF framework in the same application</h3>
+<p>The original RIFF framework and this one can share the project brief and roadmap. Their tools and progress folders remain separate: the original owns <code>.riff</code> and <code>.riff-state/</code>; this one owns <code>.riff-cli</code> and <code>.riff-data/</code>. Initialization never creates or replaces the original framework's paths. Only one should execute a given phase at a time.</p>
 </section>
 
 <section id="reference" class="panel" role="tabpanel" aria-labelledby="tab-reference" tabindex="0">
-<div class="section-head"><span class="section-num">№ 08</span><h2 class="section-title">Reference</h2></div>
+<div class="section-head"><span class="section-num">№ 09</span><h2 class="section-title">Reference</h2></div>
 <p>These files contain the detailed instructions behind the behavior described here. The project brief and roadmap remain the shared product sources; this manual is an explanation of how RIFF uses them.</p>
 <ul class="sources">
 <li><a href="riff/references/discovery.md">Discovery and readiness</a><span>Complete version planning, design handoff, and independent review.</span></li>
 <li><a href="riff/references/evolution.md">Product evolution</a><span>Brownfield prerequisites, impact analysis, and roadmap preservation.</span></li>
 <li><a href="riff/references/git-delivery.md">Branches and pull requests</a><span>One PR across waves, publication, resume, and final readiness.</span></li>
-<li><a href="docs/installation.md">Installation guide</a><span>Prerequisites, skills, hook approval, updates, and setup problems.</span></li>
+<li><a href="riff/lib/review-bridge.mjs">Review bridge</a><span>The reviewer chain, fallback rules, and artifact format behind <code>riff review run</code>.</span></li>
+<li><a href="riff/references/evidence.md">Candidate evidence</a><span>Validation, review artifacts, and the records each gate expects.</span></li>
+<li><a href="docs/installation.md">Installation guide</a><span>Prerequisites, both hosts, independent reviews, hook approval, updates, and setup problems.</span></li>
 <li><a href="docs/usage.md">Everyday use</a><span>Examples for new ideas, existing applications, small changes, and fixes.</span></li>
 <li><a href="docs/model-advice.md">Model advice</a><span>Optional advice modes, privacy controls, natural-language use, and advanced CLI input.</span></li>
 <li><a href="docs/how-it-works.md">How it works</a><span>The project flow, who does what, and what completion means.</span></li>
-<li><a href="docs/technical-reference.md">Technical reference</a><span>File locations, terminal commands, and coexistence with Claude RIFF.</span></li>
+<li><a href="docs/technical-reference.md">Technical reference</a><span>File locations, host differences, terminal commands, the review bridge, and coexistence with the original RIFF framework.</span></li>
 <li><a href="riff/references/operating-contract.md">Operating contract</a><span>Phase selection, autonomy, retries, reviews, and completion rules.</span></li>
 <li><a href="riff/references/project-framing.md">Project framing</a><span>When a larger project needs more detail about users, data, rights, and integrations.</span></li>
 <li><a href="riff/references/model-routing.md">Model routing</a><span>The model and effort policy for different kinds of work.</span></li>
-<li><a href="riff/references/security.md">Security boundary</a><span>Sensitive changes, findings, and the required review.</span></li>
+<li><a href="riff/references/security.md">Security boundary</a><span>Sensitive changes, findings, the required review, and expert deferral.</span></li>
 <li><a href="riff/references/dashboard.md">Dashboard contract</a><span>How readable phase explanations are produced and displayed.</span></li>
 <li><a href="riff/dashboard/README.md">Dashboard setup</a><span>The standalone dashboard's configuration and operation.</span></li>
 </ul>
 <details><summary>Internal files</summary><div>
 <div class="table-wrap"><table><thead><tr><th>Path in your application</th><th>Purpose</th></tr></thead><tbody>
-<tr><td><code>.riff-codex</code></td><td>Link to the permanent RIFF checkout's framework folder.</td></tr>
-<tr><td><code>.agents/skills/riff-codex-*</code></td><td>Project entries that expose the RIFF skills.</td></tr>
-<tr><td><code>.codex/hooks.json</code></td><td>RIFF checks merged with the project's existing Codex hooks.</td></tr>
-<tr><td><code>.riff-codex-state/config.json</code></td><td>Preferences, optional model-advice consent, and recorded approval of the current hooks.</td></tr>
-<tr><td><code>.riff-codex-state/state.json</code></td><td>Current progress. Written only through RIFF's commands.</td></tr>
-<tr><td><code>.riff-codex-state/receipts/</code></td><td>Check and review evidence tied to the reviewed code.</td></tr>
-<tr><td><code>.riff-codex-state/events.ndjson</code></td><td>A short history of events.</td></tr>
-<tr><td><code>.riff-codex-state/dashboard/phases/</code></td><td>Explanations of planned and verified phase results.</td></tr>
+<tr><td><code>.riff-cli</code></td><td>Link to the permanent RIFF checkout's framework folder.</td></tr>
+<tr><td><code>.claude/settings.local.json</code></td><td>Claude Code: RIFF checks merged with existing hooks, compaction at 400,000 tokens, and the RIFF plugins switched on.</td></tr>
+<tr><td><code>.agents/skills/riff-codex-*</code></td><td>Codex: project entries that expose the RIFF skills.</td></tr>
+<tr><td><code>.codex/hooks.json</code></td><td>Codex: RIFF checks merged with the project's existing Codex hooks.</td></tr>
+<tr><td><code>.riff-data/config.json</code></td><td>Preferences, optional model-advice consent, optional reviewer settings, and recorded approval of the current Codex hooks.</td></tr>
+<tr><td><code>.riff-data/state.json</code></td><td>Current progress. Written only through RIFF's commands.</td></tr>
+<tr><td><code>.riff-data/receipts/</code></td><td>Check and review evidence tied to the reviewed code.</td></tr>
+<tr><td><code>.riff-data/reviews/</code></td><td>Review artifacts written by <code>riff review run</code>.</td></tr>
+<tr><td><code>.riff-data/events.ndjson</code></td><td>A short history of events.</td></tr>
+<tr><td><code>.riff-data/dashboard/phases/</code></td><td>Explanations of planned and verified phase results.</td></tr>
 </tbody></table></div>
-<p>Initialization also chains existing Git pre-commit and commit-message hooks. It preserves foreign Claude files and does not rewrite an existing roadmap just to change its format.</p>
+<p>Initialization also chains existing Git pre-commit and commit-message hooks. It preserves the original RIFF framework's files and doesn't rewrite an existing roadmap just to change its format.</p>
 </div></details>
 </section>
 </main>
-<footer><div class="colophon"><a href="README.md">README</a><span class="big">RIFF for Codex</span></div></footer>
+<footer><div class="colophon"><a href="README.md">README</a><span class="big">RIFF for Claude Code and Codex</span></div></footer>
 <script>
 (() => {
  'use strict';
@@ -993,11 +1054,11 @@ appears in the list. I expected to see it immediately.</pre><span class="copy-st
   });
  });
  const steps = {
-  '1': ['Your request', 'Describe what someone should be able to do and why. Codex can investigate the application and the technical choices.', '“Let me save a recipe and find it later.”'],
-  '2': ['Prepare and review the plan', 'Start prepares the complete production version, including design and independent review. Map and onboard establish an existing baseline; evolve plans its changes. Light work stays scoped. Planning never launches a build.', 'Product dossier → readiness review → separate wave request'],
+  '1': ['Your request', 'Describe what someone should be able to do and why. The agent can investigate the application and the technical choices.', '“Let me save a recipe and find it later.”'],
+  '2': ['Prepare and review the plan', 'Start prepares the complete production version, including design and independent review. Onboard maps an existing application and establishes its baseline; evolve plans its changes. Light work stays scoped. Planning never launches a build.', 'Product dossier → readiness review → separate wave request'],
   '3': ['Select or resume a phase', 'RIFF reads saved progress. It resumes active work or selects the highest-priority phase whose prerequisites are complete. A request for a specific phase still respects those prerequisites.', 'Save recipes before adding recipe search.'],
-  '4': ['Build a usable result', 'Codex reads the relevant project context and implements the phase. Separate tasks can use additional help when their ownership is clear. Ordinary development errors are corrected during this work.', 'Enter a recipe → save it → retrieve it.'],
-  '5': ['Check and review', 'The changed behavior is checked and the actual code gets a fresh functional review. Sensitive changes also require a focused security review. The evidence applies to that exact version.', 'A saved recipe should still be there when you return.'],
+  '4': ['Build a usable result', 'The agent in Claude Code or Codex reads the relevant project context and implements the phase. Separate tasks can use additional help when their ownership is clear. Ordinary development errors are corrected during this work.', 'Enter a recipe → save it → retrieve it.'],
+  '5': ['Check and review', 'The changed behavior is checked, then riff review run asks a model from another family for a read-only functional review. Sensitive changes also get a security review. The evidence applies to that exact version.', 'A saved recipe should still be there when you return.'],
   '6': ['Commit and update the PR', 'RIFF records the verified phase and its local commit. With publication authorization, it opens or updates the same draft PR for this evolution. Without it, local work continues and the PR description is prepared.', 'Validated phase → commit → same authorized PR'],
   '7': ['Verify the whole version', 'Loop follows the next ready phase without stopping at a draft PR. After the last phase, RIFF checks connected journeys, gets an independent delivery review, and marks the authorized PR ready after final gates. Merge and deployment remain separate.', 'Next phase → step 3; final verification → PR ready']
  };
