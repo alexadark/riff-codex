@@ -15,6 +15,7 @@ You need:
 - **Node.js 20 or newer**, which runs RIFF's commands. Its installer includes **npm**.
 - **Bun**, which runs the local dashboard. RIFF's installation check also requires it.
 - **Access to the private GitHub repository** `alexadark/riff-codex`.
+- **The Codex CLI signed in to ChatGPT** (`codex login`), recommended even if you build in Claude Code. RIFF uses it to have another model family, GPT-6 Astra by default, review the work. Without it, reviews fall back to a fresh Claude session and are labeled as same-family.
 
 To see which tools are already installed, run these in Terminal:
 
@@ -24,6 +25,8 @@ node --version
 npm --version
 bun --version
 claude --version
+codex --version
+codex login status
 ```
 
 A version number means the tool is available. If Terminal says a command cannot be found, install that tool before continuing. If GitHub refuses the download, check that you're signed in with an account that has access to the repository.
@@ -112,6 +115,21 @@ Read the project brief and roadmap it produces, then enter:
 
 ```text
 /riff:wave
+```
+
+### Independent reviews
+
+When a phase, a dossier or the final version is ready, RIFF runs `riff review run`. It asks another model to attack the work read-only: GPT-6 Astra through the Codex CLI, then GPT-6.1 Sol, then a fresh Claude session, moving to the next one only when a reviewer can't run (missing CLI, not signed in, quota). A negative review is never skipped. The agent corrects what the reviewer finds and records the result itself, without asking you. Each review takes about a minute.
+
+Security findings are corrected during the wave and never stop it. A point that needs a security expert's judgment rather than a code fix gets the most cautious interim decision that keeps the app working, documented in its note. Delivery isn't blocked: `riff finish --check` lists these points so you can show them to an expert when one is available.
+
+`riff doctor` shows whether the Codex and Claude reviewers are available. To change the order, the models or the effort, add a `reviewers` object to `.riff-data/config.json`, for example:
+
+```json
+"reviewers": {
+  "chain": [{ "via": "codex", "model": "gpt-6-astra" }, { "via": "claude", "model": "opus" }],
+  "effort": { "default": "medium", "security": "high", "delivery": "high" }
+}
 ```
 
 [Continue with the everyday guide](usage.md).
@@ -203,6 +221,7 @@ Projects connected before RIFF was renamed have `.riff-codex` and `.riff-codex-s
 | RIFF skills are missing in Codex | Open a fresh Codex session in the initialized project and check the skill picker. |
 | Codex hook approval is pending | Review and approve in `/hooks`, then record the approval. |
 | Bun is missing | Install Bun, then run `riff doctor` again. |
+| `riff doctor` warns about `reviewer codex` | Install the Codex CLI or run `codex login`. Reviews still work through Claude meanwhile, labeled same-family. |
 | The framework folder can't be found | Restore it to its original location. See the [technical reference](technical-reference.md) before changing existing links. |
 
 ## System-managed hooks on macOS

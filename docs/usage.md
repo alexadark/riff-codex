@@ -188,7 +188,7 @@ This adds a justified step to the plan. Use `$riff:wave` when you want RIFF to b
 
 ## Understand a pause
 
-In loop mode, ordinary product choices do not require a handoff. A real blocker can still stop work: missing access, a check that depends on an unavailable outside service, an unclear target for an authorized destructive action, or a failed check or review that could not be corrected.
+In loop mode, ordinary product choices do not require a handoff. A real blocker can still stop work: missing access, a check that depends on an unavailable outside service, an unclear target for an authorized destructive action, or a failed check that could not be corrected. A security review finding never stops the wave: it's corrected, or, when it needs an expert, given a cautious documented interim decision and listed at the end.
 
 RIFF records the reason rather than declaring the step complete. Check `$riff:status` for the next action. Uploading to GitHub, deploying, and publishing remain subject to your explicit instruction.
 
