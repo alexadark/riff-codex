@@ -8,4 +8,4 @@ Check in particular:
 - Regressions in behavior the phase didn't mean to change, including callers of modified functions.
 - Error states, empty states and edge cases a user would reach.
 - Reuse: new code that duplicates an existing component, service or helper.
-- Tests: do they exercise the real behavior, or only restate the implementation?
+- Tests: flag a test that cannot fail or only restates the implementation, and a costly behavior left with no check at all. Never ask for more tests for coverage.

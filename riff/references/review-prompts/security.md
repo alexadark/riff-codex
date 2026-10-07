@@ -10,4 +10,4 @@ Check in particular:
 - Migrations or writes that can lose or corrupt existing data.
 - Webhooks, callbacks and public APIs: signature checks, replay, rate and size limits.
 
-For each finding, state what could happen, who or what is affected, and the fix.
+Review only the boundaries this candidate touches, not the whole application. For each finding, state what could happen, who or what is affected, and the fix.

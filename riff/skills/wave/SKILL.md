@@ -22,10 +22,10 @@ After the last phase, the connected journeys of the whole version are verified, 
 
 ## Verify
 
-- Run each `verify` item. Size the tests to the change: the changed behavior and its regression boundary, not an exhaustive matrix. Reuse checks that already passed on the same candidate.
+- Run each `verify` item. Size the tests to the change under `references/taste/testing.md`: at most five new tests per phase, only for costly behavior or a bug already seen, prune low-value tests in touched files, run related tests while building and the full suite once on the final candidate. Reuse checks that already passed on the same candidate.
 - For UI work, exercise the journey in a real browser at desktop and narrow widths and attach screenshots to the verification manifest. A build, a DOM snapshot or an HTTP 200 doesn't prove a screen works.
 - Verify the assembled result, not only subagent outputs.
-- Reviews come from `riff review run --type functional|security`, which runs the configured reviewer (another model family when available) read-only on the frozen candidate and writes the artifact; record it with the command it prints. They check product criteria, regressions, reuse, design fidelity and observations, and can run in parallel. Only if the bridge reports that no reviewer could run, use a fresh native subagent that didn't write the code and say so in the summary.
+- Reviews come from `riff review run --type functional|security`, which runs the configured reviewer (another model family when available) read-only on the frozen candidate and writes the artifact; record it with the command it prints. They check product criteria, regressions, reuse, design fidelity and observations, and can run in parallel. Run security only for a sensitive phase. After a failed round, fix the HIGH and CRITICAL findings in the code and review again: the bridge then only rechecks those findings, so expect two rounds, not more. MEDIUM and lower findings are noted as observations and never start another round. Only if the bridge reports that no reviewer could run, use a fresh native subagent that didn't write the code and say so in the summary.
 - A security finding never stops the wave: correct it and review again. Defer to `expert_review` only what needs a human security expert's judgment rather than a code fix; apply and document the most conservative interim decision; those findings never block delivery and `riff finish --check` lists them for the final report.
 
 ## How to work

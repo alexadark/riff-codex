@@ -14,13 +14,13 @@ Make one bounded change that leaves the product roadmap unchanged, on its own br
 ## Done when
 
 - The changed behavior works and was checked once.
-- The staged change was reviewed with `riff review run --type functional --quick` (advisory, no receipt), adding `--type security` when the boundary is sensitive. Fix HIGH or CRITICAL findings before committing.
+- A change that touches a sensitive boundary (authentication, access, customer data, payments, migrations, public APIs) was reviewed with `riff review run --type functional --quick`, plus `--type security`, and its HIGH or CRITICAL findings fixed before committing. Other quick changes need no external review: check them yourself.
 - Observations from the change are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review`, nothing unverified marked resolved.
 - The change is one atomic commit on its branch. The draft PR is created or updated only when publication is authorized; otherwise the result stays local.
 
 ## Verify
 
-- Check only the changed behavior and its regression boundary, and report the real output.
+- Check only the changed behavior and its regression boundary, and report the real output. Follow `references/taste/testing.md`: run the related tests, add a test only for costly behavior or a bug already seen.
 - For a changed user journey, exercise it in a real browser, capture screenshots and generate the HTML report with `riff report --evidence FILE`. Nonvisual checks report observed results; never invent screenshots.
 
 ## How to work

@@ -28,7 +28,7 @@ const dir = path.dirname(process.argv[1]);
 const plan = JSON.parse(fs.readFileSync(path.join(dir, 'fake-plan.json'), 'utf8'));
 const model = args[args.indexOf(via === 'codex' ? '-m' : '--model') + 1];
 const prompt = fs.readFileSync(0, 'utf8');
-fs.appendFileSync(path.join(dir, 'fake-calls.log'), via + ':' + model + ' ' + (prompt.includes('Review type: ') ? 'prompt-ok' : 'prompt-missing') + (prompt.includes('Already deferred to a human security expert') ? ' deferred' : '') + '\\n');
+fs.appendFileSync(path.join(dir, 'fake-calls.log'), via + ':' + model + ' ' + (prompt.includes('Review type: ') ? 'prompt-ok' : 'prompt-missing') + (prompt.includes('Already deferred to a human security expert') ? ' deferred' : '') + (prompt.includes('## Recheck round') && prompt.includes('- HIGH: Missing authorization check') ? ' recheck' : '') + '\\n');
 const behavior = plan[via + ':' + model] || 'pass';
 if (behavior === 'quota') { console.error("ERROR: You've hit your usage limit."); process.exit(1); }
 const verdicts = {
@@ -198,8 +198,10 @@ test('a finding deferred to a security expert lets phases and delivery continue,
   git(root, 'add', '--', 'README.md');
   ok(root, 'wave', 'validate', 'a', '--run', '--command', JSON.stringify([process.execPath, '-e', 'process.exit(0)']), '--paths', '["README.md"]');
   assert.equal(record(root, review(root, '--type', 'security').record).status, 0);
-  assert.match(calls(root).at(-1), / deferred$/);
+  // The round after a failure only rechecks the earlier findings.
+  assert.match(calls(root).at(-1), / deferred recheck$/);
   assert.equal(record(root, review(root, '--type', 'functional').record).status, 0);
+  assert.doesNotMatch(calls(root).at(-1), /recheck/);
   commit(root);
   ok(root, 'wave', 'checkpoint', 'a', '--summary', 'Feature verified', '--next', 'Verify delivery');
   write(root, '.riff-data/a-improvements.json', []);

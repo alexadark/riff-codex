@@ -1352,7 +1352,17 @@ function reviewTarget(root, state, type, options) {
   // Deferred findings wait for a human security expert at delivery; re-reporting them would block every round.
   const deferred = observationList(state).filter((finding) => finding.status === 'expert_review' && finding.phase === phase.id);
   const deferredText = deferred.length ? `\n\nAlready deferred to a human security expert before delivery (don't report these again unless this candidate makes them worse):\n${deferred.map((finding) => `- ${finding.severity}: ${finding.summary}${finding.what_could_happen ? `. ${finding.what_could_happen}` : ''}`).join('\n')}` : '';
-  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}${deferredText}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)])}` };
+  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}${deferredText}${recheckText(root, phase, type, previous)}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)])}` };
+}
+
+// After a failed round the next review only checks the corrections, so rounds converge instead of
+// each fresh hunt finding new minor points.
+function recheckText(root, phase, type, previous) {
+  if (previous?.status !== 'fail') return '';
+  let findings = [];
+  try { findings = JSON.parse(readFileSync(localPath(root, previous.evidence.path), 'utf8')).findings ?? []; } catch {}
+  const listed = findings.length ? findings.map((finding) => `- ${finding.severity}: ${finding.title}${finding.location ? ` (${finding.location})` : ''}`).join('\n') : `- ${previous.summary}`;
+  return `\n\n## Recheck round\n\nThe previous ${type} review of this phase failed. This candidate corrects it. Check only that each finding below is corrected and that the correction did not break the code around it. Don't review the rest of the diff again. Report a new finding only if it is CRITICAL.\n\nFindings to recheck:\n${listed}`;
 }
 
 function reviewRecordCommand(type, target, artifact, file) {

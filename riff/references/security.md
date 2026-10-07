@@ -11,7 +11,7 @@ Review only the changed boundary and its concrete risk. Do not run an exhaustive
 - the recommended correction;
 - why RIFF continues or stops.
 
-A credible `HIGH` or `CRITICAL` review finding never stops the wave: record the failed review, correct the code, stage the new candidate and repeat the review, because the old receipt is invalid. When a later review passes, mark the earlier finding `resolved` with `riff observations review`, naming the correction.
+A credible `HIGH` or `CRITICAL` review finding never stops the wave: record the failed review, correct the code, stage the new candidate and repeat the review, because the old receipt is invalid. That repeat is a recheck of the earlier findings, not a fresh audit. When a later review passes, mark the earlier finding `resolved` with `riff observations review`, naming the correction.
 
 Defer a finding with `--status expert_review` only when no code change can settle it and it needs a human security expert's judgment: a threat model, a compliance or legal requirement, a cryptographic or infrastructure choice, a third-party configuration outside the repository. A plain code defect is always corrected, never deferred. If the same finding survives three corrections, defer it with its history instead of looping. Before deferring, apply the most conservative interim measure that keeps the MVP working (deny by default, narrower access, a safe default setting) and write in the note what you decided, why, and what the expert should check. Deferred findings never block phases or delivery: the bridge tells later reviewers about them, and `riff finish --check` lists them with their interim decisions for the final report. An expert's later decision is recorded as `resolved` or `false_positive`.
 
