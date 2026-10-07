@@ -36,7 +36,7 @@ After the last phase, the connected journeys of the whole version are verified, 
 4. Build the whole vertical outcome. Reuse existing components and services and keep behavior outside the phase intact. Hand substantial independent packages to subagents with their profile's model and effort; unless advice is off, run `riff model-advice plan --input -` first. Concurrent writers use separate worktrees; you own integration and RIFF state.
 5. Before freezing the candidate, merge proven lessons into taste and triage observations yourself: fix confirmed in-scope problems, record decisions with `riff observations review`, never mark an unverified finding resolved.
 6. Validate, review, record the improvement pass, run `riff wave checkpoint <phase> --summary ... --next ...`, commit, complete.
-7. Open or update the draft PR only when publication is authorized; otherwise continue locally. Merge and deployment are separate actions.
+7. Open or update the draft PR only when publication is authorized; otherwise continue locally. Merge and deployment follow the standing merge authorization in `references/git-delivery.md`: once final gates and required GitHub checks pass, merge into the target base and report the deploy.
 
 In `loop` mode, never stop for a product or technical decision or to ask for a test: take the smallest reversible option, record the assumption and continue. Stop only with a CLI blocker kind. In `guided` mode, pause between phases. A request for model advice alone stops before any phase work.
 
