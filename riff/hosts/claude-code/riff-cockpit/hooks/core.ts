@@ -1,5 +1,5 @@
 // Pure rules for the RIFF cockpit: read `riff status --json` and `wave context --json`,
-// decide what the band, the pane tabs and the text commands show.
+// decide what the band and the pane tabs show.
 // The CLI stays the source of truth; the text parser only serves projects linked to an older CLI.
 
 type Phase = { id: string; title: string | null; status: string }
@@ -89,15 +89,6 @@ export function parseContext(text: string): WaveContext | null {
   }
 }
 
-/** The /riff-status answer, in the same three lines as `riff status`. */
-export function describe(status: RiffStatus): string {
-  return [
-    `${status.name}: ${status.objective ?? 'no objective yet'}`,
-    `${status.completed}/${status.total} phases completed. Active: ${status.active ?? 'none'}. Next: ${status.next ?? 'none'}.`,
-    `Human action: ${status.humanAction ?? 'none'}`,
-  ].join('\n')
-}
-
 export function clip(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1))}…`
 }
@@ -135,7 +126,7 @@ export function tabLines(tab: Tab, status: RiffStatus, context: WaveContext | nu
   })
 }
 
-/** The /riff-context answer: the phase in progress or next, its checkpoint and references. */
+/** The Phase tab: the phase in progress or next, its checkpoint and references. */
 export function describeContext(context: WaveContext | null, error: string | null = null): string {
   if (!context) return error ? `No wave context. ${error}` : 'No wave context: the RIFF CLI did not answer.'
   if (!context.phase) return 'No active or ready phase.'

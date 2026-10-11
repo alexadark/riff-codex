@@ -30,7 +30,7 @@
     {
       "name": "riff-cockpit",
       "source": "./hosts/claude-code/riff-cockpit",
-      "description": "RIFF band, /riff pane with tabs, /riff-status and /riff-context, read from the RIFF CLI"
+      "description": "RIFF band and /cockpit pane with tabs and a dashboard button, read from the RIFF CLI"
     }
   ]
 }

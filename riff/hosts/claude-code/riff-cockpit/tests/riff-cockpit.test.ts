@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { describe, describeContext, parseContext, parseStatus, summary, tabLines } from '../hooks/core.ts'
+import { describeContext, parseContext, parseStatus, summary, tabLines } from '../hooks/core.ts'
 
 const ROOT = '/work/app'
 const STATUS_JSON = JSON.stringify({
@@ -32,8 +32,12 @@ const STATUS = [
 
 function setup(on, world: { isGit: boolean; isRiff: boolean; firstNodeMissing?: boolean; legacyCli?: boolean; noPane?: boolean; preRename?: boolean }) {
   const runs: string[][] = []
+  const commands: string[] = []
   on('session.start', () => ({ cwd: ROOT }))
-  on('command.register', () => ({ value: undefined }))
+  on('command.register', ($, e) => {
+    commands.push(e.name)
+    return { value: undefined }
+  })
   on('session.cwd', () => ({ value: ROOT }))
   on('fs.exists', ($, e) => ({ value: world.isRiff && !(world.preRename && String(e.path).includes('/.riff-cli/')) }))
   on('turn.complete', () => ({ text: '' }))
@@ -42,37 +46,39 @@ function setup(on, world: { isGit: boolean; isRiff: boolean; firstNodeMissing?: 
     runs.push(e.argv)
     if (e.argv[0] === 'git') return { value: { exitCode: world.isGit ? 0 : 128, stdout: `${ROOT}\n`, stderr: '' } }
     if (world.firstNodeMissing && e.argv[0] === 'node') return { deny: 'spawn node ENOENT' }
+    if (e.argv.includes('dashboard')) return { value: { exitCode: 0, stdout: 'RIFF dashboard: http://127.0.0.1:4000\nShared dashboard.', stderr: '' } }
     const stdout = e.argv.includes('context') ? CONTEXT_JSON : world.legacyCli ? STATUS : STATUS_JSON
     return { value: { exitCode: 0, stdout, stderr: '' } }
   })
-  return runs
+  return Object.assign(runs, { commands })
 }
 
 async function start($) {
   await $.session.start({ surface: 'terminal', isInteractive: true, cwd: ROOT })
 }
 
-test('/riff-status answers from the RIFF CLI without a turn', async ($, on) => {
+test('/cockpit is the only command, outside the riff prefix', async ($, on) => {
   const runs = setup(on, { isGit: true, isRiff: true })
   await start($)
-  const answer = await $.command.run({ command: 'riff-status', args: '' })
-  expect(answer.text).toBe(STATUS)
+  expect(runs.commands).toEqual(['cockpit'])
+})
+
+test('the cockpit reads the RIFF CLI status', async ($, on) => {
+  const runs = setup(on, { isGit: true, isRiff: true })
+  await start($)
   expect(runs.some((argv) => argv.join(' ') === `node ${ROOT}/.riff-cli/bin/riff.mjs status --json`)).toBe(true)
 })
 
 test('a project not yet migrated is read through its .riff-codex link', async ($, on) => {
   const runs = setup(on, { isGit: true, isRiff: true, preRename: true })
   await start($)
-  const answer = await $.command.run({ command: 'riff-status', args: '' })
-  expect(answer.text).toBe(STATUS)
   expect(runs.some((argv) => argv.join(' ') === `node ${ROOT}/.riff-codex/bin/riff.mjs status --json`)).toBe(true)
 })
 
-test('a project linked to a CLI without --json still gets its status', async ($, on) => {
+test('a project linked to a CLI without --json still opens the cockpit', async ($, on) => {
   setup(on, { isGit: true, isRiff: true, legacyCli: true })
   await start($)
-  const answer = await $.command.run({ command: 'riff-status', args: '' })
-  expect(answer.text).toBe(STATUS)
+  expect((await $.command.run({ command: 'cockpit', args: '' })).text).toBe('RIFF cockpit opened.')
 })
 
 test('a missing node on PATH falls back to a known location', async ($, on) => {
@@ -81,27 +87,17 @@ test('a missing node on PATH falls back to a known location', async ($, on) => {
   expect(runs.some((argv) => argv[0] === '/usr/local/bin/node')).toBe(true)
 })
 
-test('outside a RIFF project the commands say so', async ($, on) => {
+test('outside a RIFF project the command says so', async ($, on) => {
   setup(on, { isGit: true, isRiff: false })
   await start($)
-  for (const command of ['riff-status', 'riff-context', 'riff']) {
-    const answer = await $.command.run({ command, args: '' })
-    expect(answer.text).toMatch(/^Not a RIFF project/)
-  }
+  const answer = await $.command.run({ command: 'cockpit', args: '' })
+  expect(answer.text).toMatch(/^Not a RIFF project/)
 })
 
-test('/riff-context describes the phase in progress', async ($, on) => {
-  setup(on, { isGit: true, isRiff: true })
-  await start($)
-  const answer = await $.command.run({ command: 'riff-context', args: '' })
-  expect(answer.text).toMatch(/^phase-8 \(active\): Search provider\n/)
-  expect(answer.text).toContain('Next: Run a live sample')
-})
-
-test('/riff opens the pane, or answers in text where no pane can be placed', async ($, on) => {
+test('/cockpit opens the pane, or answers in text where no pane can be placed', async ($, on) => {
   setup(on, { isGit: true, isRiff: true, noPane: true })
   await start($)
-  const answer = await $.command.run({ command: 'riff', args: '' })
+  const answer = await $.command.run({ command: 'cockpit', args: '' })
   expect(answer.text).toContain('## Roadmap\n✓ phase-7  Lead sourcing\n▶ phase-8  Search provider')
   expect(answer.text).toContain('## Findings\nHIGH  Key logged in clear  (phase-8)')
 })
@@ -110,7 +106,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
   test(`the pane tabs switch on press (${surface})`, async ($, on) => {
     setup(on, { isGit: true, isRiff: true })
     await start($)
-    expect((await $.command.run({ command: 'riff', args: '' })).text).toBe('RIFF cockpit opened.')
+    expect((await $.command.run({ command: 'cockpit', args: '' })).text).toBe('RIFF cockpit opened.')
     const ui = await $.ui.mount({
       plugin: 'riff-cockpit',
       surface,
@@ -124,13 +120,28 @@ for (const surface of ['terminal', 'desktop'] as const) {
     await ui.press({ key: 'tab-reviews' })
     expect(await ui.find({ text: 'functional: pass on phase-7 · Leads import works' })).toBeDefined()
   })
+
+  test(`the pane button starts the dashboard (${surface})`, async ($, on) => {
+    const runs = setup(on, { isGit: true, isRiff: true })
+    await start($)
+    await $.command.run({ command: 'cockpit', args: '' })
+    const ui = await $.ui.mount({
+      plugin: 'riff-cockpit',
+      surface,
+      component: 'Pane',
+      requestId: 'riff',
+      props: { title: 'RIFF', isFocused: true, bodyColumns: 80, placement: 'dock' } as never,
+    })
+    await ui.press({ key: 'dashboard' })
+    expect(runs.some((argv) => argv.join(' ') === `node ${ROOT}/.riff-cli/bin/riff.mjs dashboard`)).toBe(true)
+    expect(await ui.find({ text: 'RIFF dashboard: http://127.0.0.1:4000' })).toBeDefined()
+  })
 }
 
 test('status JSON is read into the band fields', () => {
   const status = parseStatus(STATUS_JSON)
   expect(status).toMatchObject({ name: 'TAMOS Outreach', completed: 7, total: 15, active: 'phase-8', next: null })
   expect(status?.humanAction).toBe('Scoped Brave Search API key is missing.')
-  expect(describe(status!)).toBe(STATUS)
   expect(summary(status!, 120)).toBe('TAMOS Outreach · 7/15 phases · active phase-8 · 1 open finding')
   expect(parseStatus(JSON.stringify({ schema: 'other/1' }))).toBe(null)
 })
