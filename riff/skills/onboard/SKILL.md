@@ -34,4 +34,4 @@ Publish GitHub issues only through the `issue` skill.
 
 ## References
 
-Read when the step needs them, under `.riff-cli/references/`: `project-framing.md`, `evolution.md`, `taste.md` and `taste/frontend.md`, `model-routing.md`, `operating-contract.md`.
+Read when the step needs them, under `.riff-cli/references/`: `project-framing.md`, `evolution.md`, `taste.md` and `taste/frontend.md`, `operating-contract.md`.

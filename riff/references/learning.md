@@ -14,11 +14,11 @@ Check for an existing equivalent rule first. Amend an obsolete rule with the evi
 
 This learning is automatic within authorized work and shared across phases and roles, not across unrelated private projects. A reusable stack gap uses the `learn-stack` skill. A consumer never silently changes RIFF's framework references or another project's conventions. Framework-wide improvements belong to an explicitly authorized framework task.
 
-## End-of-phase improvement proposals
+## End-of-version improvement proposals
 
-Before `wave complete`, record what would make the project or RIFF better with `riff improve record --phase ID --file FILE`. The file is a JSON array of at most three proposals; an empty array is a valid answer when nothing useful surfaced. Do not invent proposals or log routine success.
+On the last phase of a version, before `wave complete`, record what would make the project or RIFF better with `riff improve record --phase ID --file FILE`. The file is a JSON array of at most three proposals; an empty array is a valid answer when nothing useful surfaced. Do not invent proposals or log routine success.
 
-Ask what surprised you, what failed in a way likely to recur, and what RIFF lacked during the phase (a missing command, an unclear reference, outdated documentation). Check `riff improve list` and `riff improve list --target riff` first; the CLI also skips titles already recorded.
+Ask what surprised you, what failed in a way likely to recur, and what RIFF lacked during the version (a missing command, an unclear reference, outdated documentation). Check `riff improve list` and `riff improve list --target riff` first; the CLI also skips titles already recorded.
 
 Each proposal has `target` (`project` or `riff`), `title`, `what_happened`, `proposal` and `impact` (HIGH, MEDIUM or LOW). A project proposal may name a `suggested_phase`; a RIFF proposal names an `area` (skill, reference, cli, dashboard, doc or other).
 

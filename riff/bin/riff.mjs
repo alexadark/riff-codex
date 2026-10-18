@@ -30,12 +30,12 @@ import { CODEX_STATE_DIR, STATE_DIR, inside, localPath, phaseId, stateDirFor, wi
 import { verificationEvidence, writeReport } from '../lib/report.mjs';
 import { REVIEW_TYPES, buildPrompt, reviewerAvailability, runReviewChain, toArtifact } from '../lib/review-bridge.mjs';
 import { managedHookPolicy } from '../lib/managed-hooks.mjs';
-import { selectReadyPhase } from '../lib/phase-selection.mjs';
+import { canRunBeside, selectParallelBatch, selectReadyPhase } from '../lib/phase-selection.mjs';
 import { portAvailable, observationList, reviewObservation } from '../lib/dashboard.mjs';
 import { DISCOVERY_MANIFEST, discoverySnapshot } from '../lib/delivery-contract.mjs';
 import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 import { recommendPlan } from '../lib/model-advice-plan.mjs';
-import { decideImprovement, ideasFile, improvementPassError, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
+import { decideImprovement, ideasFile, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
 
 const VERSION = '0.1.0';
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -771,6 +771,7 @@ function normalizePhase(id, phase, canonical) {
     status: normalizeRoadmapStatus(phase.status, id),
     done_when: normalizeStringArray(phase.done_when),
     verify: normalizeStringArray(phase.verify),
+    owns: normalizeStringArray(phase.owns),
   };
 }
 
@@ -923,11 +924,37 @@ function dependenciesComplete(state, phase) {
   return (phase.depends_on ?? []).every((id) => TERMINAL_PHASE_STATES.has(byId.get(id)?.status));
 }
 
+function activePhases(state) {
+  return state.phases.filter((phase) => phase.status === 'active');
+}
+
+// The lead stays the phase the wave started with; batch lists every active phase when several run together.
+function setActiveWave(state, lead) {
+  const ids = activePhases(state).map((phase) => phase.id);
+  if (!ids.length) { state.activeWave = null; return; }
+  const phase = ids.includes(lead) ? lead : ids.includes(state.activeWave?.phase) ? state.activeWave.phase : ids[0];
+  const { batch: _previous, ...wave } = state.activeWave ?? {};
+  state.activeWave = { ...wave, phase, startedAt: wave.startedAt ?? now(), checkpointAt: now(), ...(ids.length > 1 ? { batch: ids } : {}) };
+}
+
+function activeLabel(wave) {
+  return wave?.batch?.join(', ') ?? wave?.phase ?? 'none';
+}
+
+function inActiveWave(state, id) {
+  return state.activeWave?.phase === id || Boolean(state.activeWave?.batch?.includes(id));
+}
+
 function selectPhase(state, requested) {
-  const active = state.phases.find((phase) => phase.status === 'active');
-  if (active) {
-    if (requested && requested !== active.id) throw new Error(`phase ${active.id} is active; resume or park it first`);
-    return active;
+  const active = activePhases(state);
+  if (active.length) {
+    const lead = active.find((phase) => phase.id === state.activeWave?.phase) ?? active[0];
+    if (!requested) return lead;
+    const hit = active.find((phase) => phase.id === requested);
+    if (hit) return hit;
+    const phase = state.phases.find((item) => item.id === requested);
+    if (phase?.status === 'ready' && dependenciesComplete(state, phase) && canRunBeside(phase, active)) return phase;
+    throw new Error(`phase ${lead.id} is active; resume or park it first (phases run side by side only when each declares owns paths that don't overlap)`);
   }
   if (requested) {
     const phase = state.phases.find((item) => item.id === requested);
@@ -963,7 +990,8 @@ function markPhase(root, state, phase, status, reason = null, blockerKind = null
   phase.status = status;
   phase.reason = reason;
   phase.blockerKind = ['awaiting_human', 'blocked', 'parked'].includes(status) ? blockerKind : null;
-  state.activeWave = status === 'active' ? { phase: phase.id, startedAt: state.activeWave?.startedAt ?? now(), checkpointAt: now() } : null;
+  if (!activePhases(state).some((item) => item.id !== phase.id)) state.activeWave = null;
+  setActiveWave(state, state.activeWave?.phase ?? phase.id);
   if (status === 'awaiting_human' || status === 'blocked' || status === 'parked') {
     state.humanAction = { phase: phase.id, status, kind: blockerKind, reason: reason ?? 'Human attention is required.' };
   } else if (state.humanAction?.phase === phase.id) state.humanAction = null;
@@ -972,7 +1000,7 @@ function markPhase(root, state, phase, status, reason = null, blockerKind = null
 }
 
 function activePhase(state, phase) {
-  if (phase.status !== 'active' || state.activeWave?.phase !== phase.id || !dependenciesComplete(state, phase)) throw new Error(`phase ${phase.id} must be active with completed dependencies`);
+  if (phase.status !== 'active' || !inActiveWave(state, phase.id) || !dependenciesComplete(state, phase)) throw new Error(`phase ${phase.id} must be active with completed dependencies`);
 }
 
 function reviewArtifact(root, file, candidate, type, status) {
@@ -1086,7 +1114,7 @@ function checkpointPhase(root, state, phase, options) {
     reviews: Object.fromEntries(['functional', 'security'].map((type) => [type, receiptFor(root, phase, type) ? { candidate: receiptFor(root, phase, type).candidate, status: receiptFor(root, phase, type).status, evidence: receiptFor(root, phase, type).evidence ?? null } : null])),
     at: now(),
   };
-  state.activeWave = { ...(state.activeWave ?? {}), phase: phase.id, checkpointAt: now() };
+  setActiveWave(state, phase.id);
   saveState(root, state);
   event(root, 'phase_checkpoint', { phase: phase.id, candidate, references });
   process.stdout.write(`Checkpoint saved for ${phase.id} at ${candidate}.\n`);
@@ -1235,14 +1263,12 @@ function completePhase(root, state, phase, commit) {
   if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree || !evidenceValid(root, functional.evidence)) throw new Error('a passing functional receipt with intact evidence for the exact commit tree is required');
   if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree || !evidenceValid(root, security.evidence))) throw new Error('a passing security receipt with intact evidence for the exact sensitive commit tree is required');
   requireEnrolledCompletionGates(root, state, phase, commitTree);
-  const improvementError = improvementPassError(phase);
-  if (improvementError) throw new Error(improvementError);
   phase.commit = run('git', ['rev-parse', commit], { cwd: root });
   phase.status = 'completed';
   phase.reason = null;
   phase.blockerKind = null;
   state.lastCommit = phase.commit;
-  state.activeWave = null;
+  setActiveWave(state, state.activeWave?.phase);
   state.humanAction = null;
   state.validationNeeds = [];
   saveState(root, state);
@@ -1309,9 +1335,10 @@ const REVIEW_DIFF_LIMIT = 60000;
 const DISCOVERY_ROUND_LIMIT = 3;
 const SEVERITY_ORDER = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
-function reviewDiff(root, args) {
-  const stat = run('git', [...args, '--stat'], { cwd: root });
-  const patch = run('git', args, { cwd: root, maxBuffer: 256 * 1024 * 1024 });
+function reviewDiff(root, args, pathspec = []) {
+  const limit = pathspec.length ? ['--', ...pathspec] : [];
+  const stat = run('git', [...args, '--stat', ...limit], { cwd: root });
+  const patch = run('git', [...args, ...limit], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
   const truncated = patch.length > REVIEW_DIFF_LIMIT;
   return `Changed files:\n${stat || '(none)'}\n\nDiff${truncated ? ` (truncated to ${REVIEW_DIFF_LIMIT} characters; read the files for the rest)` : ''}:\n\`\`\`diff\n${patch.slice(0, REVIEW_DIFF_LIMIT)}\n\`\`\``;
 }
@@ -1341,6 +1368,7 @@ function reviewTarget(root, state, type, options) {
     const phases = state.phases.map((phase) => `## ${phase.status}\n${reviewPhaseContext(phase)}`).join('\n\n');
     return { candidate, context: `Roadmap phases:\n\n${phases}${base ? `\n\nWhole version since ${base}:\n${run('git', ['diff', base, 'HEAD', '--stat'], { cwd: root }) || '(no change)'}` : ''}` };
   }
+  if (!options.phase && state.activeWave?.batch?.length) throw new Error(`several phases are active (${state.activeWave.batch.join(', ')}); pass --phase ID or --phase ${state.activeWave.batch.join(',')}`);
   const requested = options.phase ?? state.activeWave?.phase ?? null;
   if (!requested && !options.quick) throw new Error('no active phase; pass --phase ID, or --quick for an advisory review of a quick change');
   if (!requested) return { candidate, advisory: true, context: `Quick change outside any phase. Staged candidate against HEAD.\n\n${reviewDiff(root, ['diff', '--cached', baseline(root)])}` };
@@ -1352,7 +1380,12 @@ function reviewTarget(root, state, type, options) {
   // Deferred findings wait for a human security expert at delivery; re-reporting them would block every round.
   const deferred = observationList(state).filter((finding) => finding.status === 'expert_review' && finding.phase === phase.id);
   const deferredText = deferred.length ? `\n\nAlready deferred to a human security expert before delivery (don't report these again unless this candidate makes them worse):\n${deferred.map((finding) => `- ${finding.severity}: ${finding.summary}${finding.what_could_happen ? `. ${finding.what_could_happen}` : ''}`).join('\n')}` : '';
-  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}${deferredText}${recheckText(root, phase, type, previous)}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)])}` };
+  // In a batch the candidate also holds the other phases' changes; show this phase's owned paths and say so.
+  const siblings = (state.activeWave?.batch ?? []).filter((id) => id !== phase.id);
+  const scoped = siblings.length > 0 && phase.owns?.length > 0;
+  const batchText = scoped ? `\n\nThis phase is built in one candidate together with ${siblings.join(', ')}, which are reviewed separately. The diff below is limited to this phase's owned paths (${phase.owns.join(', ')}); read other files when needed and report only breakage this phase causes or suffers.` : '';
+  const pathspec = scoped ? phase.owns : [];
+  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}${deferredText}${recheckText(root, phase, type, previous)}${batchText}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)], pathspec)}` };
 }
 
 // After a failed round the next review only checks the corrections, so rounds converge instead of
@@ -1379,29 +1412,92 @@ function reviewRecordCommand(type, target, artifact, file) {
   return parts.join(' ');
 }
 
-function cmdReview(tokens) {
+const REVIEW_READY = 'RIFF_REVIEW_TARGET_READY';
+
+// Parallel reviews finish close together; their short event writes wait for the lock instead of failing.
+function withLockPatient(root, action) {
+  for (let attempt = 0; ; attempt++) {
+    try { return withLock(root, action); }
+    catch (error) {
+      if (attempt >= 50 || !/RIFF is busy/.test(error.message)) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+    }
+  }
+}
+
+// Several types (--type functional,security) or phases of one batch (--phase a,b) run as separate child reviews on the same candidate;
+// each child keeps the single-type checks and writes its own artifact. Children start one after
+// another until their Git reads are done (concurrent git write-tree races on the index lock), then
+// their reviewers run at the same time.
+async function cmdReviewParallel(tokens, types, phases) {
+  const rest = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (['--type', '--phase'].includes(tokens[index])) { index += 1; continue; }
+    rest.push(tokens[index]);
+  }
+  const start = ({ type, phase }) => {
+    let ready;
+    const started = new Promise((resolve) => { ready = resolve; });
+    const finished = new Promise((resolve) => {
+      const args = [fileURLToPath(import.meta.url), 'review', 'run', ...rest, '--type', type, ...(phase ? ['--phase', phase] : [])];
+      const child = spawn(process.execPath, args, { cwd: process.cwd(), env: { ...process.env, RIFF_REVIEW_SIGNAL_READY: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+      let stdout = '';
+      let stderr = '';
+      child.stdout.on('data', (chunk) => { stdout += chunk; });
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk;
+        if (stderr.includes(REVIEW_READY)) ready();
+      });
+      child.on('close', (code) => {
+        ready();
+        stderr = stderr.replace(`${REVIEW_READY}\n`, '');
+        const label = phase ? { phase, type } : { type };
+        if (code === 0) { try { resolve({ ...label, ...JSON.parse(stdout) }); return; } catch {} }
+        resolve({ ...label, error: (stderr || stdout).trim() || `exit ${code}` });
+      });
+    });
+    return { started, finished };
+  };
+  const runs = [];
+  const jobs = (phases.length ? phases : [null]).flatMap((phase) => types.map((type) => ({ type, phase })));
+  for (const job of jobs) {
+    const child = start(job);
+    runs.push(child.finished);
+    await child.started;
+  }
+  const results = await Promise.all(runs);
+  process.stdout.write(`${JSON.stringify(results, null, 2)}\n`);
+  if (results.some((result) => result.error)) process.exitCode = 1;
+}
+
+async function cmdReview(tokens) {
   const root = gitRoot();
-  if (tokens[0] !== 'run') throw new Error('use riff review run --type discovery|functional|security|delivery [--phase ID|--quick]');
+  if (tokens[0] !== 'run') throw new Error('use riff review run --type discovery|functional|security|delivery[,TYPE...] [--phase ID[,ID...]|--quick]');
   const options = parseOptions(tokens.slice(1));
-  const type = optionRequired(options, 'type');
-  if (!REVIEW_TYPES.includes(type)) throw new Error(`--type must be one of ${REVIEW_TYPES.join(', ')}`);
+  const types = [...new Set(String(optionRequired(options, 'type')).split(',').map((item) => item.trim()).filter(Boolean))];
+  const unknown = types.find((item) => !REVIEW_TYPES.includes(item));
+  if (unknown || !types.length) throw new Error(`--type must be one or more of ${REVIEW_TYPES.join(', ')}, separated by commas`);
+  const phases = typeof options.phase === 'string' ? [...new Set(options.phase.split(',').map((item) => item.trim()).filter(Boolean))] : [];
+  if (types.length > 1 || phases.length > 1) return cmdReviewParallel(tokens.slice(1), types, phases);
+  const [type] = types;
   const state = readState(root);
   const config = readJson(pathsFor(root).config, false) ?? {};
   const target = reviewTarget(root, state, type, options);
   const language = ({ en: 'English', fr: 'French' })[config.artifactLanguage ?? 'en'] ?? config.artifactLanguage;
   const prompt = buildPrompt(type, `${target.context}\n\nProduct sources: PROJECT.md, ROADMAP.yaml and taste.md at the repository root, when present.\n\nWrite the summary, evidence and findings in ${language}, whatever language other instructions use.`);
+  if (process.env.RIFF_REVIEW_SIGNAL_READY) process.stderr.write(`${REVIEW_READY}\n`);
   const runAt = now();
   // No lock while the reviewer runs: it can take many minutes and only reads the project.
   let result;
   try { result = runReviewChain({ type, prompt, root, config }); }
   catch (error) {
-    withLock(root, () => event(root, 'review_unavailable', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, skipped: error.skipped ?? [] }));
+    withLockPatient(root, () => event(root, 'review_unavailable', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, skipped: error.skipped ?? [] }));
     throw error;
   }
   const artifact = toArtifact({ candidate: target.candidate, type, verdict: result.verdict, reviewer: result.reviewer, runAt });
   const file = `${stateDirFor(root)}/reviews/${type}-${target.candidate.slice(0, 12)}-${runAt.replace(/[:.]/g, '-')}.json`;
   writeJson(localPath(root, file), artifact);
-  withLock(root, () => event(root, 'review_run', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, status: artifact.status, reviewer: result.reviewer.id, sameFamily: result.reviewer.sameFamily, skipped: result.reviewer.skipped, artifact: file }));
+  withLockPatient(root, () => event(root, 'review_run', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, status: artifact.status, reviewer: result.reviewer.id, sameFamily: result.reviewer.sameFamily, skipped: result.reviewer.skipped, artifact: file }));
   process.stdout.write(`${JSON.stringify({ artifact: file, status: artifact.status, summary: artifact.summary, reviewer: result.reviewer, findings: artifact.findings, advisory: Boolean(target.advisory), record: reviewRecordCommand(type, target, artifact, file) }, null, 2)}\n`);
 }
 
@@ -1446,14 +1542,18 @@ function cmdWave(tokens) {
       process.stdout.write(`${state.phases.length} roadmap phases synchronized.\n`);
       return;
     }
+    if (action === 'select' && options.parallel === true) {
+      process.stdout.write(`${JSON.stringify(selectParallelBatch(state.phases), null, 2)}\n`);
+      return;
+    }
     if (action === 'select' || action === 'resume') {
       const requested = options._[0];
       if (action === 'resume') discoveryGate(root, state);
       if (action === 'resume' && requested) {
         const resumable = phaseById(state, requested);
         if (['parked', 'blocked', 'awaiting_human'].includes(resumable.status)) {
-          const active = state.phases.find((item) => item.status === 'active');
-          if (active && active.id !== resumable.id) throw new Error(`phase ${active.id} is active; resume or park it first`);
+          const active = activePhases(state).filter((item) => item.id !== resumable.id);
+          if (active.length && !canRunBeside(resumable, active)) throw new Error(`phase ${active[0].id} is active; resume or park it first`);
           const reason = optionRequired(options, 'reason');
           discoveryGate(root, state);
           resumable.attempts = 0;
@@ -1775,7 +1875,7 @@ async function cmdDashboard(tokens) {
     try {
       const data = dashboardData(root);
       if (options.check) process.stdout.write('Dashboard state is readable.\n');
-      else process.stdout.write(`${data.project.name ?? 'Unshaped project'}\nProgress: ${data.progress.completed}/${data.progress.total}\nActive: ${data.activeWave?.phase ?? 'none'}\nNext ready: ${data.nextReady?.id ?? 'none'}\nHuman action: ${data.humanAction?.reason ?? 'none'}\n`);
+      else process.stdout.write(`${data.project.name ?? 'Unshaped project'}\nProgress: ${data.progress.completed}/${data.progress.total}\nActive: ${activeLabel(data.activeWave)}\nNext ready: ${data.nextReady?.id ?? 'none'}\nHuman action: ${data.humanAction?.reason ?? 'none'}\n`);
     } catch (error) { fail(error.message); }
     return;
   }
@@ -1910,7 +2010,7 @@ function parkForFinding(root, finding) {
     active.status = 'parked';
     active.reason = finding.decision_reason;
     active.blockerKind = 'validation-failure';
-    state.activeWave = null;
+    setActiveWave(state, state.activeWave?.phase);
     state.humanAction = { phase: active.id, status: 'parked', kind: 'validation-failure', reason: finding.decision_reason };
   }
   saveState(root, state);
@@ -2049,7 +2149,8 @@ function cmdHook(tokens) {
       if ((config?.preferences?.autonomy ?? 'loop') === 'loop') context.push('Loop autonomy governs waves: make conservative product and technical decisions, follow ready dependencies automatically, and do not request human decisions. Stop only for missing credentials or external access, impossible third-party verification, an unidentifiable destructive target, or failed RIFF validation. Product definition still asks the user: the start and evolve skills interview them, and add-phase asks when its outcome is unclear.');
       else context.push('Guided autonomy: preserve confirmation at product decision boundaries and between phases.');
       if (active) {
-        context.push(`Resume interrupted phase ${active.id}. Load ${frameworkDirFor(root)}/references/operating-contract.md before continuing.`);
+        const batch = state.activeWave?.batch?.length > 1 ? ` (built together with ${state.activeWave.batch.filter((id) => id !== active.id).join(', ')})` : '';
+        context.push(`Resume interrupted phase ${active.id}${batch}. Load ${frameworkDirFor(root)}/references/operating-contract.md before continuing.`);
         const clip = (text) => String(text).replace(/\s+/g, ' ').slice(0, 300);
         if (active.checkpoint?.summary) context.push(`Last checkpoint: ${clip(active.checkpoint.summary)} Next: ${clip(active.checkpoint.next)} Check it against current files with riff wave context before trusting it.`);
       }
@@ -2082,6 +2183,7 @@ function cmdStatus(tokens) {
       project: { name: data.project.name ?? null, objective: data.project.objective ?? null },
       progress: data.progress,
       active: data.activeWave?.phase ?? null,
+      activePhases: data.activeWave ? data.activeWave.batch ?? [data.activeWave.phase] : [],
       next: data.nextReady ? { id: data.nextReady.id, title: data.nextReady.title ?? null } : null,
       humanAction: data.humanAction ?? null,
       phases: readState(root).phases.map((phase) => ({ id: phase.id, title: phase.title ?? null, status: phase.status })),
@@ -2091,7 +2193,7 @@ function cmdStatus(tokens) {
     }, null, 2)}\n`);
     return;
   }
-  process.stdout.write(`${data.project.name ?? 'Unshaped project'}: ${data.project.objective ?? 'no objective yet'}\n${data.progress.completed}/${data.progress.total} phases completed. Active: ${data.activeWave?.phase ?? 'none'}. Next: ${data.nextReady?.id ?? 'none'}.\nHuman action: ${data.humanAction?.reason ?? 'none'}\n`);
+  process.stdout.write(`${data.project.name ?? 'Unshaped project'}: ${data.project.objective ?? 'no objective yet'}\n${data.progress.completed}/${data.progress.total} phases completed. Active: ${activeLabel(data.activeWave)}. Next: ${data.nextReady?.id ?? 'none'}.\nHuman action: ${data.humanAction?.reason ?? 'none'}\n`);
 }
 
 function cmdReport(tokens) {
@@ -2317,7 +2419,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery [--phase ID|--quick]\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery[,TYPE...] [--phase ID[,ID...]|--quick]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -2342,7 +2444,7 @@ else if (['report', 'promote', 'incident', 'finish'].includes(command)) {
   } catch (error) { fail(error.message); }
 }
 else if (command === 'review') {
-  try { cmdReview(tokens); } catch (error) { fail(error.message); }
+  try { await cmdReview(tokens); } catch (error) { fail(error.message); }
 }
 else if (command === 'improve') {
   try { cmdImprove(tokens); } catch (error) { fail(error.message); }

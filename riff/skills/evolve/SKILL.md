@@ -47,4 +47,4 @@ Report the outcome, assumptions, phases added, revised, replaced or deferred, th
 
 ## References
 
-Read when the step needs them, under `.riff-cli/references/`: `evolution.md` (baseline, change analysis, roadmap edit rules, active work, readiness), `discovery.md` (dossier content, design handoff, review lifecycle), `project-framing.md`, `operating-contract.md` (modes, blocker kinds, phase contract), `dashboard.md` (`EXPLAIN.simple.md`), `security.md`, `model-routing.md`, `taste.md` and the applicable `taste/` topics.
+Read when the step needs them, under `.riff-cli/references/`: `evolution.md` (baseline, change analysis, roadmap edit rules, active work, readiness), `discovery.md` (dossier content, design handoff, review lifecycle), `project-framing.md`, `operating-contract.md` (modes, blocker kinds, phase contract), `dashboard.md` (`EXPLAIN.simple.md`), `security.md`, `taste.md` and the applicable `taste/` topics.

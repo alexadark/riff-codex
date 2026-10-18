@@ -83,8 +83,3 @@ export function decideImprovement(state, { id, status, note, at }) {
   item.decision = { note: typeof note === 'string' ? note.trim() : '', at };
   return item;
 }
-
-export function improvementPassError(phase) {
-  if (phase.improvementPass) return null;
-  return `record the end-of-phase improvement pass first: riff improve record --phase ${phase.id} --file FILE (an empty list [] is valid)`;
-}

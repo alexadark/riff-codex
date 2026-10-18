@@ -1,71 +1,83 @@
 # RIFF operating contract
 
-This file is the canonical source for persistent state and wave behavior.
+The canonical source for persistent state, wave behavior, delegation and recovery. [Evidence](evidence.md) holds the artifact formats, [Git delivery](git-delivery.md) the branch and PR rules, [model routing](model-routing.md) the subagent choice.
 
 ## Product artifacts
 
-- `PROJECT.md` is the product contract and dossier index. It records vocabulary, users, outcomes, constraints, facts, preferences, assumptions and exclusions, linking detailed contracts rather than duplicating them. Production application `start` and explicit complete-planning requests follow [discovery](discovery.md): the committed version's stories, journeys, ASCII wireframes, design references/tokens, data schema and rights, architecture, real Mermaid sources, decisions, risk probes and verification strategy. `ROADMAP.yaml` maps vertical outcomes to this dossier. Scratch discovery, bounded APEX work and the `quick` skill stay lightweight.
-- `docs/specs/readiness.json` explicitly enrolls a project in the complete discovery contract. Its referenced artifacts and an independent content-bound review must pass `discovery check` before phase activation. Non-applicable areas need substantive reasons. Existing projects without enrollment are not silently migrated by `resync` or a wave; removal of an enrolled manifest does not remove the gate. A revised dossier requires a matching new review before further activation. The CLI checks structural coverage and evidence integrity; the reviewer judges completeness, feasibility and coherence.
-- `taste.md`, applicable `taste/` topics and `references/taste/stacks/` preserve project conventions shared with the original RIFF framework. Read [the taste contract](taste.md) for selective loading, production seeding, evidence-backed learning and frontend skill/visual acceptance requirements. Taste serves the product goal and does not create another state system or approval queue.
-- `ROADMAP.yaml` is a shared product artifact. RIFF creates a root containing `version`, `project`, `phases`, and `out_of_scope`, and also reads roadmaps of the original RIFF framework with root `phase-*` entries. Never convert an existing roadmap merely to change formats. When a skill makes an authorized change, preserve unknown fields, comments, key order, and the existing representation with a targeted edit.
-- The `evolve` skill plans authorized changes to an onboarded application under [evolution](evolution.md). It reuses the existing product baseline and discovery gates, protects active and historical contracts, and stops before implementation. Map and onboard remain explicit prerequisites for bringing an unfamiliar brownfield application into RIFF. Pending replacement and deferral use the supported roadmap rules, never invented lifecycle states.
-- Roadmap phases are vertical tracer bullets with a result a user can demonstrate. Do not predict exact files, exhaustive tests, or detailed future implementation plans.
-- Every phase states when it is finished and how to check it: `done_when` lists observable conditions in the running product, and `verify` lists the checks that prove them (test commands, a journey in a real browser, expected screenshots). `wave context` hands both to the agent unchanged. Size the checks to the phase; `doctor` flags unfinished phases without them.
-- Every phase has an explicit priority: `P0` for an immediate critical safety or release blocker, `P1` for a high-priority committed outcome, `P2` for normal planned work, and `P3` for a low-priority optional outcome. Never infer a default priority merely for display.
-- `.riff-data/state.json` is written only through the RIFF CLI. `.riff-data/events.ndjson` is the short append-only event stream. The original RIFF framework's `.riff` and `.riff-state/` are foreign and must never be modified or replaced.
+- `PROJECT.md` is the product contract and dossier index: vocabulary, users, outcomes, constraints, decisions, assumptions, exclusions. It links detailed contracts instead of copying them. A production `start` follows [discovery](discovery.md); scratch work and the `quick` skill stay light.
+- `ROADMAP.yaml` is the canonical phase list, shared with the original RIFF framework (which uses root `phase-*` entries; read both, never convert formats). Edit it with targeted changes that keep unknown fields, comments and key order.
+- A phase is a vertical outcome a user can demonstrate. It has a priority (`P0` critical blocker, `P1` committed, `P2` normal, `P3` optional), `done_when` (observable conditions in the running product) and `verify` (the checks that prove them). `wave context` hands both over unchanged; `doctor` flags phases without them. Don't predict files or detailed implementation plans.
+- A phase may list `owns`: the directories or files only it changes. Phases with `owns` that don't overlap can run in one batch (see below). Shared ground (database schema and migrations, design system, shared types, package manifests) belongs to no phase's `owns`; a phase that changes it either lists it, and then runs alone, or depends on the phase that does.
+- `docs/specs/readiness.json` enrolls a project in the complete discovery contract: `discovery check` must pass before a phase activates, a revised dossier needs a new review, and removing the manifest doesn't remove the gate.
+- `taste.md` and its topics hold project conventions under [the taste contract](taste.md).
+- `.riff-data/state.json` is written only through the CLI; `.riff-data/events.ndjson` is the append-only event stream. The original framework's `.riff` and `.riff-state/` are foreign: never modify them. Only one runtime executes phases at a time.
 
-The original RIFF framework and RIFF may coexist in one project and share `PROJECT.md` and `ROADMAP.yaml`. Only one runtime may execute a phase at a time.
+## Autonomy and blockers
 
-One roadmap phase is active at a time. Within it, substantial independent implementation packages can use separate worktrees under [execution](execution.md). The primary agent owns shared state and integration; worker checks do not replace validation and review of the integrated candidate.
-
-## Autonomy
-
-`loop` is the default. The autonomy mode governs waves; product definition in the `start` and `evolve` skills interviews the user in either mode. In `loop`, RIFF resolves product and technical ambiguity without a human handoff by choosing the smallest reversible option that preserves the explicit product contract, current behavior, user data, least privilege, existing dependencies, and external systems. It records assumptions, avoids speculative scope, and continues automatically through dependency-ready work.
-
-`guided` preserves confirmation at product decision boundaries, before shared artifacts are frozen, and between phases.
-
-In `loop`, `awaiting_human`, `blocked`, and `parked` are never used for a product or technical decision. A wave may stop only for one of these recorded blocker kinds:
+`loop` is the default and governs waves; the `start` and `evolve` skills interview the user in any mode. In `loop`, resolve product and technical ambiguity yourself with the smallest reversible option that preserves the product contract, current behavior, user data, least privilege and external systems; record the assumption and continue through dependency-ready work. A wave stops only for one of these recorded blocker kinds:
 
 - `credentials-or-access`: required credentials or external access are missing.
-- `third-party-verification`: required verification depends on a third party and cannot be completed.
-- `destructive-target`: a destructive operation is authorized in principle but its exact target cannot be identified safely.
-- `validation-failure`: a RIFF validation or review failed and its permitted correction did not produce acceptable evidence.
+- `third-party-verification`: a required verification depends on a third party and can't be completed.
+- `destructive-target`: a destructive operation is authorized in principle but its exact target can't be identified safely.
+- `validation-failure`: a validation or review failed and the permitted correction didn't produce acceptable evidence.
 
-Waiting for the original RIFF framework to release the shared roadmap is scheduling, not a decision handoff, and must not create `awaiting_human`. Completing the roadmap is a successful terminal condition. Publication and merge scheduling follow [Git delivery](git-delivery.md): a draft PR never pauses a loop, and missing publication authorization does not stop independent local work. Work requiring an actual base-branch integration waits for that integration without inventing a phase status.
+`guided` keeps confirmation at product decisions, before freezing shared artifacts, and between phases. A missing promised design is an external dependency: plan everything else, never invent or substitute it unless authorized. In `loop`, a legacy parked or blocked phase whose reason is only a decision resumes automatically with a conservative choice.
 
-If the user supplies design through another model, finish independent planning while awaiting that actual external artifact. An unavailable promised reference is an external access dependency: report the missing input and keep discovery incomplete before phase activation. Do not invent receipt of the design, create a product-decision approval queue, or substitute RIFF design unless authorized. A non-UI project can justify visual areas as not applicable.
+## States and selection
 
-## States and readiness
-
-Valid phase states are `ready`, `active`, `completed`, `parked`, `blocked`, `awaiting_human`, and imported `skipped`. A `ready` phase is selectable only when every `depends_on` phase is terminal (`completed` or imported `skipped`). Automatic selection chooses the highest-priority ready phase, preserving roadmap order as the tie-breaker. A parked phase does not prevent independent ready phases from running. `blocked` means an external or global blocker, not an unmet roadmap dependency.
-
-The dashboard presents those operational states using the fixed columns `Todo`, `In progress`, `Done`, `Blocked`, and `Skipped`: `ready` maps to `Todo`, `active` to `In progress`, `completed` to `Done`, and `parked`, `blocked`, or `awaiting_human` to `Blocked`. `Skipped` remains available for imported legacy roadmaps; RIFF does not silently skip committed phases.
+Phase states: `ready`, `active`, `completed`, `parked`, `blocked`, `awaiting_human`, imported `skipped`. A `ready` phase is selectable when every `depends_on` phase is `completed` or `skipped`; selection takes the highest priority, roadmap order breaking ties. `blocked` means an external blocker, not an unmet dependency. The dashboard maps them to Todo, In progress, Done, Blocked and Skipped.
 
 ## Wave discipline
 
-1. Read `PROJECT.md`, `ROADMAP.yaml`, current RIFF state, project `taste.md` when present, and only topic/stack references needed by the current boundary. Apply the taste contract for a missing production taste and for frontend skill routing.
-2. Resume an active phase, honor an explicit phase, or select the highest-priority ready phase without bypassing dependencies or the enrolled discovery gate. Read its checkpoint and narrowly relevant contracts; native compaction is not a context reset.
-3. Build the complete vertical outcome with one writer per worktree. Search for existing implementations before creating components or services and preserve unrelated behavior. Delegate independent work only when it adds value, under the execution contract. Integrate before acceptance.
-4. Treat compiler, lint, and test feedback encountered during construction as normal development feedback. Once the candidate is coherent, validate only affected behavior once at the appropriate checkpoint and record the result. Hooks accumulate validation needs but never run a full suite or typecheck after each edit.
-5. Stage the complete candidate, record its Git tree hash, then obtain a fresh functional review. Load the security reference and obtain a focused security review only for a sensitive boundary.
-6. A concrete failure recorded by `wave validate` permits one targeted correction and one repeat of the failed check. Pre-validation development feedback does not consume this retry. Park the phase if the formal correction fails.
-7. Triage observations at every phase, record a current checkpoint, commit the reviewed tree atomically and persist completion. Any correction after the candidate was frozen requires affected fresh evidence. Follow dependencies automatically in `loop`; pause between phases in `guided`.
-8. After the last phase, verify the connected whole-version journeys and obtain an independent delivery review under the execution contract. For enrolled projects `finish --review FILE` and `finish --check` enforce the final receipt. Correct in-scope defects through a normal correction phase, preserving completed history. In `loop`, stop only when version verification is complete or one of the four permitted blocker kinds applies. In `guided`, preserve the requested confirmation boundaries.
+1. Read `wave context`, the `PROJECT.md` index, the phase, and only the linked contracts, taste topics and design references the outcome needs. Search for existing components, services and behavior before creating any.
+2. Build the complete vertical outcome, delegating independent packages (see below). Compiler, lint and test feedback during construction is normal development feedback.
+3. Once the candidate is coherent, stage it; `git write-tree` is its identity. Validate affected behavior once with `wave validate --run`, then get the functional review, plus security for a sensitive boundary. Run both reviews in parallel on the same frozen candidate, and keep working on something that doesn't touch the candidate meanwhile.
+4. A concrete validation or review failure permits one targeted correction and one repeat. Name the failure, the cause, the change and the check that distinguishes success. Re-running an unchanged candidate, reopening a review for a better opinion or switching model is not progress and doesn't reset the budget. Park the phase if the correction fails.
+5. Triage observations, checkpoint, commit the reviewed tree, complete. Receipts are valid only for their recorded tree: any later change needs fresh affected evidence.
+6. Continue with the next ready phase in `loop`; pause in `guided`.
 
-In `loop`, RIFF automatically resumes a legacy parked, blocked, or awaiting-human phase whose reason is only a product or technical decision, recording the conservative choice. A permitted hard blocker resumes only after it is cleared. In `guided`, explicit user instruction may resume the phase. Resumption records the reason, activates the phase, and starts a fresh formal retry budget without bypassing validation or review gates.
+## Phase batches
 
-Use [candidate evidence](evidence.md) for executed validation, independent review artifacts and generated screenshot reports. Follow [Git delivery](git-delivery.md) for one scoped branch and PR per coherent evolution across successive waves. Authorized draft publication follows completed phase evidence; final PR readiness requires `finish --check`, which does not itself publish anything.
+Independent phases run together instead of one after another:
 
-Checkpoints, compaction and recovery of active work preserve correction counts and evidence; they are not new attempts. Do not re-run a failed check or review on an unchanged candidate to obtain a favorable result. A resumed hard blocker needs a genuine corrected condition, not merely a different model or session. See [execution](execution.md) for durable context and no-progress handling.
+1. `riff wave select --parallel` lists the batch: the active phases, then the ready phases in priority order whose `owns` don't overlap. A phase without `owns` always runs alone. Activate each with `wave activate <id>`; the CLI refuses a phase that overlaps an active one.
+2. Settle anything shared first. Then launch one subagent per phase, in one message, each in its own worktree from the same committed baseline, with its phase contract and owned paths. Each builds and tests its phase and commits on its branch; none touches RIFF state.
+3. Integrate every branch into the integration checkout without committing, stage everything: the batch shares one candidate.
+4. Run `wave validate <id> --run` for each phase with its own `verify` check; `--paths` covers the files the batch changed. Then run all reviews at once: `riff review run --phase a,b --type functional` (add `security` for sensitive phases, separately if only some are). Each reviewer sees its phase's owned paths and is told about the others.
+5. A failure is corrected within the failing phase's budget. The corrected candidate is a new tree, so every phase of the batch needs fresh validation and review; the failed one gets a recheck round.
+6. Checkpoint each phase, make one commit, then `wave complete <id> --commit HEAD` for each.
 
-Receipts are valid only for their recorded Git tree hash. Any candidate change requires staging again and issuing fresh receipts. Do not create a persistent plan unless the operation is exceptionally destructive, ambiguous, multi-system, or genuinely long-running.
+A batch never mixes in a phase that depends on another member, and its members never share owned paths. When integration shows two phases colliding after all, finish them one after another.
 
-## Bounded work and reporting
+## Delegation and worktrees
 
-Use direct work for a tiny correction, explicit APEX for an independent bounded feature, and RIFF for dependent phases requiring persistent progress. Before APEX runs inside a RIFF project, inspect the roadmap and current phase. Work belonging to an active phase retains RIFF receipts and completion gates; an independent change need not create a phase or a second state system.
+Delegate by default. When a phase contains independent packages with settled contracts, hand each to a subagent from the [routing table](model-routing.md) instead of writing them yourself. Exploration of separate modules always runs in parallel, read-only. You keep product decisions, architecture, shared contracts, integration, RIFF state and final judgment.
 
-Review both whether the result satisfies the user's request and whether it follows relevant repository standards. Require observable evidence appropriate to the promised behavior; a build alone does not prove a live workflow. Keep receipts internal. The user-facing report gives the outcome, commit, checks, blocker and next phase. GitHub issues are optional projections created only by an explicit request for the `issue` skill, grouped by useful outcomes without microtasks or historical PR metadata. Authorized Git delivery includes creating or updating the change's PR under [Git delivery](git-delivery.md). Report the verified PR URL and actual delivery status, or explicitly report a local-only result when publication is not authorized. Extensive PR metadata and collaborator-specific delivery dossiers are not required. Merge and deployment retain their explicit authorization boundaries.
+- Settle shared schema, API and component contracts first, under one owner; parallelize what depends on them afterwards.
+- Each concurrent writer gets its own Git worktree and branch from a committed baseline that contains the contracts it needs (a worktree from HEAD lacks uncommitted integration changes). Resolve symlinks first so nobody writes into another checkout.
+- Worktrees don't isolate databases, ports, caches or credentials: give writers separate test resources or serialize that work.
+- A worker brief names the outcome, worktree path, owned files, contracts, exclusions, acceptance criteria, commands and expected evidence; send the smallest sufficient context.
+- Workers return commits or patches with observed checks and open questions. They never activate phases, touch RIFF state, publish or claim the phase complete. Integrate them one at a time, resolve semantic conflicts, then verify the assembled journey: passing worker checks never prove the phase.
+- Remove clean task-owned worktrees after integration; keep any with unresolved work.
 
-## Observation ownership at completion
+## Context and recovery
 
-The implementing agent handles pending technical and security observations before every phase completion and after final verification, following [observation triage](dashboard.md#end-of-work-observation-triage). The user consults the outcome; technical validity does not require the user's opinion. Record verified dispositions through the CLI, preserve unresolved evidence and real blockers, and refresh candidate-bound checks only when a correction changes the candidate. A pending nonblocking problem needs a justified explicit follow-up; pending HIGH or CRITICAL findings cannot be deferred through a phase-completion gate. The only exception is `expert_review`, for a finding that needs a human security expert rather than a code fix: the agent applies and documents a conservative interim decision, phases and delivery continue, and `finish --check` lists it for an expert (see the [security reference](security.md)).
+Use the host's native compaction; never claim to clear context, relaunch your own host or create a scheduler. The one exception is `riff review run`, which calls another host's CLI read-only for the reviewer role.
+
+Before completion or an interruption, run `wave checkpoint <phase> --summary ... --next ...` with the verified outcome, decisions, remaining risk and next action. After compaction or in a new session, run `wave resume` and check the checkpoint against current files and evidence before trusting it; preserve the worktree and index. A new session must be able to continue from artifacts, state and evidence alone.
+
+## Behavior to preserve
+
+Reuse existing components and services; extend an abstraction only when its contract fits. Never drop features, weaken criteria, delete a failing regression test or loosen authorization to make a phase pass.
+
+## Whole-version verification
+
+After the last phase, verify the full-version criteria and connected journeys (authorization, data lifecycle, integration failure and recovery, design consistency, regressions), reusing phase evidence that covers the same final candidate. Never infer production behavior from a local or sandbox result. Get an independent `delivery` review, record it with `finish --review FILE` and pass `finish --check`. A defect found here goes through an in-scope correction phase (`add-phase`), preserving completed history; new product scope still needs the user.
+
+## Observations at completion
+
+Before every phase completion and after final verification, triage pending observations under [observation triage](dashboard.md#end-of-work-observation-triage). The user doesn't judge technical validity. HIGH or CRITICAL findings can't be deferred past a completion gate, except `expert_review` for a finding that needs a human security expert: apply a conservative interim decision, continue, and `finish --check` lists it (see [security](security.md)).
+
+## Reporting
+
+Report the outcome, commit, checks, PR URL or local-only status, blocker and next phase; keep receipts internal. GitHub issues exist only through the `issue` skill. Use direct work for a tiny fix and the `quick` skill for a bounded change; RIFF phases are for dependent work that needs persistent progress.

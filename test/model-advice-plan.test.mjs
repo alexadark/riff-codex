@@ -131,10 +131,5 @@ test('CLI persists a separate role plan and wave instructions require advice bef
     assert.equal(JSON.parse(run(['model-advice', 'show']).stdout).plan.kind, 'wave-model-plan');
     assert.equal(JSON.parse(run(['wave', 'context', 'test']).stdout).modelAdvicePlan.phase, 'test');
     assert.equal(run(args, { ...input, phase: 'missing' }).status, 1);
-    const wave = readFileSync(path.join(root, 'riff/skills/wave/SKILL.md'), 'utf8');
-    const routing = readFileSync(path.join(root, 'riff/references/model-routing.md'), 'utf8');
-    assert.match(wave, /model-advice plan/);
-    assert.match(routing, /dispatch\.status/);
-    assert.match(routing, /advice-only/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

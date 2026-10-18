@@ -556,8 +556,6 @@ test('phase completion requires executed scoped validation and intact independen
   writeFileSync(reportPath, reportBytes);
   runCli(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Reviewed behavior', '--evidence', proof);
   execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Verified phase'], { cwd: root });
-  assert.match(runCliFailure(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /improvement pass/);
-  improvementPass(root, 'a');
   assert.match(runCli(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /a completed/);
   assert.match(runCli(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /already completed/);
   assert.equal(JSON.parse(runCli(root, 'wave', 'select')).id, 'b');
@@ -755,6 +753,32 @@ test('completion rejects missing security receipts, stale receipts and passing r
   review('security', second);
   improvementPass(root, 's');
   assert.match(runCli(root, 'wave', 'complete', 's', '--commit', 'HEAD'), /s completed/);
+});
+
+test('phases with disjoint owns are built and completed together on one candidate', () => {
+  const root = lifecycleFixture();
+  const owned = (id, priority, owns) => ({ ...fixturePhase(id, priority), ...(owns ? { owns } : {}) });
+  roadmapFixture(root, [owned('a', 'P1', ['src/a']), owned('b', 'P2', ['src/b/']), owned('c', 'P2', ['src/a/x']), owned('d', 'P2')]);
+  assert.deepEqual(JSON.parse(runCli(root, 'wave', 'select', '--parallel')).map((phase) => phase.id), ['a', 'b']);
+  runCli(root, 'wave', 'activate', 'a');
+  runCli(root, 'wave', 'activate', 'b');
+  assert.match(runCliFailure(root, 'wave', 'activate', 'c'), /resume or park it first/);
+  assert.match(runCliFailure(root, 'wave', 'activate', 'd'), /resume or park it first/);
+  const stateFile = path.join(root, '.riff-codex-state', 'state.json');
+  assert.deepEqual(JSON.parse(readFileSync(stateFile, 'utf8')).activeWave.batch, ['a', 'b']);
+  for (const file of ['src/a/one.txt', 'src/b/two.txt']) { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), 'feature\n'); }
+  execFileSync('git', ['add', '--', 'src'], { cwd: root });
+  for (const id of ['a', 'b']) runCli(root, 'wave', 'validate', id, '--run', '--command', '["node","-e","process.exit(0)"]', '--paths', '["src"]');
+  assert.match(runCliFailure(root, 'review', 'run', '--type', 'functional'), /several phases are active \(a, b\)/);
+  const candidate = execFileSync('git', ['write-tree'], { cwd: root, encoding: 'utf8' }).trim();
+  for (const id of ['a', 'b']) runCli(root, 'wave', 'review', id, '--type', 'functional', '--status', 'pass', '--summary', `Phase ${id} works`, '--evidence', proofFile(root, 'functional', candidate));
+  execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-qm', 'Phases a and b'], { cwd: root });
+  assert.match(runCli(root, 'wave', 'complete', 'a', '--commit', 'HEAD'), /a completed/);
+  assert.deepEqual(JSON.parse(readFileSync(stateFile, 'utf8')).activeWave.phase, 'b');
+  assert.equal(JSON.parse(readFileSync(stateFile, 'utf8')).activeWave.batch, undefined);
+  assert.match(runCli(root, 'wave', 'complete', 'b', '--commit', 'HEAD'), /b completed/);
+  assert.equal(JSON.parse(readFileSync(stateFile, 'utf8')).activeWave, null);
+  assert.deepEqual(JSON.parse(runCli(root, 'wave', 'select', '--parallel')).map((phase) => phase.id), ['c']);
 });
 
 test('improvement pass caps proposals, skips duplicates, feeds the idea box and never blocks on decisions', () => {

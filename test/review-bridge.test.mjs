@@ -116,6 +116,39 @@ test('a functional review from Astra produces an artifact the existing wave revi
   assert.equal(receipt.model, 'codex:gpt-6-astra');
 });
 
+test('several review types run in parallel and each artifact is recordable; an unknown type is refused', () => {
+  const root = fixture();
+  validatedCandidate(root);
+  const results = review(root, '--type', 'functional,security');
+  assert.deepEqual(results.map((result) => [result.type, result.status, result.reviewer.id]), [
+    ['functional', 'pass', 'codex:gpt-6-astra@medium'],
+    ['security', 'pass', 'codex:gpt-6-astra@high'],
+  ]);
+  assert.equal(calls(root).length, 2);
+  for (const result of results) {
+    const recorded = record(root, result.record);
+    assert.equal(recorded.status, 0, recorded.text);
+  }
+  rejected(root, /one or more of/, 'review', 'run', '--type', 'functional,style');
+});
+
+test('the phases of a batch are reviewed in parallel, each on its own owned paths', () => {
+  const root = fixture();
+  write(root, 'ROADMAP.yaml', { version: 1, project: { name: 'Fixture' }, phases: ['a', 'b'].map((id) => ({ id, title: `Fixture ${id}`, outcome: `${id} works`, priority: 'P2', depends_on: [], owns: [`src/${id}`] })) });
+  git(root, 'add', '--', 'ROADMAP.yaml');
+  commit(root, 'Batch roadmap');
+  ok(root, 'wave', 'sync');
+  ok(root, 'wave', 'activate', 'a');
+  ok(root, 'wave', 'activate', 'b');
+  for (const id of ['a', 'b']) write(root, `src/${id}/feature.txt`, `${id}\n`);
+  git(root, 'add', '--', 'src');
+  for (const id of ['a', 'b']) ok(root, 'wave', 'validate', id, '--run', '--command', JSON.stringify([process.execPath, '-e', '0']), '--paths', '["src"]');
+  const results = review(root, '--type', 'functional', '--phase', 'a,b');
+  assert.deepEqual(results.map((result) => [result.phase, result.status]), [['a', 'pass'], ['b', 'pass']]);
+  for (const result of results) assert.equal(record(root, result.record).status, 0);
+  assert.equal(read(root, '.riff-data/receipts/b-functional.json').status, 'pass');
+});
+
 test('a blocking finding fails the review even when the model says pass, without falling back or parking the phase, and the unchanged candidate cannot be re-reviewed', () => {
   const root = fixture();
   plan(root, { 'codex:gpt-6-astra': 'pass-with-high' });

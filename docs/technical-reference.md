@@ -133,7 +133,6 @@ Read the [dashboard README](../riff/dashboard/README.md) and [projection contrac
 - [Operating contract](../riff/references/operating-contract.md): product sources, selection, reviews, retries, and completion.
 - [Project framing](../riff/references/project-framing.md): when a larger project needs deeper discovery.
 - [Discovery](../riff/references/discovery.md): complete application dossier, external design handoff and independent readiness review.
-- [Execution](../riff/references/execution.md): phase context, worktrees, no-progress handling and final verification.
 - [Taste](../riff/references/taste.md): selective conventions, learning and Claude coexistence.
 - [Frontend taste](../riff/references/taste/frontend.md): required design skills and rendered acceptance.
 - [NowStack](../riff/references/taste/stacks/nowstack.md): starter conventions and version-aware evidence.

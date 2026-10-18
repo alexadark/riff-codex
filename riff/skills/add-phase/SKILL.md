@@ -14,7 +14,7 @@ Add one already understood, independent outcome to the roadmap as one phase the 
 ## Done when
 
 - The outcome is in product scope and no existing phase already covers it.
-- One vertical, demonstrable phase is added with `done_when`, `verify`, an explicit P0 to P3 priority justified for this phase rather than copied from its neighbors, and only real dependencies, blocking edges, risks, sensitivity and exclusions.
+- One vertical, demonstrable phase is added with `done_when`, `verify`, an explicit P0 to P3 priority justified for this phase rather than copied from its neighbors, only real dependencies, blocking edges, risks, sensitivity and exclusions, and `owns` (the paths only this phase changes) when it can run beside other phases.
 - `riff wave sync` passed and you reported when the phase becomes ready.
 - Enrolled project: the dossier's story-to-phase mapping and affected references are updated, a fresh independent review covers the revised digest and `riff discovery check` passes before further work is activated.
 

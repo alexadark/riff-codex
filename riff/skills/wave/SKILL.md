@@ -15,30 +15,29 @@ Deliver the selected phase as a complete outcome a user can demonstrate, then co
 
 - Every `done_when` item from `riff wave context` is true in the running product. If the phase has none, derive them from `outcome` and `demo` and state them in the checkpoint.
 - `riff wave validate --run` passed on the staged candidate, and `riff wave review` recorded a passing functional review on that same candidate, plus security for a sensitive phase.
-- The improvement pass is recorded with `riff improve record`: zero to three proposals for the project or RIFF.
-- The reviewed tree is committed, `riff wave complete <phase> --commit HEAD` succeeded and `EXPLAIN-POST.simple.md` is written.
+- The reviewed tree is committed, `riff wave complete <phase> --commit HEAD` succeeded and a short `EXPLAIN-POST.simple.md` is written.
 
-After the last phase, the connected journeys of the whole version are verified, a delivery review from `riff review run --type delivery` is recorded with `riff finish --review FILE`, and `riff finish --check` passes. Fix in-scope defects through an explicit correction phase.
+On the last phase of the version, before completing it, record one improvement pass with `riff improve record`: zero to three proposals for the project or RIFF, drawn from the whole version. After the last phase, the connected journeys of the whole version are verified, a delivery review from `riff review run --type delivery` is recorded with `riff finish --review FILE`, and `riff finish --check` passes. Fix in-scope defects through an explicit correction phase.
 
 ## Verify
 
 - Run each `verify` item. Size the tests to the change under `references/taste/testing.md`: at most five new tests per phase, only for costly behavior or a bug already seen, prune low-value tests in touched files, run related tests while building and the full suite once on the final candidate. Reuse checks that already passed on the same candidate.
 - For UI work, exercise the journey in a real browser at desktop and narrow widths and attach screenshots to the verification manifest. A build, a DOM snapshot or an HTTP 200 doesn't prove a screen works.
 - Verify the assembled result, not only subagent outputs.
-- Reviews come from `riff review run --type functional|security`, which runs the configured reviewer (another model family when available) read-only on the frozen candidate and writes the artifact; record it with the command it prints. They check product criteria, regressions, reuse, design fidelity and observations, and can run in parallel. Run security only for a sensitive phase. After a failed round, fix the HIGH and CRITICAL findings in the code and review again: the bridge then only rechecks those findings, so expect two rounds, not more. MEDIUM and lower findings are noted as observations and never start another round. Only if the bridge reports that no reviewer could run, use a fresh native subagent that didn't write the code and say so in the summary.
+- Reviews come from `riff review run --type functional|security`, which runs the configured reviewer (another model family when available) read-only on the frozen candidate and writes the artifact; record it with the command it prints. They check product criteria, regressions, reuse, design fidelity and observations. For a sensitive phase run `riff review run --type functional,security` so both reviewers work in parallel; run it in the background and keep going on work that doesn't touch the frozen candidate (checkpoint, explanation, reading the next phase's contracts). After a failed round, fix the HIGH and CRITICAL findings in the code and review again: the bridge then only rechecks those findings, so expect two rounds, not more. MEDIUM and lower findings are noted as observations and never start another round. Only if the bridge reports that no reviewer could run, use a fresh native subagent that didn't write the code and say so in the summary.
 - A security finding never stops the wave: correct it and review again. Defer to `expert_review` only what needs a human security expert's judgment rather than a code fix; apply and document the most conservative interim decision; those findings never block delivery and `riff finish --check` lists them for the final report.
 
 ## How to work
 
-1. Run `riff wave sync`, then `riff wave resume` or `riff wave select [phase]`, then `riff wave context`. On resume, check the checkpoint against current files and keep uncommitted work.
+1. Run `riff wave sync`, then `riff wave resume`, or `riff wave select --parallel` to see which ready phases can run together, then `riff wave context`. When several phases fit beside each other, run them as one batch following the operating contract: one subagent per phase in its own worktree, one shared candidate, all reviews at once with `riff review run --phase a,b`. On resume, check the checkpoint against current files and keep uncommitted work.
 2. Establish the evolution's integration branch before building.
 3. Read only what the phase needs: its stories, criteria and contracts linked from `PROJECT.md`, the project taste and relevant topics, applicable lessons, and the security reference for a sensitive phase. Finish missing planning or design before building.
-4. Build the whole vertical outcome. Reuse existing components and services and keep behavior outside the phase intact. Hand substantial independent packages to subagents with their profile's model and effort; unless advice is off, run `riff model-advice plan --input -` first. Concurrent writers use separate worktrees; you own integration and RIFF state.
+4. Build the whole vertical outcome. Reuse existing components and services and keep behavior outside the phase intact. Delegate by default: explore separate modules in parallel, settle shared contracts yourself, then hand each independent package to a subagent from the table in `references/model-routing.md`, all launched in one message so they run at once. Concurrent writers use separate worktrees; you own integration and RIFF state, and you verify the assembled result.
 5. Before freezing the candidate, merge proven lessons into taste and triage observations yourself: fix confirmed in-scope problems, record decisions with `riff observations review`, never mark an unverified finding resolved.
-6. Validate, review, record the improvement pass, run `riff wave checkpoint <phase> --summary ... --next ...`, commit, complete.
+6. Validate, review, run `riff wave checkpoint <phase> --summary ... --next ...`, commit, complete.
 7. Open or update the draft PR only when publication is authorized; otherwise continue locally. Merge and deployment follow the standing merge authorization in `references/git-delivery.md`: once final gates and required GitHub checks pass, merge into the target base and report the deploy.
 
-In `loop` mode, never stop for a product or technical decision or to ask for a test: take the smallest reversible option, record the assumption and continue. Stop only with a CLI blocker kind. In `guided` mode, pause between phases. A request for model advice alone stops before any phase work.
+In `loop` mode, never stop for a product or technical decision or to ask for a test: take the smallest reversible option, record the assumption and continue. Stop only with a CLI blocker kind. In `guided` mode, pause between phases. Model advice (`riff model-advice`) runs only on an explicit request; a request for advice alone stops before any phase work.
 
 Never relaunch your own host to do the work, create a scheduler, or publish GitHub issues without the `issue` skill.
 
@@ -46,4 +45,4 @@ Report the outcome, commit, checks, PR URL or local-only status, and any real bl
 
 ## References
 
-Read when the step needs them, under `.riff-cli/references/`: `operating-contract.md` (states, modes, blocker kinds), `execution.md` (context, recovery, delegation, worktrees, whole-version verification), `evidence.md` (validation, browser evidence, review artifacts), `git-delivery.md`, `model-routing.md`, `learning.md` (lessons and improvement proposals), `dashboard.md` (observation triage), `taste.md` and `taste/frontend.md`.
+Read when the step needs them, under `.riff-cli/references/`: `operating-contract.md` (states, modes, blocker kinds, delegation, worktrees, recovery, whole-version verification), `evidence.md` (validation, browser evidence, review artifacts), `git-delivery.md`, `model-routing.md` (subagent table), `learning.md` (lessons and improvement proposals), `dashboard.md` (observation triage), `taste.md` and `taste/frontend.md`.
