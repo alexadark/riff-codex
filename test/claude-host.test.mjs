@@ -13,7 +13,7 @@ test('Claude Code subagents match every Anthropic catalog profile', () => {
   assert.deepEqual(readdirSync(AGENTS_DIR).filter((file) => file.endsWith('.md')).sort(), expected.map((agent) => agent.file).sort(), 'run node riff/lib/claude-agents.mjs');
   for (const agent of expected) assert.equal(readFileSync(path.join(AGENTS_DIR, agent.file), 'utf8'), agent.content, `${agent.file} is stale: run node riff/lib/claude-agents.mjs`);
   assert.match(expected.find((agent) => agent.file === 'opus-5-5-medium.md').content, /\nmodel: claude-opus-5-5\neffort: medium\n/);
-  assert.doesNotMatch(expected.find((agent) => agent.file === 'haiku-4-5.md').content, /effort:/);
+  assert.match(expected.find((agent) => agent.file === 'haiku-5-5-medium.md').content, /\neffort: medium\ntools: Read, Grep, Glob\n/);
 });
 
 test('the riff plugin exposes every skill except the Codex-only deep-audit', () => {

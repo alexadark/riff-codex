@@ -99,7 +99,7 @@ test('recovery reuses decisions including failures, explicit reason refreshes, a
   assert.equal(calls, 3, 'restoring key alone does not cause a retry');
   const repaired = await recommend(brief(), { ...options, previous: { ...first, model: 'forged-model', effort: 'made-up', privateExtra: 'must not survive' } });
   assert.equal(repaired.reused, false);
-  assert.equal(repaired.model, 'gpt-6-sol');
+  assert.equal(repaired.model, 'gpt-6.1-sol');
   assert.equal(repaired.privateExtra, undefined);
   const invalidProvider = await recommend(brief(), { ...options, previous: { ...first, jev: { ...first.jev, model: false } } });
   assert.equal(invalidProvider.reused, false);
@@ -163,7 +163,7 @@ test('CLI integration preserves wave state, consent, projections and private inp
 test('no provider is preferred by default; Ollama stays opt-in and filters still apply', async () => {
   const opus = catalog.profiles.filter((p) => p.model === 'claude-opus-5-5');
   assert.deepEqual(opus.map((p) => p.effort), ['low', 'medium', 'high', 'xhigh']);
-  assert.deepEqual(catalog.profiles.filter((p) => p.provider === 'anthropic' && p.model !== 'claude-opus-5-5').map((p) => p.id), ['sonnet_5_5_low', 'sonnet_5_5_medium', 'sonnet_5_5_high', 'haiku_4_5']);
+  assert.deepEqual(catalog.profiles.filter((p) => p.provider === 'anthropic' && p.model !== 'claude-opus-5-5').map((p) => p.id), ['sonnet_5_5_low', 'sonnet_5_5_medium', 'sonnet_5_5_high', 'haiku_5_5_medium', 'haiku_5_5_high']);
   assert.deepEqual([...new Set(eligible.map((p) => p.provider))].sort(), ['anthropic', 'openai']);
   const constraints = { providers: ['anthropic'], availableProfiles: ['opus_5_5_medium'] };
   assert.deepEqual(eligibleProfiles(normalizeInput(brief({ constraints }), catalog), catalog).map((p) => p.id), ['opus_5_5_medium']);
