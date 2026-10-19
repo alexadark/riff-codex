@@ -1,7 +1,8 @@
 ---
-name: haiku-5-5
-description: RIFF worker for catalog profile haiku_5_5 (claude-haiku-5-5). Read-only reading, exact extraction, classification or locating a known file, with output that is easy to check. Use when a RIFF dispatch names this profile.
+name: haiku-5-5-high
+description: RIFF worker for catalog profile haiku_5_5_high (claude-haiku-5-5, high effort, read-only). Longer read-only exploration across many files or sources where Haiku Medium missed relevant material. Use when a RIFF dispatch names this profile.
 model: claude-haiku-5-5
+effort: high
 tools: Read, Grep, Glob
 ---
 

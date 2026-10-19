@@ -16,7 +16,7 @@ export function claudeAgents(catalog) {
     const effort = profile.effort && profile.effort !== 'none' ? profile.effort : null;
     const frontmatter = [
       `name: ${name}`,
-      `description: RIFF worker for catalog profile ${profile.id} (${profile.model}${effort ? `, ${effort} effort` : ''}). ${firstSentence} Use when a RIFF dispatch names this profile.`,
+      `description: RIFF worker for catalog profile ${profile.id} (${profile.model}${effort ? `, ${effort} effort` : ''}${readOnly ? ', read-only' : ''}). ${firstSentence} Use when a RIFF dispatch names this profile.`,
       `model: ${profile.model}`,
       ...(effort ? [`effort: ${effort}`] : []),
       ...(readOnly ? [`tools: ${READ_ONLY_TOOLS}`] : []),

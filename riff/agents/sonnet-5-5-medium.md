@@ -1,6 +1,6 @@
 ---
 name: sonnet-5-5-medium
-description: RIFF worker for catalog profile sonnet_5_5_medium (claude-sonnet-5-5, medium effort). Bounded, well-specified changes such as the quick skill, and exploration that needs judgment. Use when a RIFF dispatch names this profile.
+description: RIFF worker for catalog profile sonnet_5_5_medium (claude-sonnet-5-5, medium effort). Bounded, well-specified changes when Opus capacity is short. Use when a RIFF dispatch names this profile.
 model: claude-sonnet-5-5
 effort: medium
 ---

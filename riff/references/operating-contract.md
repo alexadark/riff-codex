@@ -51,7 +51,7 @@ A batch never mixes in a phase that depends on another member, and its members n
 
 ## Delegation and worktrees
 
-Delegate by default. When a phase contains independent packages with settled contracts, hand each to a subagent from the [routing table](model-routing.md) instead of writing them yourself. Exploration of separate modules always runs in parallel, read-only. You keep product decisions, architecture, shared contracts, integration, RIFF state and final judgment.
+Delegate where it pays, following [model routing](model-routing.md): exploration of separate modules runs in parallel on read-only subagents, and each independent, sizeable package with settled contracts goes to its own subagent. A chain of dependent steps, a small change or checking your own work stays with you. You keep product decisions, architecture, shared contracts, integration, RIFF state and final judgment.
 
 - Settle shared schema, API and component contracts first, under one owner; parallelize what depends on them afterwards.
 - Each concurrent writer gets its own Git worktree and branch from a committed baseline that contains the contracts it needs: the phase's integration branch, never `main` by default (a worktree from HEAD lacks uncommitted integration changes). Resolve symlinks first so nobody writes into another checkout.
