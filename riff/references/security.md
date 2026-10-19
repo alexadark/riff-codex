@@ -4,16 +4,16 @@ Load this file only for a sensitive phase, promotion, incident, or explicit secu
 
 Sensitive boundaries include authentication, authorization, tenant isolation, user data, secrets, payments, migrations, public APIs, callbacks, and webhooks.
 
-Review only the changed boundary and its concrete risk. Do not run an exhaustive audit during a normal wave. Every finding must say, in plain language:
+Review only the changed boundary and its concrete risk. Every finding must say, in plain language:
 
 - what could happen;
 - who or what data is affected;
 - the recommended correction;
 - why RIFF continues or stops.
 
-A credible `HIGH` or `CRITICAL` review finding never stops the wave: record the failed review, correct the code, stage the new candidate and repeat the review, because the old receipt is invalid. That repeat is a recheck of the earlier findings, not a fresh audit. When a later review passes, mark the earlier finding `resolved` with `riff observations review`, naming the correction.
+A credible `HIGH` or `CRITICAL` review finding does not park the phase by itself: record the failed review, correct the code, stage the new candidate and repeat the review, because the old receipt is invalid. That repeat is a recheck of the earlier findings, not a fresh audit, and the normal review round limit still applies. When a later review passes, mark the earlier finding `resolved` with `riff observations review`, naming the correction.
 
-Defer a finding with `--status expert_review` only when no code change can settle it and it needs a human security expert's judgment: a threat model, a compliance or legal requirement, a cryptographic or infrastructure choice, a third-party configuration outside the repository. A plain code defect is always corrected, never deferred. If the same finding survives three corrections, defer it with its history instead of looping. Before deferring, apply the most conservative interim measure that keeps the MVP working (deny by default, narrower access, a safe default setting) and write in the note what you decided, why, and what the expert should check. Deferred findings never block phases or delivery: the bridge tells later reviewers about them, and `riff finish --check` lists them with their interim decisions for the final report. An expert's later decision is recorded as `resolved` or `false_positive`.
+Defer a finding with `--status expert_review` only when no code change can settle it and it needs a human security expert's judgment: a threat model, a compliance or legal requirement, a cryptographic or infrastructure choice, a third-party configuration outside the repository. A plain code defect is always corrected, never deferred. If the same finding survives the round limit and needs expert judgment, defer it with its history instead of looping. Before deferring, apply the most conservative interim measure that keeps the MVP working (deny by default, narrower access, a safe default setting) and write in the note what you decided, why, and what the expert should check. Deferred findings never block phases or delivery: the bridge tells later reviewers about them, and `riff finish --check` lists them with their interim decisions for the final report. An expert's later decision is recorded as `resolved` or `false_positive`.
 
 Hooks block only high-confidence destructive or security violations. Heuristic authentication, IDOR, input-validation, orphan-file, and TODO checks warn and create structured events for the fresh review. Destructive migrations and high-confidence secrets block and park an active phase.
 

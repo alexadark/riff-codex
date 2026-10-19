@@ -12,12 +12,14 @@ export function claudeAgents(catalog) {
   return catalog.profiles.filter((profile) => profile.provider === 'anthropic').map((profile) => {
     const name = profile.id.replaceAll('_', '-');
     const firstSentence = profile.usage.split(/(?<=\.)\s/)[0];
-    const readOnly = profile.effort === 'none';
+    const readOnly = profile.readOnly === true;
+    const effort = profile.effort && profile.effort !== 'none' ? profile.effort : null;
     const frontmatter = [
       `name: ${name}`,
-      `description: RIFF worker for catalog profile ${profile.id} (${profile.model}${readOnly ? '' : `, ${profile.effort} effort`}). ${firstSentence} Use when a RIFF dispatch names this profile.`,
+      `description: RIFF worker for catalog profile ${profile.id} (${profile.model}${effort ? `, ${effort} effort` : ''}). ${firstSentence} Use when a RIFF dispatch names this profile.`,
       `model: ${profile.model}`,
-      ...(readOnly ? [`tools: ${READ_ONLY_TOOLS}`] : [`effort: ${profile.effort}`]),
+      ...(effort ? [`effort: ${effort}`] : []),
+      ...(readOnly ? [`tools: ${READ_ONLY_TOOLS}`] : []),
     ];
     const body = [
       'You run one bounded package that the main RIFF agent handed you.',

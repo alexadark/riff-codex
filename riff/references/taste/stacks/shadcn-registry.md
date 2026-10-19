@@ -19,7 +19,7 @@ paths:
 
 2. **Strip Next.js-specific pragmas after install.** Registry files often carry `'use client'` directives inherited from Next.js source. In TanStack Start / Vite / non-Next.js frameworks, the pragma is a no-op but misleads readers about boundary semantics. After install, scan the new files and remove the directive:
    ```bash
-   grep -rl "^'use client'" app/components/{auth,ui}/ | xargs sed -i '' "/^'use client'/d"
+   grep -rl "^'use client'" app/components/{auth,ui}/ | xargs perl -ni -e "print unless /^'use client'/"
    ```
 
 3. **Registry files may carry breaking-change debt from upstream lib bumps.** Example: `react-day-picker` v10 renamed `table` classname to `month_grid`; a stale `calendar.tsx` in the registry uses the v8 name and needs a one-line patch after `pnpm install` pulls v10. Verify visually that primitives render correctly after install — if a date picker / popover / drawer looks broken, search the file for the old class.

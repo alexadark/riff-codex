@@ -59,7 +59,7 @@ Example with one role (add actual independent packages only when useful):
       "verification": "Existing unit checks",
       "lateErrorCost": "Local reversible change",
       "localAdvice": {
-        "profile": "sol_medium",
+        "profile": "astra_medium",
         "reason": "Bounded connected execution",
         "reconsiderWhen": "The integration contract changes"
       }

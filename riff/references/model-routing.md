@@ -13,7 +13,7 @@ Under Claude Code, each Anthropic profile of [model-profiles.json](model-profile
 | Code spanning data, permissions or integrations | `riff:opus-5-5-medium` |
 | Hard diagnosis or architectural trade-off | `riff:opus-5-5-high` |
 
-Under Codex, use the equivalent OpenAI profiles from the catalog (Luna for bounded units, Sol for well-specified work, Astra for dependent or ambiguous work). Raise effort only for a concrete difficulty the lower profile failed on, then come back down. Explicit user model choices and actual runtime availability win over this table. Changing model never resets the correction budget or weakens a gate.
+Under Codex, use the equivalent OpenAI profiles from the catalog (Luna for bounded units, Sol for well-specified work, Astra for dependent or ambiguous work). Raise effort only for a concrete difficulty the lower profile failed on, then come back down. Explicit user model choices and actual runtime availability win over this table. Changing model never resets the correction budget or the review round count, and never weakens a gate. Reviews go to another model family through `riff review run` (`gpt-6-astra`, then `gpt-6.1-sol`, then Claude Opus; configure `reviewers.chain`). Never send OpenAI execution through OpenRouter.
 
 ## Optional advice
 

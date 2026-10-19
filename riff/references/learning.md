@@ -2,8 +2,6 @@
 
 Keep verified lessons in the project's existing `taste.md` and relevant `taste/` topics. These files are the shared memory for planning, implementation and review, including later sessions and the original RIFF framework. Lessons are separate from improvement proposals, described below.
 
-Before a phase or a related bug fix, read the applicable topic and any directly relevant prior incident or phase review. Apply its prevention rule to the current boundary; do not replay the whole history.
-
 When a correction or review establishes a reusable lesson, merge it into that topic before final candidate validation. Use one short entry containing:
 
 - **When:** the concrete condition where this lesson applies.

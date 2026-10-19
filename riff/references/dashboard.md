@@ -5,7 +5,7 @@ The dashboard is an independent application. Roadmap and wave state remain read-
 RIFF producers write derived display artifacts under `.riff-data/dashboard/phases/<id>-<slug>/`, where `<slug>` is the phase title converted to lowercase kebab-case:
 
 - `EXPLAIN.simple.md` describes the demonstrable outcome before implementation in the configured conversation language.
-- `EXPLAIN-POST.simple.md` replaces intent with the verified result after completion and briefly includes validation, review, security, and commit evidence when available.
+- `EXPLAIN-POST.simple.md` is optional; the final report's TL;DR already explains the verified result.
 
 Keep each explanation concrete, jargon-free, and short. The product contract, roadmap, receipts, and RIFF state remain canonical; dashboard files are disposable projections and must never drive execution.
 
@@ -13,11 +13,11 @@ Legacy RIFF projects keep their existing `.planning/phases/**/EXPLAIN*.md` artif
 
 ## End-of-work observation triage
 
-The implementing agent owns technical triage at every phase, not only at the end of a wave. Before freezing each phase candidate and before whole-version completion, run `node .riff-cli/bin/riff.mjs observations list` and inspect pending observations against current code and evidence. Prioritize security findings. Do not ask the user to judge whether a technical warning is valid.
+The implementing agent owns technical triage. Before freezing each phase candidate, run `node .riff-cli/bin/riff.mjs observations list` and handle pending HIGH and CRITICAL observations; they block completion. Triage the lower ones once, before whole-version completion. Do not ask the user to judge whether a technical warning is valid.
 
-For each observation, record `false_positive` only with a concrete explanation of why the detector does not apply; record `resolved` only after verifying the correction. Include inspected paths and the relevant check or evidence in the note. Repair confirmed problems within the authorized task, then refresh affected validation and reviews if the candidate changed. Never bulk-dismiss a backlog or treat age, repetition, or a passing unrelated review as proof of resolution.
+When you triage an observation, record `false_positive` only with a concrete explanation of why the detector does not apply; record `resolved` only after verifying the correction. Include inspected paths and the relevant check or evidence in the note. Repair confirmed problems within the authorized task, then refresh affected validation and reviews if the candidate changed. Never bulk-dismiss a backlog or treat age, repetition, or a passing unrelated review as proof of resolution.
 
-Keep unverifiable or out-of-scope findings `pending`, with a current-revision decision explaining the impact, why it cannot be corrected here, and a concrete next action. For enrolled projects, a nonblocking pending item must reference another unfinished roadmap phase in its note before the current phase can complete. Add that phase only when the work is already authorized and in product scope; otherwise report the actual missing authority/access and do not silently accept an incomplete delivery. An arbitrary issue link or “later” is not a completion disposition. Confirmed HIGH or CRITICAL findings remain blocking until verified correction or a justified false-positive decision; moving them to a follow-up phase cannot bypass the gate. Final verification must also account for remaining observations.
+Keep unverifiable or out-of-scope findings `pending`, with a current-revision decision explaining the impact, why it cannot be corrected here, and a concrete next action. A nonblocking pending item does not stop phase completion; it stays listed for the final report. Confirmed HIGH or CRITICAL findings remain blocking until verified correction or a justified false-positive decision; moving them to a follow-up phase cannot bypass the gate. Final verification must also account for remaining observations.
 
 Escalate only a real access, authorization or destructive-action boundary under the operating contract. Triage is part of the active task, not a background scheduler or a new approval ceremony. Existing projects without discovery enrollment retain their CLI behavior, while the agent follows this per-phase discipline.
 

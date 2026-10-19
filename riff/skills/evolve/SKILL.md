@@ -29,7 +29,7 @@ Turn an authorized change to an existing application into a verifiable plan the 
 
 - Run `riff doctor` and `riff status` before and after the edits.
 - Check the plan against the code and tests around the affected paths, not only the documents.
-- An enrolled dossier is reviewed with `riff review run --type discovery`; the reviewer judges the coherence of the whole revised version, including the existing behavior affected. Three failed rounds at most before recording a blocker.
+- An enrolled dossier is reviewed with `riff review run --type discovery`. After a first passing review the CLI scopes later reviews to the dossier diff since that pass; before one exists, pass `--since <commit before the evolution>`. The reviewer judges the change and the existing behavior it touches, sees the earlier failed rounds, and keeps HIGH for real contradictions and main-path gaps. Turn rare cases it reports into operating instructions in the evolution document instead of more machinery. Two failed rounds at most before recording a blocker.
 
 ## How to work
 

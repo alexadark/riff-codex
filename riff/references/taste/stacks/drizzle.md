@@ -137,30 +137,27 @@ Default `build` does not migrate. Add a `vercel-build` script Vercel auto-detect
 
 Match the package manager the project uses (`pnpm`/`npm`/`yarn`). Mixing `npm run` inside a pnpm project breaks the `node_modules/.bin` path so `tsx` is not found.
 
-`check-safe-migration.ts` (template at `riff/templates/scripts/check-safe-migration.ts`) reads `drizzle/meta/_journal.json`, queries `drizzle.__drizzle_migrations`, and scans pending migrations for destructive patterns (`DROP TABLE/COLUMN`, `TRUNCATE`, `DELETE FROM`, `RENAME`, `ALTER COLUMN ... TYPE`). Match → exit 1 → build fails → migration must be applied manually. Override per-migration with `-- @riff:reviewed` after a careful read.
+RIFF ships no template for `scripts/check-safe-migration.ts`; write it in the project. It reads `drizzle/meta/_journal.json`, queries `drizzle.__drizzle_migrations`, and scans pending migrations for destructive patterns (`DROP TABLE/COLUMN`, `TRUNCATE`, `DELETE FROM`, `RENAME`, `ALTER COLUMN ... TYPE`). Match → exit 1 → build fails → the migration is applied manually after review. Allow a per-migration override such as a `-- reviewed` comment after a careful read.
 
-The framework hook `hooks/migration-gate.sh` enforces the RLS pairing on commit: any `CREATE TABLE` in a staged migration without a matching `ENABLE ROW LEVEL SECURITY` blocks the commit (Supabase projects only, detected via `@supabase/*` in `package.json`). Bypass: `RIFF_SKIP_RLS_CHECK=1`.
+RIFF's own pre-commit hook only flags explicit destructive SQL (`DROP`, `TRUNCATE`, `DELETE FROM`) in staged migration files. It does not check RLS pairing: ask the security review to confirm that every `CREATE TABLE` in a Supabase migration has its `ENABLE ROW LEVEL SECURITY`.
 
-## Daily RLS audit (catches what slipped past the hook)
+## RLS audit against the database
 
-The pre-commit hook only sees migrations that go through the local commit pipeline. Tables added directly via the Supabase SQL editor, a different machine without the hook, or a `--no-verify` bypass land in prod unchecked. To catch those, drop in the linter:
+Review and commit hooks only see migrations that go through the repository. Tables added directly in the Supabase SQL editor, from another machine or through a `--no-verify` bypass land in prod unchecked. For a multi-tenant Supabase project, add a project script and a scheduled CI job:
 
-- `templates/scripts/check-rls.ts` — runs the two Supabase rules that matter for multi-tenancy (`rls_disabled_in_public` + `policy_exists_rls_disabled`) directly against `pg_class` / `pg_policy`. Exits 1 if any public table is unprotected.
-- `templates/github-workflows/db-lint.yml` — runs the script daily (cron) and on push to `main`/PRs, with `DATABASE_URL` from repo secrets.
+- `scripts/check-rls.ts`: runs the two Supabase lint rules that matter for multi-tenancy (`rls_disabled_in_public` and `policy_exists_rls_disabled`) directly against `pg_class` / `pg_policy`, and exits 1 if any public table is unprotected.
+- A CI workflow that runs it daily and on pushes and pull requests, with `DATABASE_URL` from repository secrets.
 
-Wire-up:
 ```json
 "db:check-rls": "tsx --env-file-if-exists=.env scripts/check-rls.ts"
 ```
 
-The daily cron is the safety net: even a table created from a coffee-shop laptop with no RIFF hooks installed shows up as a red CI run within 24h.
-
 ### RLS + grants drift test (pins the surface, not just "RLS on")
 
-`check-rls.ts` answers "is RLS on?". It does NOT catch a stray `GRANT SELECT … TO authenticated` that re-exposes a table whose RLS you trusted. Drop `templates/scripts/rls-drift.test.ts` into the suite for that: it asserts (1) every `public` table has `relrowsecurity`, and (2) every `anon`/`authenticated` grant in `information_schema.role_table_grants` is in an explicit `GRANT_ALLOWLIST` you maintain in the file. Any grant outside the allowlist fails the test → drift is visible in the PR, not in prod.
+`check-rls.ts` answers "is RLS on?". It does not catch a stray `GRANT SELECT … TO authenticated` that re-exposes a table whose RLS you trusted. Add a `scripts/rls-drift.test.ts` that asserts (1) every `public` table has `relrowsecurity`, and (2) every `anon`/`authenticated` grant in `information_schema.role_table_grants` is in an explicit `GRANT_ALLOWLIST` maintained in the file. Any grant outside the allowlist fails the test, so drift shows in the pull request, not in prod.
 
 ```json
 "test:rls": "vitest run scripts/rls-drift.test.ts"
 ```
 
-Needs `// @vitest-environment node` (the file has it) — the default jsdom env has no `postgres` socket. Skips cleanly when `DATABASE_URL` is unset.
+Give the file `// @vitest-environment node` (the default jsdom environment has no `postgres` socket) and skip it cleanly when `DATABASE_URL` is unset.

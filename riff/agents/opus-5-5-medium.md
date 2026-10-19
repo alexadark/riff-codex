@@ -1,6 +1,6 @@
 ---
 name: opus-5-5-medium
-description: RIFF worker for catalog profile opus_5_5_medium (claude-opus-5-5, medium effort). Default Opus 5.5 starting point for coding, source synthesis and prolonged tool-based knowledge work. Use when a RIFF dispatch names this profile.
+description: RIFF worker for catalog profile opus_5_5_medium (claude-opus-5-5, medium effort). RIFF default for planning and the primary agent: discovery, roadmap, phase design, integration and judgment. Use when a RIFF dispatch names this profile.
 model: claude-opus-5-5
 effort: medium
 ---

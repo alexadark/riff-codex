@@ -1,6 +1,6 @@
 ---
 name: opus-5-5-low
-description: RIFF worker for catalog profile opus_5_5_low (claude-opus-5-5, low effort). Simple, bounded extraction or rewriting when Anthropic execution is allowed and latency matters. Use when a RIFF dispatch names this profile.
+description: RIFF worker for catalog profile opus_5_5_low (claude-opus-5-5, low effort). RIFF default for delegated execution: a bounded package with owned files, a clear contract and a check to run. Use when a RIFF dispatch names this profile.
 model: claude-opus-5-5
 effort: low
 ---

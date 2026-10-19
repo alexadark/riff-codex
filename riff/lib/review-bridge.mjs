@@ -15,10 +15,17 @@ export const DEFAULT_REVIEWERS = {
   chain: [
     { via: 'codex', model: 'gpt-6-astra' },
     { via: 'codex', model: 'gpt-6.1-sol' },
-    { via: 'claude', model: 'opus', fresh: true },
+    { via: 'claude', model: 'opus' },
   ],
   effort: { default: 'medium', security: 'high', delivery: 'high' },
   timeoutSeconds: 1200,
+  // Whole `riff review run` budget per review type, all reviewers of the chain included.
+  runTimeoutMinutes: 25,
+  // Review round limits per phase and type: from this round the reviewer re-checks the earlier findings
+  // instead of reviewing from scratch, and after maxFailedRounds failures `review run` refuses and the
+  // phase goes to the human.
+  convergenceFromRound: 2,
+  maxFailedRounds: 2,
 };
 
 export function reviewerConfig(config) {
@@ -27,6 +34,9 @@ export function reviewerConfig(config) {
     chain: Array.isArray(custom.chain) && custom.chain.length ? custom.chain : DEFAULT_REVIEWERS.chain,
     effort: { ...DEFAULT_REVIEWERS.effort, ...(custom.effort ?? {}) },
     timeoutSeconds: Number(custom.timeoutSeconds) > 0 ? Number(custom.timeoutSeconds) : DEFAULT_REVIEWERS.timeoutSeconds,
+    runTimeoutMinutes: Number(custom.runTimeoutMinutes) > 0 ? Number(custom.runTimeoutMinutes) : DEFAULT_REVIEWERS.runTimeoutMinutes,
+    convergenceFromRound: Number.isInteger(custom.convergenceFromRound) && custom.convergenceFromRound > 1 ? custom.convergenceFromRound : DEFAULT_REVIEWERS.convergenceFromRound,
+    maxFailedRounds: Number.isInteger(custom.maxFailedRounds) && custom.maxFailedRounds > 0 ? custom.maxFailedRounds : DEFAULT_REVIEWERS.maxFailedRounds,
     builderFamily: custom.builderFamily ?? null,
   };
 }
@@ -70,6 +80,14 @@ export function unavailableReason(text) {
   return null;
 }
 
+// The Codex sandbox (bubblewrap, Landlock, seccomp) failed to start, so the reviewer could not read a single
+// file: whatever verdict it returns is not a review. Example: "bwrap: loopback: Failed RTM_NEWADDR".
+export function sandboxFailure(text) {
+  const value = String(text ?? '');
+  return /bwrap: [^\n]*(?:RTM_NEWADDR|RTM_NEWLINK|loopback|Operation not permitted|No permissions|Failed to|Can't|setting up uid map)/i.test(value)
+    || /(?:sandbox|landlock|seccomp)[^\n]{0,60}(?:failed to (?:start|initiali[sz]e|apply|create)|could not be (?:started|applied)|is not supported on this)/i.test(value);
+}
+
 function errorTail(text) {
   return String(text ?? '').split('\n').map((line) => line.trim()).filter(Boolean).slice(-3).join(' | ').slice(0, 300);
 }
@@ -80,10 +98,11 @@ function runCodex(entry, effort, prompt, root, settings, env) {
   const out = path.join(dir, 'last-message.json');
   try {
     const args = ['exec', '--ignore-user-config', '-m', entry.model, '-c', `model_reasoning_effort=${effort}`, '-s', 'read-only', '--ephemeral', '--skip-git-repo-check', '--output-schema', SCHEMA_FILE, '-o', out, '-C', root, '-'];
-    const result = spawnSync(bin, args, { input: prompt, encoding: 'utf8', env, timeout: settings.timeoutSeconds * 1000, maxBuffer: 64 * 1024 * 1024 });
+    const result = spawnSync(bin, args, { input: prompt, encoding: 'utf8', env, timeout: settings.timeoutMs ?? settings.timeoutSeconds * 1000, maxBuffer: 64 * 1024 * 1024 });
     const text = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
     if (result.error?.code === 'ENOENT') return { unavailable: 'cli-missing' };
     if (result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM') return { unavailable: 'timeout' };
+    if (sandboxFailure(text)) return { unavailable: `sandbox-unavailable: ${errorTail(text.split('\n').filter((line) => sandboxFailure(line)).join('\n'))}` };
     if (result.status !== 0) return { unavailable: unavailableReason(text) ?? `error: ${errorTail(text)}` };
     if (!existsSync(out)) return { invalid: 'no output message' };
     return { raw: readFileSync(out, 'utf8'), model: entry.model };
@@ -94,7 +113,7 @@ function runClaude(entry, effort, prompt, root, settings, env) {
   const bin = binary('claude', env);
   const schema = readFileSync(SCHEMA_FILE, 'utf8');
   const args = ['-p', '--model', entry.model, '--effort', effort, '--no-session-persistence', '--strict-mcp-config', '--tools', 'Read,Grep,Glob', '--permission-mode', 'dontAsk', '--output-format', 'json', '--json-schema', schema];
-  const result = spawnSync(bin, args, { input: prompt, cwd: root, encoding: 'utf8', env, timeout: settings.timeoutSeconds * 1000, maxBuffer: 64 * 1024 * 1024 });
+  const result = spawnSync(bin, args, { input: prompt, cwd: root, encoding: 'utf8', env, timeout: settings.timeoutMs ?? settings.timeoutSeconds * 1000, maxBuffer: 64 * 1024 * 1024 });
   const text = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
   if (result.error?.code === 'ENOENT') return { unavailable: 'cli-missing' };
   if (result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM') return { unavailable: 'timeout' };
@@ -115,12 +134,15 @@ export function parseVerdict(raw) {
   if (!evidence.length) return { error: 'review lists no inspected evidence' };
   const findings = value.findings.map((finding) => ({ ...finding, severity: String(finding?.severity ?? '').toUpperCase() }));
   if (findings.some((finding) => !SEVERITIES.includes(finding.severity) || !String(finding.title ?? '').trim())) return { error: 'finding without valid severity or title' };
-  // A blocking finding always fails, whatever status the model chose.
-  const status = findings.some((finding) => BLOCKING.has(finding.severity)) ? 'fail' : value.status;
+  // The status follows the findings alone: a blocking finding fails, anything else passes.
+  const status = findings.some((finding) => BLOCKING.has(finding.severity)) ? 'fail' : 'pass';
   return { verdict: { status, summary: value.summary.trim(), evidence, findings } };
 }
 
-export function runReviewChain({ type, prompt, root, config, env = process.env }) {
+// A reviewer needs at least this much of the run budget left to be worth starting.
+const MIN_REVIEWER_MS = 30_000;
+
+export function runReviewChain({ type, prompt, root, config, env = process.env, deadline = null }) {
   const settings = reviewerConfig(config);
   const effort = settings.effort[type] ?? settings.effort.default;
   const family = builderFamily(settings, env);
@@ -131,7 +153,10 @@ export function runReviewChain({ type, prompt, root, config, env = process.env }
     const id = `${entry.via}:${entry.model}@${effort}`;
     const runner = entry.via === 'codex' ? runCodex : runClaude;
     const attempt = () => {
-      const outcome = runner(entry, effort, prompt, root, settings, childEnvironment);
+      const remaining = deadline ? deadline - Date.now() : Infinity;
+      if (remaining < MIN_REVIEWER_MS) return { unavailable: 'run-timeout' };
+      const timeoutMs = Math.min(settings.timeoutSeconds * 1000, remaining);
+      const outcome = runner(entry, effort, prompt, root, { ...settings, timeoutMs }, childEnvironment);
       if (outcome.unavailable) return outcome;
       const parsed = outcome.invalid ? { error: outcome.invalid } : parseVerdict(outcome.raw);
       return parsed.error ? { invalid: parsed.error } : { ...outcome, verdict: parsed.verdict };

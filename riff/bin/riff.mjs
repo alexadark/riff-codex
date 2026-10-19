@@ -28,16 +28,16 @@ import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
 import { CODEX_STATE_DIR, STATE_DIR, inside, localPath, phaseId, stateDirFor, withLock, withFileLock } from '../lib/safety.mjs';
 import { verificationEvidence, writeReport } from '../lib/report.mjs';
-import { REVIEW_TYPES, buildPrompt, reviewerAvailability, runReviewChain, toArtifact } from '../lib/review-bridge.mjs';
+import { REVIEW_TYPES, buildPrompt, reviewerAvailability, reviewerConfig, runReviewChain, toArtifact } from '../lib/review-bridge.mjs';
 import { managedHookPolicy } from '../lib/managed-hooks.mjs';
-import { canRunBeside, selectParallelBatch, selectReadyPhase } from '../lib/phase-selection.mjs';
+import { canRunBeside, ownsOverlap, selectParallelBatch, selectReadyPhase } from '../lib/phase-selection.mjs';
 import { portAvailable, observationList, reviewObservation } from '../lib/dashboard.mjs';
 import { DISCOVERY_MANIFEST, discoverySnapshot } from '../lib/delivery-contract.mjs';
 import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 import { recommendPlan } from '../lib/model-advice-plan.mjs';
 import { decideImprovement, ideasFile, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
 
-const VERSION = '0.1.0';
+const VERSION = '0.3.0';
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = path.resolve(path.dirname(SCRIPT), '..');
 const FRAMEWORK_DIR = '.riff-cli';
@@ -53,6 +53,8 @@ const CLAUDE_SETTINGS = path.join('.claude', 'settings.local.json');
 const CLAUDE_COMPACT_WINDOW = 400000;
 const CLAUDE_MARKETPLACE = 'riff';
 const CLAUDE_PLUGINS = [`riff@${CLAUDE_MARKETPLACE}`, `riff-cockpit@${CLAUDE_MARKETPLACE}`];
+// Plugins RIFF once enabled and no longer ships; resync removes them from project settings.
+const RETIRED_CLAUDE_PLUGINS = [];
 const GIT_HOOK_MARKER = '# RIFF Codex managed wrapper';
 const LEGACY_GIT_HOOK_MARKER = '# RIFF managed wrapper';
 const PHASE_STATES = new Set(['ready', 'active', 'completed', 'parked', 'blocked', 'awaiting_human', 'skipped']);
@@ -60,7 +62,6 @@ const TERMINAL_PHASE_STATES = new Set(['completed', 'skipped']);
 const ROADMAP_PRIORITIES = new Set(['P0', 'P1', 'P2', 'P3']);
 const AUTONOMY_MODES = new Set(['loop', 'guided']);
 const LOOP_STOP_KINDS = new Set(['credentials-or-access', 'third-party-verification', 'destructive-target', 'validation-failure']);
-const PRIORITY_RANK = new Map([['P0', 0], ['P1', 1], ['P2', 2], ['P3', 3]]);
 const SENSITIVE_WORDS = /auth|authori[sz]|tenant|user data|secret|payment|migration|public api|callback|webhook/i;
 
 function fail(message, code = 1) {
@@ -274,6 +275,7 @@ function mergeClaudeSettings(existing, script = SCRIPT) {
   if (settings.enabledPlugins !== undefined && (typeof settings.enabledPlugins !== 'object' || Array.isArray(settings.enabledPlugins))) throw new Error(`${CLAUDE_SETTINGS} enabledPlugins must be an object`);
   settings.enabledPlugins ??= {};
   for (const plugin of CLAUDE_PLUGINS) settings.enabledPlugins[plugin] ??= true;
+  for (const plugin of RETIRED_CLAUDE_PLUGINS) delete settings.enabledPlugins[plugin];
   return settings;
 }
 
@@ -528,7 +530,8 @@ function excludeLocalState(root) {
   const lines = new Set(current.split('\n'));
   // Links are files to Git, so they need bare patterns. Exclusion never hides a tracked link.
   const entries = stateDirFor(root) === STATE_DIR ? [`${STATE_DIR}/`, FRAMEWORK_DIR, CODEX_STATE_DIR, CODEX_FRAMEWORK_DIR] : [`${CODEX_STATE_DIR}/`, FRAMEWORK_DIR];
-  const missing = [...entries, '.uxtest/runs/', CLAUDE_SETTINGS].filter((line) => !lines.has(line));
+  // Codex hooks and skill links are machine-local too: they point into this machine's RIFF install.
+  const missing = [...entries, '.uxtest/runs/', CLAUDE_SETTINGS, '.codex/hooks.json', '.agents/skills/riff-codex-*'].filter((line) => !lines.has(line));
   if (missing.length) appendFileSync(exclude, `${current && !current.endsWith('\n') ? '\n' : ''}# RIFF worktree-local state\n${missing.join('\n')}\n`);
 }
 
@@ -704,7 +707,7 @@ async function cmdInit(tokens) {
     reportMigration(result.migration);
   } catch (error) { fail(error.message); }
   const config = readJson(pathsFor(root).config);
-  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${frameworkDirFor(root)} -> ${PLUGIN_ROOT}\nState: project-local in ${stateDirFor(root)}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nGit hooks: pre-commit and commit-msg chained with existing hooks.\nClaude Code: hooks, compaction at ${CLAUDE_COMPACT_WINDOW} tokens and the riff plugins in ${CLAUDE_SETTINGS}; skills run as /riff:wave, /riff:start. If riff doctor reports the marketplace missing, run once per machine: claude plugin marketplace add ${PLUGIN_ROOT}\nCodex: hooks in .codex/hooks.json, skills under .agents/skills/riff-codex-* and the $riff:* plugin namespace. ${config.hooks?.source === 'system' ? 'Hooks use the installed system policy; no per-hook approval is required after configuration reload.' : 'Open /hooks in Codex, review the local hooks, then run riff doctor --record-hooks-approved.'}\nPaths and state of the original RIFF framework (.riff, .riff-state) were not created or replaced.\n`);
+  process.stdout.write(`RIFF ${VERSION} initialized in ${root}\nConfiguration: conversation=${config.language}, artifacts=${config.artifactLanguage ?? 'en'}, scope=${config.project?.scope ?? 'production'}, explanation=${config.preferences?.explanation ?? 'simple'}, autonomy=${config.preferences?.autonomy ?? 'loop'}.\nFramework: ${frameworkDirFor(root)} -> ${PLUGIN_ROOT}\nState: project-local in ${stateDirFor(root)}/.\nProduct artifacts: shared PROJECT.md and ROADMAP.yaml are preserved.\nGit hooks: pre-commit and commit-msg chained with existing hooks.\nClaude Code: hooks, compaction at ${CLAUDE_COMPACT_WINDOW} tokens and the riff plugin in ${CLAUDE_SETTINGS}; skills run as /riff:wave, /riff:start. If riff doctor reports the marketplace missing, run once per machine: claude plugin marketplace add ${PLUGIN_ROOT}\nCodex: hooks in .codex/hooks.json, skills under .agents/skills/riff-codex-* and the $riff:* plugin namespace. ${config.hooks?.source === 'system' ? 'Hooks use the installed system policy; no per-hook approval is required after configuration reload.' : 'Open /hooks in Codex, review the local hooks, then run riff doctor --record-hooks-approved.'}\nPaths and state of the original RIFF framework (.riff, .riff-state) were not created or replaced.\n`);
 }
 
 function reportMigration(migration) {
@@ -900,11 +903,21 @@ function syncRoadmap(root, { preserveLegacyVerification = false } = {}) {
       if (changed.length) throw new Error(`cannot change normalized plan fields for ${prior.status} phase ${prior.id}: ${changed.join(', ')}`);
     }
   }
+  const notes = [];
   const phases = roadmap.phases.map((phase) => {
     const prior = old.get(phase.id);
     if (!prior) return { ...phase, commit: null, attempts: 0, reason: null, blockerKind: null };
     const protectedPlan = ['active', ...TERMINAL_PHASE_STATES].includes(prior.status);
     const merged = protectedPlan ? { ...prior } : { ...prior, ...phase };
+    if (protectedPlan) {
+      // done_when and verify are frozen at activation. A phase that never had them gets them once,
+      // since no contract existed to protect; a change to existing ones needs a recorded decision.
+      for (const field of ['done_when', 'verify']) {
+        const frozen = normalizeStringArray(prior[field]);
+        if (!frozen.length && phase[field].length) { merged[field] = phase[field]; notes.push(`${prior.id}: added ${field} from ROADMAP.yaml (the phase had none)`); }
+        else if (prior.status === 'active' && frozen.length && JSON.stringify(frozen) !== JSON.stringify(phase[field])) notes.push(`${prior.id}: ROADMAP.yaml ${field} differs from the contract frozen at activation; reviewers keep judging the frozen one. Record the reason for the change with riff wave decision ${prior.id} --type contract --note "..."`);
+      }
+    }
     return { ...merged, status: prior.status, commit: prior.commit ?? null, attempts: prior.attempts ?? 0, reason: prior.reason ?? null, blockerKind: prior.blockerKind ?? null };
   });
   const nextState = {
@@ -915,8 +928,8 @@ function syncRoadmap(root, { preserveLegacyVerification = false } = {}) {
   };
   validateState(nextState);
   saveState(root, nextState);
-  event(root, 'roadmap_synced', { phases: nextState.phases.length, preserveLegacyVerification });
-  return nextState;
+  event(root, 'roadmap_synced', { phases: nextState.phases.length, preserveLegacyVerification, notes: notes.length ? notes : undefined });
+  return { state: nextState, notes };
 }
 
 function dependenciesComplete(state, phase) {
@@ -1008,6 +1021,12 @@ function reviewArtifact(root, file, candidate, type, status) {
   const artifact = JSON.parse(bytes);
   if (artifact.version !== 1 || artifact.candidate !== candidate || artifact.type !== type || artifact.status !== status || typeof artifact.reviewer?.id !== 'string' || !artifact.reviewer.id.trim() || artifact.reviewer.independent !== true || !Array.isArray(artifact.evidence) || !artifact.evidence.length || artifact.evidence.some((item) => typeof item !== 'string' || !item.trim()) || !Array.isArray(artifact.findings)) throw new Error('review artifact needs current candidate, matching type/status, independent reviewer identity, evidence and findings');
   if (status === 'pass' && artifact.findings.some((finding) => ['HIGH', 'CRITICAL'].includes(String(finding.severity).toUpperCase()))) throw new Error('passing review cannot contain blocking findings');
+  // Bridge types must come from `riff review run`, or declare the native-subagent fallback and why the bridge could not run.
+  if (REVIEW_TYPES.includes(type)) {
+    const fromBridge = artifact.reviewedBy === 'riff review run' && inside(localPath(root, `${stateDirFor(root)}/reviews`), localPath(root, file));
+    const fallback = artifact.reviewedBy === 'native-subagent' && typeof artifact.fallbackReason === 'string' && artifact.fallbackReason.trim();
+    if (!fromBridge && !fallback) throw new Error(`${type} review artifact must be the file riff review run wrote under ${stateDirFor(root)}/reviews/, or a native fallback with "reviewedBy": "native-subagent" and a "fallbackReason"`);
+  }
   return { artifact, bytes, hash: sha(bytes) };
 }
 
@@ -1067,31 +1086,21 @@ function requireValidation(root, phase, candidate) {
   return validation;
 }
 
-function pendingObservationError(state, phase) {
+function pendingObservationError(state) {
   const observations = observationList(state).filter((finding) => finding.status === 'pending');
-  const nonTerminal = new Set(state.phases.filter((item) => !TERMINAL_PHASE_STATES.has(item.status) && item.id !== phase.id).map((item) => item.id));
+  // Only HIGH and CRITICAL observations block completion; lower ones stay listed in the dashboard.
   for (const finding of observations) {
     const severity = String(finding.severity ?? 'INFO').toUpperCase();
     if (['HIGH', 'CRITICAL'].includes(severity)) return `pending ${severity} observation ${finding.id} blocks completion`;
-    const note = finding.review?.note?.trim() ?? '';
-    const noteTokens = note.split(/[^A-Za-z0-9._-]+/).filter(Boolean);
-    const followUp = [...nonTerminal].find((id) => noteTokens.includes(id));
-    if (!finding.review || finding.review.revision !== finding.revision || !followUp || note.length < 3) {
-      return `pending observation ${finding.id} needs a current triage note naming a non-terminal follow-up phase and reason`;
-    }
   }
   return null;
 }
 
-function requireEnrolledCompletionGates(root, state, phase, candidate) {
+function requireEnrolledCompletionGates(root, state, phase) {
   if (!discoveryEnrolled(root, state)) return;
   discoveryGate(root, state);
-  const observationError = pendingObservationError(state, phase);
+  const observationError = pendingObservationError(state);
   if (observationError) throw new Error(observationError);
-  const checkpoint = phase.checkpoint;
-  if (!checkpoint || checkpoint.candidate !== candidate || typeof checkpoint.summary !== 'string' || !checkpoint.summary.trim() || typeof checkpoint.next !== 'string' || !checkpoint.next.trim()) {
-    throw new Error('enrolled phase requires an explicit checkpoint for the exact candidate with summary and next step');
-  }
 }
 
 function checkpointPhase(root, state, phase, options) {
@@ -1121,6 +1130,13 @@ function checkpointPhase(root, state, phase, options) {
 }
 
 function validateCandidate(root, state, phase, options) {
+  // --rerun repeats the last executed validation of the phase: same command, paths and manifest, restaged.
+  if (options.rerun === true) {
+    const last = phase.validation;
+    if (!last?.executed || !Array.isArray(last.command) || !Array.isArray(last.allowedPaths)) throw new Error(`no executed validation to rerun for ${phase.id}; run wave validate with --run --command --paths once`);
+    options = { ...options, run: true, command: JSON.stringify(last.command), paths: options.paths ?? JSON.stringify(last.allowedPaths), verification: options.verification ?? last.verificationManifest?.path };
+    run('git', ['add', '-A', '--', ...JSON.parse(options.paths)], { cwd: root });
+  }
   const command = optionRequired(options, 'command');
   const candidate = candidateTree(root);
   if (discoveryEnrolled(root, state) && phase.validation?.status === 'fail') {
@@ -1151,7 +1167,9 @@ function validateCandidate(root, state, phase, options) {
   const changed = execFileSync('git', ['diff', '--name-only', '-z', base, candidate], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
   const outside = changed.filter((file) => !paths.some((entry) => inside(path.resolve(root, entry), path.resolve(root, file))));
   if (outside.length) throw new Error(`candidate exceeds declared scope: ${outside.join(', ')}`);
-  run('git', ['diff', '--exit-code'], { cwd: root });
+  // Unstaged edits (often a formatter run on a whole folder) would make the check differ from the candidate.
+  const unstaged = run('git', ['diff', '--name-only'], { cwd: root }).split('\n').filter(Boolean);
+  if (unstaged.length) throw new Error(`unstaged changes to tracked files: ${unstaged.slice(0, 20).join(', ')}${unstaged.length > 20 ? ` (+${unstaged.length - 20} more)` : ''}. Stage the ones that belong to the phase and restore the others (git restore <file>)`);
   const visual = options.verification ? verificationEvidence(root, options.verification, candidate) : undefined;
   phase.validation = null;
   state.lastValidation = null;
@@ -1163,6 +1181,7 @@ function validateCandidate(root, state, phase, options) {
   const status = observed.status === 0 && !observed.error && unchanged ? 'pass' : 'fail';
   const summary = !unchanged ? 'Validation changed the candidate; stage and validate the corrected tree.' : observed.error?.message ?? `Command exited ${observed.status ?? observed.signal}`;
   const validation = { phase: phase.id, status, command: argv, summary, candidate, executed: true, output, at: now(), allowedPaths: paths, changedPaths: changed, exitCode: observed.status };
+  if (visual) validation.verificationManifest = { path: String(options.verification), hash: visual.hash };
   if (phase.verificationRequired && (!visual || visual.manifest.steps.some((step) => step.status !== 'pass'))) validation.status = 'fail';
   validation.verification = writeReport(root, { title: phase.title, phase: phase.id, candidate, validation, evidence: visual, steps: phase.verificationRequired && !visual ? [{ name: 'Required verification', status: 'unverified', observed: 'No verification manifest was supplied.' }] : [] });
   validation.evidence = storeEvidence(root, 'validation', Buffer.from(JSON.stringify(validation)));
@@ -1181,14 +1200,21 @@ function autonomyMode(root) {
   return autonomy;
 }
 
+function phaseFailedValidation(state, phase) {
+  // The phase's own record wins: another phase validating later replaces only state.lastValidation.
+  if ((phase.validation?.phase ?? phase.id) === phase.id && phase.validation?.status === 'fail') return phase.validation;
+  if (state.lastValidation?.phase === phase.id && state.lastValidation?.status === 'fail') return state.lastValidation;
+  return null;
+}
+
 function loopStopKind(root, state, phase, options) {
   const kind = String(options.kind ?? '');
   if (!LOOP_STOP_KINDS.has(kind)) {
     throw new Error(`loop mode may stop only with --kind ${[...LOOP_STOP_KINDS].join(', ')}`);
   }
   if (kind === 'validation-failure') {
-    const validationFailed = state.lastValidation?.phase === phase.id && state.lastValidation?.status === 'fail';
-    const reviewFailed = ['functional', 'security'].some((type) => receiptFor(root, phase, type)?.status === 'fail');
+    const validationFailed = Boolean(phaseFailedValidation(state, phase));
+    const reviewFailed = ['functional', 'security'].some((type) => receiptFor(root, phase, type)?.status === 'fail' || failedRounds(phase, type) > 0);
     if (!validationFailed && !reviewFailed) throw new Error('validation-failure requires a recorded failed validation or review for this phase');
   }
   return kind;
@@ -1238,6 +1264,7 @@ function recordReview(root, state, phase, options) {
     }
   }
   writeJson(localPath(root, path.join(pathsFor(root).receipts, `${phase.id}-${type}.json`)), receipt);
+  noteReviewRound(phase, type, { candidate, status, summary: proof.artifact.summary ?? receipt.summary, findings: proof.artifact.findings, at: proof.artifact.runAt ?? receipt.reviewedAt });
   state.reviews[type] = receipt;
   if (options.model) state.model = { name: options.model, reasoning: options.reasoning ?? null, fast_available: options.fast_available === 'true' };
   // A failed security review never parks the phase: the agent corrects and reviews a new candidate.
@@ -1262,7 +1289,11 @@ function completePhase(root, state, phase, commit) {
   const security = receiptFor(root, phase, 'security');
   if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree || !evidenceValid(root, functional.evidence)) throw new Error('a passing functional receipt with intact evidence for the exact commit tree is required');
   if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree || !evidenceValid(root, security.evidence))) throw new Error('a passing security receipt with intact evidence for the exact sensitive commit tree is required');
-  requireEnrolledCompletionGates(root, state, phase, commitTree);
+  requireEnrolledCompletionGates(root, state, phase);
+  markCompleted(root, state, phase, commit);
+}
+
+function markCompleted(root, state, phase, commit, note = '') {
   phase.commit = run('git', ['rev-parse', commit], { cwd: root });
   phase.status = 'completed';
   phase.reason = null;
@@ -1272,9 +1303,80 @@ function completePhase(root, state, phase, commit) {
   state.humanAction = null;
   state.validationNeeds = [];
   saveState(root, state);
-  event(root, 'phase_completed', { phase: id, commit: phase.commit });
+  event(root, 'phase_completed', { phase: phase.id, commit: phase.commit, ...(phase.acceptance ? { acceptedWithRisks: true } : {}) });
   const next = selectPhase(state);
-  process.stdout.write(`${id} completed at ${phase.commit.slice(0, 12)}.\n${next ? `Next ready: ${next.id}\n` : 'No further phase is ready.\n'}`);
+  process.stdout.write(`${phase.id} completed${note} at ${phase.commit.slice(0, 12)}.\n${next ? `Next ready: ${next.id}\n` : 'No further phase is ready.\n'}`);
+}
+
+const reviewTypesFor = (phase) => (phase.sensitive ? ['functional', 'security'] : ['functional']);
+const findingKey = (text) => clip(text, 160).toLowerCase();
+
+function phaseResidualRisks(state, phase) {
+  return state.securityFindings.filter((finding) => finding.kind === 'residual_risk' && finding.phase === phase.id);
+}
+
+// The owner may stop review rounds on a phase that hit the round limit and accept what is left as
+// known residual risks. Validation stays mandatory; only the failing review types are waived, and
+// only when every blocking finding of their last failed round is recorded as a residual risk.
+function acceptPhase(root, state, phase, commit, options) {
+  const reason = String(optionRequired(options, 'reason')).trim();
+  if (reason.length < 10) throw new Error('--reason must state the owner decision (at least 10 characters)');
+  if (!['active', 'parked'].includes(phase.status)) throw new Error(`phase ${phase.id} must be active or parked at the review round limit to complete with accepted risks`);
+  const others = activePhases(state).filter((item) => item.id !== phase.id);
+  if (others.length && !(phase.status === 'active' && inActiveWave(state, phase.id))) throw new Error(`phase ${others[0].id} is active; finish or park it first`);
+  if (!dependenciesComplete(state, phase)) throw new Error(`phase ${phase.id} has unfinished dependencies`);
+  const commitTree = run('git', ['rev-parse', `${commit}^{tree}`], { cwd: root });
+  if (run('git', ['rev-parse', commit], { cwd: root }) !== run('git', ['rev-parse', 'HEAD'], { cwd: root })) throw new Error('completion must refer to current HEAD');
+  requireValidation(root, phase, commitTree);
+  const limits = reviewLimits(root);
+  const risks = phaseResidualRisks(state, phase);
+  const recorded = new Set(risks.flatMap((risk) => [risk.finding, risk.summary].filter(Boolean).map(findingKey)));
+  const waived = [];
+  for (const type of reviewTypesFor(phase)) {
+    const receipt = receiptFor(root, phase, type);
+    if (receipt?.status === 'pass' && receipt.candidate === commitTree && evidenceValid(root, receipt.evidence)) continue;
+    if (failedRounds(phase, type) < limits.maxFailedRounds) throw new Error(`${type} review has ${failedRounds(phase, type)} failed round(s) out of ${limits.maxFailedRounds}; owner completion applies only at the round limit. Otherwise record a passing ${type} review for the commit tree`);
+    const last = (phase.reviewRounds?.[type]?.log ?? []).at(-1);
+    const open = (last?.findings ?? []).filter((finding) => ['HIGH', 'CRITICAL'].includes(finding.severity) && !recorded.has(findingKey(finding.title)));
+    if (open.length) {
+      throw new Error(`record each remaining blocking ${type} finding of round ${last.round} as a residual risk first:\n${open.map((finding) => `  riff wave risk ${phase.id} --kind crash-window|runtime-unverified|edge-case --severity ${finding.severity} --summary ${JSON.stringify(finding.title)} --note "why the owner accepts it"`).join('\n')}`);
+    }
+    waived.push({ type, round: last?.round ?? null, failedRounds: failedRounds(phase, type) });
+  }
+  if (!waived.length) throw new Error('every required review passed for this commit tree; use riff wave complete without --accept-risks');
+  requireEnrolledCompletionGates(root, state, phase);
+  const at = now();
+  addDecision(phase, { note: `Owner stopped review rounds and accepted the residual risks: ${reason}`, type: 'contract', source: 'owner', at });
+  phase.acceptance = { source: 'owner', reason: clip(reason, 600), at, commit: run('git', ['rev-parse', commit], { cwd: root }), waived, risks: risks.map((risk) => ({ kind: risk.residual, severity: risk.severity, summary: clip(risk.summary, 200) })) };
+  event(root, 'phase_accepted', { phase: phase.id, source: 'owner', reason: clip(reason, 200), waived: waived.map((entry) => entry.type), risks: risks.length });
+  markCompleted(root, state, phase, commit, ` with ${risks.length} accepted residual risk(s) by owner decision`);
+}
+
+function acceptedPhasesText(state) {
+  const accepted = state.phases.filter((phase) => phase.status === 'completed' && phase.acceptance);
+  if (!accepted.length) return '';
+  return `Phases accepted by the owner with residual risks (${accepted.length}; review rounds stopped at the limit, validation passed):\n${accepted.map((phase) => `- ${phase.id} ${phase.title ?? ''}: waived ${phase.acceptance.waived.map((entry) => `${entry.type} after ${entry.failedRounds} failed rounds`).join(', ')}. Owner decision: ${phase.acceptance.reason}\n${phase.acceptance.risks.map((risk) => `  - ${risk.severity} ${risk.kind}: ${risk.summary}`).join('\n')}`).join('\n')}\n`;
+}
+
+const RESIDUAL_RISK_KINDS = new Set(['crash-window', 'runtime-unverified', 'edge-case']);
+
+// A finding not worth another round (a crash window between two writes, runtime behavior a read-only
+// reviewer cannot observe, a rare edge case outside the criteria) goes to the human as a known residual
+// risk. It can be recorded from the first round.
+function recordResidualRisk(root, state, phase, options) {
+  if (!['active', 'parked'].includes(phase.status)) throw new Error(`phase ${phase.id} must be active or parked to record a residual risk`);
+  const kind = optionRequired(options, 'kind');
+  if (!RESIDUAL_RISK_KINDS.has(kind)) throw new Error(`--kind must be ${[...RESIDUAL_RISK_KINDS].join(' or ')}`);
+  const severity = parseSeverity(options.severity ?? 'MEDIUM');
+  const summary = String(optionRequired(options, 'summary')).trim();
+  const note = String(optionRequired(options, 'note')).trim();
+  const finding = { kind: 'residual_risk', residual: kind, severity, summary, finding: options.finding ? String(options.finding).trim() : null, what_could_happen: options.what_could_happen ?? null, affected: options.affected ?? null, phase: phase.id, candidate: candidateTree(root), reviewedAt: now() };
+  state.securityFindings.push(finding);
+  const observation = observationList(state).find((entry) => entry.kind === 'residual_risk' && entry.summary === summary && entry.phase === phase.id);
+  reviewObservation(state, { id: observation.id, revision: observation.revision, status: 'expert_review', note: `Known residual risk (${kind}) for a human decision: ${note}` });
+  saveState(root, state);
+  event(root, 'residual_risk', { phase: phase.id, kind, severity, summary: clip(summary, 200) });
+  process.stdout.write(`Residual risk recorded for ${phase.id} and listed for the human; later reviews will not report it again unless the candidate makes it worse.\n`);
 }
 
 function cmdDiscovery(tokens) {
@@ -1293,6 +1395,7 @@ function cmdDiscovery(tokens) {
       review: same ? prior.review ?? null : null,
       ...(same && prior.lastReviewAttempt ? { lastReviewAttempt: prior.lastReviewAttempt } : {}),
       ...(prior?.failedRounds ? { failedRounds: prior.failedRounds } : {}),
+      ...(prior?.lastPassCommit ? { lastPassCommit: prior.lastPassCommit, lastPassAt: prior.lastPassAt } : {}),
     };
     saveState(root, state);
     event(root, 'discovery_snapshot', snapshot);
@@ -1326,14 +1429,43 @@ function cmdDiscovery(tokens) {
   };
   // Failed rounds accumulate across revised snapshots until a review passes; the review bridge caps them.
   state.discovery.failedRounds = status === 'pass' ? 0 : (state.discovery.failedRounds ?? 0) + 1;
+  // The next evolution is reviewed as a diff from the dossier accepted here.
+  if (status === 'pass') {
+    state.discovery.lastPassCommit = run('git', ['rev-parse', 'HEAD'], { cwd: root });
+    state.discovery.lastPassAt = state.discovery.review.reviewedAt;
+  }
   saveState(root, state);
   event(root, 'discovery_review', { candidate: snapshot.digest, status, evidence: state.discovery.review.evidence });
   process.stdout.write(`Discovery review ${status} recorded at ${snapshot.digest}.\n`);
 }
 
 const REVIEW_DIFF_LIMIT = 60000;
-const DISCOVERY_ROUND_LIMIT = 3;
+const DISCOVERY_ROUND_LIMIT = 2;
 const SEVERITY_ORDER = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+// New dossier files not yet committed are invisible to git diff; name them so the reviewer reads them.
+function untrackedDossier(root, files) {
+  const untracked = run('git', ['ls-files', '--others', '--exclude-standard', '--', ...files], { cwd: root });
+  return untracked ? `\n\nNew dossier files not in the diff (read them in full):\n${untracked.split('\n').map((file) => `- ${file}`).join('\n')}` : '';
+}
+
+// Failed dossier rounds since the last pass: the reviewer sees what was already raised, so later rounds
+// confirm fixes and catch real contradictions instead of finding one more edge case each time.
+function discoveryRoundsContext(root, state, digest, since) {
+  const dir = localPath(root, `${stateDirFor(root)}/reviews`);
+  if (!existsSync(dir)) return '';
+  // Only rounds of this evolution: after the last pass, or after the commit the scoped review starts from.
+  const sinceAt = since ? new Date(run('git', ['log', '-1', '--format=%cI', since], { cwd: root })).toISOString() : '';
+  const after = [state.discovery.lastPassAt ?? '', sinceAt].sort().at(-1);
+  if (!after) return '';
+  const rounds = readdirSync(dir).filter((name) => name.startsWith('discovery-') && name.endsWith('.json'))
+    .map((name) => readJson(path.join(dir, name), false)).filter((artifact) => artifact?.status === 'fail' && artifact.candidate !== digest && String(artifact.runAt ?? '') > after)
+    .sort((left, right) => String(left.runAt).localeCompare(String(right.runAt)))
+    .slice(-5);
+  if (!rounds.length) return '';
+  const list = rounds.map((artifact, index) => `Round ${index + 1} (${artifact.runAt}):\n${artifact.findings.map((finding) => `- ${finding.severity}: ${finding.title}`).join('\n')}`).join('\n\n');
+  return `\n\nEarlier failed rounds on this evolution (the dossier was revised after each):\n\n${list}\n\nConvergence rules for this round:\n- Don't report again a finding above that the dossier now addresses; check the fix instead.\n- HIGH only for a contradiction between documents or a missing decision that forces an implementer to guess on the main path, data loss or a security exposure, including one a fix above introduced.\n- A further rare case of the same kind as above (a narrower race, a multi-step failure sequence, an operator mistake) is MEDIUM at most; recommend recording it as an operating instruction for the team.`;
+}
 
 function reviewDiff(root, args, pathspec = []) {
   const limit = pathspec.length ? ['--', ...pathspec] : [];
@@ -1349,6 +1481,142 @@ function reviewPhaseContext(phase) {
     `done_when:\n${list(phase.done_when)}`, `verify:\n${list(phase.verify)}`, phase.risks?.length ? `Risks:\n${list(phase.risks)}` : null].filter(Boolean).join('\n');
 }
 
+const ROUND_LOG_LIMIT = 12;
+const DECISION_LIMIT = 20;
+const clip = (text, size) => { const value = String(text ?? '').replace(/\s+/g, ' ').trim(); return value.length > size ? `${value.slice(0, size - 1)}…` : value; };
+
+function reviewLimits(root) {
+  return reviewerConfig(readJson(pathsFor(root).config, false) ?? {});
+}
+
+function failedRounds(phase, type) {
+  return Number(phase.reviewRounds?.[type]?.failed ?? 0);
+}
+
+// Counts one failed review round per phase, type and candidate. Recording the same failed candidate
+// again (review run, then wave review) never counts twice. Passing reviews leave the count alone.
+// `failed` restarts after a human resume; `total` and the log keep the whole history.
+function noteReviewRound(phase, type, { candidate, status, summary, findings, at }) {
+  if (!['functional', 'security'].includes(type) || status !== 'fail') return false;
+  phase.reviewRounds ??= {};
+  const record = phase.reviewRounds[type] ??= { failed: 0, total: 0, log: [] };
+  record.failed = Number(record.failed ?? 0);
+  record.total = Number(record.total ?? record.failed);
+  record.log ??= [];
+  if (record.log.some((entry) => entry.candidate === candidate && entry.round > Number(record.resetAtRound ?? 0))) return false;
+  record.failed += 1;
+  record.total += 1;
+  record.log.push({
+    round: record.total,
+    candidate,
+    at,
+    summary: clip(summary, 300),
+    findings: (findings ?? []).slice(0, 10).map((finding) => ({ severity: String(finding.severity ?? 'INFO').toUpperCase(), title: clip(finding.title, 160), ...(finding.location ? { location: clip(finding.location, 120) } : {}) })),
+  });
+  record.log = record.log.slice(-ROUND_LOG_LIMIT);
+  return true;
+}
+
+function addDecision(phase, { note, type = null, source = 'agent', at = now() }) {
+  phase.decisions = [...(phase.decisions ?? []), { at, type, source, note: clip(note, 600) }].slice(-DECISION_LIMIT);
+}
+
+function changedBetween(root, from, to) {
+  try {
+    const files = run('git', ['diff', '--name-only', from, to], { cwd: root }).split('\n').filter(Boolean);
+    return files.length ? `${files.slice(0, 8).join(', ')}${files.length > 8 ? ` (+${files.length - 8} more)` : ''}` : 'no file change';
+  } catch { return 'unknown (tree no longer available)'; }
+}
+
+function decisionsContext(phase) {
+  if (!phase.decisions?.length) return '';
+  return `\n\nDecisions recorded during this phase (they explain intentional tradeoffs and criterion interpretations; judge whether each is justified instead of reversing it silently):\n${phase.decisions.map((decision) => `- ${String(decision.at).slice(0, 10)}${decision.type ? ` [${decision.type}]` : ''}${decision.source !== 'agent' ? ` (${decision.source})` : ''}: ${decision.note}`).join('\n')}`;
+}
+
+// Compact history of every failed round of the phase, all review types together, so a reviewer
+// sees which fixes earlier rounds asked for and can detect oscillation between contracts.
+function roundLog(root, phase, candidate) {
+  const entries = ['functional', 'security'].flatMap((type) => (phase.reviewRounds?.[type]?.log ?? []).map((entry) => ({ ...entry, type })))
+    .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  return entries.map((entry, index) => {
+    const next = entries[index + 1]?.candidate ?? candidate;
+    const findings = (entry.findings ?? []).map((finding) => `\n  - ${finding.severity}: ${finding.title}${finding.location ? ` (${finding.location})` : ''}`).join('');
+    return `- ${entry.type} round ${entry.round} on ${String(entry.candidate).slice(0, 12)} (${String(entry.at).slice(0, 16)}): ${entry.summary}${findings}\n  Changed after this round: ${next === entry.candidate ? 'nothing yet' : changedBetween(root, entry.candidate, next)}`;
+  }).join('\n');
+}
+
+const stripAnsi = (text) => String(text ?? '').replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+
+function readJsonQuietly(root, relative) {
+  try { return JSON.parse(readFileSync(localPath(root, relative), 'utf8')); } catch { return null; }
+}
+
+// Verification steps observed for this candidate: the manifest attached at validation, the steps of the
+// report RIFF wrote at that validation, or a manifest at the conventional or `verify`-declared path.
+function verificationSteps(root, phase, validation) {
+  const attached = validation.verificationManifest?.path;
+  const reportRun = validation.verification?.path ? path.join(path.dirname(validation.verification.path), 'run.json') : null;
+  const candidates = [
+    attached && { file: attached, attested: true },
+    reportRun && { file: reportRun, attested: true, report: true },
+    { file: `${stateDirFor(root)}/verification/${phase.id}/manifest.json`, attested: false },
+    ...(phase.verify ?? []).flatMap((item) => [...String(item).matchAll(/[\w./-]+\.json\b/g)].map((match) => ({ file: match[0], attested: false }))),
+  ].filter(Boolean);
+  for (const source of candidates) {
+    const data = readJsonQuietly(root, source.file);
+    const steps = (data?.steps ?? []).filter((step) => step && step.name && step.name !== 'Automated checks');
+    if (!steps.length) continue;
+    const matches = data.candidate === validation.candidate;
+    return { ...source, steps, matches, candidate: data.candidate ?? null };
+  }
+  return null;
+}
+
+function validationContext(root, phase, validation) {
+  if (!validation) return '';
+  const command = Array.isArray(validation.command) ? validation.command.map((arg) => (/^[\w./:=@%+-]+$/.test(arg) ? arg : JSON.stringify(arg))).join(' ') : String(validation.command);
+  const output = stripAnsi(validation.output).trim();
+  const excerpt = output.length > 2500 ? `…${output.slice(-2500)}` : output;
+  const lines = [
+    '\n\nValidation receipt for this exact candidate, recorded by `riff wave validate --run`. RIFF executed the command itself and bound the result to the candidate tree, so execution is attested: do not report these checks as not run, or runtime behavior as unverified, only because you cannot execute anything read-only. Judge instead whether the checks and observations below actually cover each criterion; a criterion they do not cover is still a gap.',
+    `- Command: ${command}`,
+    `- Exit code: ${validation.exitCode ?? 'not recorded'}; status: ${validation.status}; candidate tree: ${validation.candidate}; run at: ${validation.at}`,
+    validation.verification?.path ? `- Report: ${validation.verification.path} (verdict ${validation.verification.verdict ?? 'unknown'})` : null,
+    excerpt ? `- Output excerpt:\n\`\`\`\n${excerpt}\n\`\`\`` : '- Output: (empty)',
+  ];
+  const verification = verificationSteps(root, phase, validation);
+  if (verification) {
+    const origin = verification.attested
+      ? `${verification.report ? 'report written at this validation' : 'manifest attached to this validation'}: ${verification.file}`
+      : `${verification.file}${verification.matches ? '' : `, recorded for candidate ${verification.candidate ?? 'unknown'}, not this one: treat it as earlier evidence`}`;
+    lines.push(`\nVerification steps observed (${origin}):`);
+    for (const step of verification.steps.slice(0, 40)) {
+      const details = [step.expected && `expected: ${clip(step.expected, 200)}`, `observed: ${clip(step.observed, 300)}`, step.url && `url: ${step.url}`, step.viewport && `viewport: ${step.viewport}`, step.screenshot && `screenshot: ${step.screenshot}`].filter(Boolean).join('; ');
+      lines.push(`- ${String(step.status ?? 'unknown').toUpperCase()}: ${clip(step.name, 160)}. ${details}`);
+    }
+    if (verification.steps.length > 40) lines.push(`- (${verification.steps.length - 40} more steps in ${verification.file})`);
+  } else lines.push('\nNo verification manifest was recorded for this candidate; judge criteria that need a browser or database observation from the code and tests above.');
+  return lines.filter(Boolean).join('\n');
+}
+
+// From the second round the reviewer re-checks: earlier findings and the change made since the last
+// failed round, not a fresh review from scratch that would surface a new set of edge cases each time.
+function convergenceContext(root, phase, type, candidate, limits) {
+  const failed = failedRounds(phase, type);
+  if (failed + 1 < limits.convergenceFromRound) return '';
+  const last = (phase.reviewRounds?.[type]?.log ?? []).at(-1);
+  const sinceLast = last && last.candidate !== candidate ? `\n\nChange since the last failed ${type} round (${String(last.candidate).slice(0, 12)}):\n\n${reviewDiff(root, ['diff', last.candidate, candidate])}` : '';
+  return `\n\nRe-review: this is ${type} review round ${failed + 1} for this phase; after ${limits.maxFailedRounds} failed rounds the phase goes to a human. Earlier failed rounds, oldest first, with the files changed in response:\n${roundLog(root, phase, candidate)}${sinceLast}\n\nRules for this round:\n- Check that each earlier HIGH or CRITICAL finding is fixed. Report one again only if it is still there.\n- Read the change since the last round. A new HIGH or CRITICAL finding is allowed only when that change introduced it, or when a done_when criterion is plainly not met in normal use.\n- Any other new problem is MEDIUM at most, even if you would have rated it higher in a first review.\n- If a finding reverses a fix made for an earlier finding, or conflicts with a done_when criterion, a security requirement or a recorded decision, start its title with "CONFLICT:", name both contracts and the earlier round, and rate it MEDIUM so the human can choose.`;
+}
+
+function roundCapMessage(root, phase, type, limits) {
+  return `${failedRounds(phase, type)} ${type} review rounds failed for phase ${phase.id} (limit ${limits.maxFailedRounds}); another round is refused. Hand the conflict to the human instead of looping:\n`
+    + `1. Record each remaining finding that is not worth another round as a known residual risk: riff wave risk ${phase.id} --kind crash-window|runtime-unverified|edge-case --severity LOW|MEDIUM|HIGH --summary "..." --note "why it stays open".\n`
+    + `2. Park with a conflict summary naming the competing contracts: riff wave park ${phase.id} --kind validation-failure --reason "<which contracts conflict and the options>".\n`
+    + `3. Only the owner resumes it: riff wave resume ${phase.id} --reason "<decision>" records the decision and allows one more round.\n`
+    + `Failed rounds so far:\n${roundLog(root, phase, candidateTree(root))}`;
+}
+
 // Resolve what the reviewer judges, refusing a run the existing record commands would reject anyway.
 function reviewTarget(root, state, type, options) {
   if (type === 'discovery') {
@@ -1356,7 +1624,12 @@ function reviewTarget(root, state, type, options) {
     if (!state.discovery || state.discovery.digest !== snapshot.digest) throw new Error('run discovery snapshot before requesting a dossier review');
     if (state.discovery.review?.status === 'fail' && state.discovery.review.candidate === snapshot.digest) throw new Error('the last dossier review failed on this unchanged dossier; revise it and snapshot again');
     if ((state.discovery.failedRounds ?? 0) >= DISCOVERY_ROUND_LIMIT) throw new Error(`${DISCOVERY_ROUND_LIMIT} dossier review rounds failed; record the unresolved findings as a blocker instead of another round`);
-    return { candidate: snapshot.digest, context: `Dossier files (read all of them):\n${snapshot.files.map((file) => `- ${file}`).join('\n')}` };
+    // An evolution is judged as a change: the diff since the last accepted dossier, not the whole dossier again.
+    const since = options.since ?? state.discovery.lastPassCommit ?? null;
+    const scope = since
+      ? `Scoped review of an evolution. Judge the change below and its effect on the existing behavior it touches. Read unchanged dossier files only to check consistency with this change; don't re-review parts the change doesn't touch.\n\nDossier change since ${since}:\n\n${reviewDiff(root, ['diff', since, '--', ...snapshot.files])}${untrackedDossier(root, snapshot.files)}\n\nOther dossier files (for consistency checks):\n${snapshot.files.map((file) => `- ${file}`).join('\n')}`
+      : `Dossier files (read all of them):\n${snapshot.files.map((file) => `- ${file}`).join('\n')}`;
+    return { candidate: snapshot.digest, context: `${scope}${discoveryRoundsContext(root, state, snapshot.digest, since)}` };
   }
   const candidate = candidateTree(root);
   if (type === 'delivery') {
@@ -1365,7 +1638,7 @@ function reviewTarget(root, state, type, options) {
     if (run('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: root })) throw new Error('final delivery review requires a clean tracked candidate');
     if (state.deliveryReview?.status === 'fail' && state.deliveryReview.candidate === candidate) throw new Error('the last delivery review failed on this unchanged candidate; correct it first');
     const base = state.phases.map((phase) => phase.baseCommit).find(Boolean);
-    const phases = state.phases.map((phase) => `## ${phase.status}\n${reviewPhaseContext(phase)}`).join('\n\n');
+    const phases = state.phases.map((phase) => `## ${phase.status}${phase.acceptance ? ` (accepted by the owner with residual risks, review rounds stopped at the limit: ${phase.acceptance.reason})` : ''}\n${reviewPhaseContext(phase)}`).join('\n\n');
     return { candidate, context: `Roadmap phases:\n\n${phases}${base ? `\n\nWhole version since ${base}:\n${run('git', ['diff', base, 'HEAD', '--stat'], { cwd: root }) || '(no change)'}` : ''}` };
   }
   if (!options.phase && state.activeWave?.batch?.length) throw new Error(`several phases are active (${state.activeWave.batch.join(', ')}); pass --phase ID or --phase ${state.activeWave.batch.join(',')}`);
@@ -1376,26 +1649,18 @@ function reviewTarget(root, state, type, options) {
   activePhase(state, phase);
   const previous = receiptFor(root, phase, type);
   if (previous?.status === 'fail' && previous.candidate === candidate) throw new Error(`the last ${type} review failed on this unchanged candidate; correct it first`);
-  requireValidation(root, phase, candidate);
-  // Deferred findings wait for a human security expert at delivery; re-reporting them would block every round.
+  const limits = reviewLimits(root);
+  if (failedRounds(phase, type) >= limits.maxFailedRounds) throw new Error(roundCapMessage(root, phase, type, limits));
+  const validation = requireValidation(root, phase, candidate);
+  // Deferred findings and accepted residual risks wait for a human at delivery; re-reporting them would block every round.
   const deferred = observationList(state).filter((finding) => finding.status === 'expert_review' && finding.phase === phase.id);
-  const deferredText = deferred.length ? `\n\nAlready deferred to a human security expert before delivery (don't report these again unless this candidate makes them worse):\n${deferred.map((finding) => `- ${finding.severity}: ${finding.summary}${finding.what_could_happen ? `. ${finding.what_could_happen}` : ''}`).join('\n')}` : '';
+  const deferredText = deferred.length ? `\n\nAlready deferred to a human expert or accepted as known residual risks before delivery (don't report these again unless this candidate makes them worse):\n${deferred.map((finding) => `- ${finding.severity}: ${finding.summary}${finding.what_could_happen ? `. ${finding.what_could_happen}` : ''}`).join('\n')}` : '';
   // In a batch the candidate also holds the other phases' changes; show this phase's owned paths and say so.
   const siblings = (state.activeWave?.batch ?? []).filter((id) => id !== phase.id);
   const scoped = siblings.length > 0 && phase.owns?.length > 0;
   const batchText = scoped ? `\n\nThis phase is built in one candidate together with ${siblings.join(', ')}, which are reviewed separately. The diff below is limited to this phase's owned paths (${phase.owns.join(', ')}); read other files when needed and report only breakage this phase causes or suffers.` : '';
   const pathspec = scoped ? phase.owns : [];
-  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}${deferredText}${recheckText(root, phase, type, previous)}${batchText}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)], pathspec)}` };
-}
-
-// After a failed round the next review only checks the corrections, so rounds converge instead of
-// each fresh hunt finding new minor points.
-function recheckText(root, phase, type, previous) {
-  if (previous?.status !== 'fail') return '';
-  let findings = [];
-  try { findings = JSON.parse(readFileSync(localPath(root, previous.evidence.path), 'utf8')).findings ?? []; } catch {}
-  const listed = findings.length ? findings.map((finding) => `- ${finding.severity}: ${finding.title}${finding.location ? ` (${finding.location})` : ''}`).join('\n') : `- ${previous.summary}`;
-  return `\n\n## Recheck round\n\nThe previous ${type} review of this phase failed. This candidate corrects it. Check only that each finding below is corrected and that the correction did not break the code around it. Don't review the rest of the diff again. Report a new finding only if it is CRITICAL.\n\nFindings to recheck:\n${listed}`;
+  return { candidate, phase: phase.id, context: `${reviewPhaseContext(phase)}\nThese done_when and verify items are the contract frozen when the phase was activated. Judge against them; if ROADMAP.yaml words a criterion differently, only a recorded decision below justifies the change.${decisionsContext(phase)}${deferredText}${validationContext(root, phase, validation)}${convergenceContext(root, phase, type, candidate, limits)}${batchText}\n\nStaged candidate against the phase start (${phase.baseCommit ?? 'baseline'}).\n\n${reviewDiff(root, ['diff', '--cached', phase.baseCommit ?? baseline(root)], pathspec)}` };
 }
 
 function reviewRecordCommand(type, target, artifact, file) {
@@ -1412,93 +1677,145 @@ function reviewRecordCommand(type, target, artifact, file) {
   return parts.join(' ');
 }
 
-const REVIEW_READY = 'RIFF_REVIEW_TARGET_READY';
-
-// Parallel reviews finish close together; their short event writes wait for the lock instead of failing.
-function withLockPatient(root, action) {
-  for (let attempt = 0; ; attempt++) {
+// Concurrent reviews (and other sessions) finish at random moments; a short state write waits its turn.
+function withLockRetry(root, action, attempts = 120) {
+  for (let attempt = 1; ; attempt += 1) {
     try { return withLock(root, action); }
     catch (error) {
-      if (attempt >= 50 || !/RIFF is busy/.test(error.message)) throw error;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+      if (attempt >= attempts || !/RIFF is busy/.test(error.message)) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
     }
   }
 }
 
-// Several types (--type functional,security) or phases of one batch (--phase a,b) run as separate child reviews on the same candidate;
-// each child keeps the single-type checks and writes its own artifact. Children start one after
-// another until their Git reads are done (concurrent git write-tree races on the index lock), then
-// their reviewers run at the same time.
-async function cmdReviewParallel(tokens, types, phases) {
-  const rest = [];
-  for (let index = 0; index < tokens.length; index += 1) {
-    if (['--type', '--phase'].includes(tokens[index])) { index += 1; continue; }
-    rest.push(tokens[index]);
-  }
-  const start = ({ type, phase }) => {
-    let ready;
-    const started = new Promise((resolve) => { ready = resolve; });
-    const finished = new Promise((resolve) => {
-      const args = [fileURLToPath(import.meta.url), 'review', 'run', ...rest, '--type', type, ...(phase ? ['--phase', phase] : [])];
-      const child = spawn(process.execPath, args, { cwd: process.cwd(), env: { ...process.env, RIFF_REVIEW_SIGNAL_READY: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
-      let stdout = '';
-      let stderr = '';
-      child.stdout.on('data', (chunk) => { stdout += chunk; });
-      child.stderr.on('data', (chunk) => {
-        stderr += chunk;
-        if (stderr.includes(REVIEW_READY)) ready();
-      });
-      child.on('close', (code) => {
-        ready();
-        stderr = stderr.replace(`${REVIEW_READY}\n`, '');
-        const label = phase ? { phase, type } : { type };
-        if (code === 0) { try { resolve({ ...label, ...JSON.parse(stdout) }); return; } catch {} }
-        resolve({ ...label, error: (stderr || stdout).trim() || `exit ${code}` });
-      });
-    });
-    return { started, finished };
-  };
-  const runs = [];
-  const jobs = (phases.length ? phases : [null]).flatMap((phase) => types.map((type) => ({ type, phase })));
-  for (const job of jobs) {
-    const child = start(job);
-    runs.push(child.finished);
-    await child.started;
-  }
-  const results = await Promise.all(runs);
-  process.stdout.write(`${JSON.stringify(results, null, 2)}\n`);
-  if (results.some((result) => result.error)) process.exitCode = 1;
+const REVIEW_READY = 'RIFF_REVIEW_TARGET_READY';
+
+function reviewTypes(value) {
+  const types = [...new Set(String(value).split(',').map((item) => item.trim()).filter(Boolean))];
+  if (!types.length || types.some((type) => !REVIEW_TYPES.includes(type))) throw new Error(`--type must be one or more of ${REVIEW_TYPES.join(', ')}, comma-separated`);
+  if (types.length > 1 && types.some((type) => !['functional', 'security'].includes(type))) throw new Error('only functional and security reviews can run together (--type functional,security)');
+  return types;
 }
 
-async function cmdReview(tokens) {
-  const root = gitRoot();
-  if (tokens[0] !== 'run') throw new Error('use riff review run --type discovery|functional|security|delivery[,TYPE...] [--phase ID[,ID...]|--quick]');
-  const options = parseOptions(tokens.slice(1));
-  const types = [...new Set(String(optionRequired(options, 'type')).split(',').map((item) => item.trim()).filter(Boolean))];
-  const unknown = types.find((item) => !REVIEW_TYPES.includes(item));
-  if (unknown || !types.length) throw new Error(`--type must be one or more of ${REVIEW_TYPES.join(', ')}, separated by commas`);
-  const phases = typeof options.phase === 'string' ? [...new Set(options.phase.split(',').map((item) => item.trim()).filter(Boolean))] : [];
-  if (types.length > 1 || phases.length > 1) return cmdReviewParallel(tokens.slice(1), types, phases);
-  const [type] = types;
+// One review type, run by the child process that `riff review run` starts for it.
+function runSingleReview(root, type, options) {
   const state = readState(root);
   const config = readJson(pathsFor(root).config, false) ?? {};
   const target = reviewTarget(root, state, type, options);
   const language = ({ en: 'English', fr: 'French' })[config.artifactLanguage ?? 'en'] ?? config.artifactLanguage;
   const prompt = buildPrompt(type, `${target.context}\n\nProduct sources: PROJECT.md, ROADMAP.yaml and taste.md at the repository root, when present.\n\nWrite the summary, evidence and findings in ${language}, whatever language other instructions use.`);
-  if (process.env.RIFF_REVIEW_SIGNAL_READY) process.stderr.write(`${REVIEW_READY}\n`);
+  // The parent starts the next review only after this one has finished its Git reads (concurrent git write-tree races on the index lock).
+  if (process.env.RIFF_REVIEW_CHILD === '1') process.stderr.write(`${REVIEW_READY}\n`);
   const runAt = now();
+  const deadline = Number(process.env.RIFF_REVIEW_DEADLINE_MS) > 0 ? Number(process.env.RIFF_REVIEW_DEADLINE_MS) : null;
   // No lock while the reviewer runs: it can take many minutes and only reads the project.
   let result;
-  try { result = runReviewChain({ type, prompt, root, config }); }
+  try { result = runReviewChain({ type, prompt, root, config, deadline }); }
   catch (error) {
-    withLockPatient(root, () => event(root, 'review_unavailable', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, skipped: error.skipped ?? [] }));
+    withLockRetry(root, () => event(root, 'review_unavailable', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, skipped: error.skipped ?? [] }));
     throw error;
   }
   const artifact = toArtifact({ candidate: target.candidate, type, verdict: result.verdict, reviewer: result.reviewer, runAt });
   const file = `${stateDirFor(root)}/reviews/${type}-${target.candidate.slice(0, 12)}-${runAt.replace(/[:.]/g, '-')}.json`;
   writeJson(localPath(root, file), artifact);
-  withLockPatient(root, () => event(root, 'review_run', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, status: artifact.status, reviewer: result.reviewer.id, sameFamily: result.reviewer.sameFamily, skipped: result.reviewer.skipped, artifact: file }));
-  process.stdout.write(`${JSON.stringify({ artifact: file, status: artifact.status, summary: artifact.summary, reviewer: result.reviewer, findings: artifact.findings, advisory: Boolean(target.advisory), record: reviewRecordCommand(type, target, artifact, file) }, null, 2)}\n`);
+  let round = null;
+  withLockRetry(root, () => {
+    if (target.phase) {
+      const current = readState(root);
+      const phase = phaseById(current, target.phase);
+      if (noteReviewRound(phase, type, { candidate: target.candidate, status: artifact.status, summary: artifact.summary, findings: artifact.findings, at: runAt })) saveState(root, current);
+      round = phase.reviewRounds?.[type] ? { failed: phase.reviewRounds[type].failed, limit: reviewLimits(root).maxFailedRounds } : null;
+    }
+    event(root, 'review_run', { reviewType: type, phase: target.phase ?? null, candidate: target.candidate, status: artifact.status, reviewer: result.reviewer.id, sameFamily: result.reviewer.sameFamily, skipped: result.reviewer.skipped, artifact: file, failedRounds: round?.failed ?? null });
+  });
+  const conflicts = artifact.findings.filter((finding) => /^CONFLICT:/i.test(String(finding.title ?? '')));
+  const note = conflicts.length
+    ? 'The reviewer reports conflicting contracts. Choose one and record why with riff wave decision, or park the phase for the human; do not flip the earlier fix back.'
+    : round && round.failed >= round.limit ? `This was failed ${type} round ${round.failed} of ${round.limit}; record it, then park the phase for the human (riff review run explains how).` : undefined;
+  process.stdout.write(`${JSON.stringify({ type, ...(target.phase ? { phase: target.phase } : {}), artifact: file, status: artifact.status, summary: artifact.summary, reviewer: result.reviewer, findings: artifact.findings, advisory: Boolean(target.advisory), record: reviewRecordCommand(type, target, artifact, file), ...(round ? { failedRounds: round.failed, maxFailedRounds: round.limit } : {}), ...(note ? { note } : {}) }, null, 2)}\n`);
+}
+
+const REVIEW_KILL_GRACE_MS = 30_000;
+
+// Runs one child CLI per review (type and phase) in its own process group, bounded by the shared deadline.
+// `ready` resolves once the child has resolved its target, so the next child can start.
+function spawnReview(root, { type, phase }, options, deadline, children) {
+  const args = [SCRIPT, 'review', 'run', '--type', type, ...(phase ? ['--phase', phase] : []), ...(options.quick ? ['--quick'] : []), ...(options.since ? ['--since', String(options.since)] : [])];
+  let ready;
+  const started = new Promise((resolve) => { ready = resolve; });
+  const finished = new Promise((resolve) => {
+    const child = spawn(process.execPath, args, { cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, RIFF_REVIEW_CHILD: '1', RIFF_REVIEW_DEADLINE_MS: String(deadline) } });
+    children.add(child);
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    child.stdout.on('data', (chunk) => { stdout += chunk; });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+      if (stderr.includes(REVIEW_READY)) ready();
+    });
+    const kill = (signal) => { try { process.kill(-child.pid, signal); } catch { /* already gone */ } };
+    const timer = setTimeout(() => { timedOut = true; kill('SIGTERM'); setTimeout(() => kill('SIGKILL'), 10_000).unref(); }, Math.max(0, deadline - Date.now()) + REVIEW_KILL_GRACE_MS);
+    child.on('close', (code, signal) => {
+      clearTimeout(timer);
+      // The child is gone; a reviewer CLI that ignored SIGTERM must not outlive it.
+      if (timedOut) kill('SIGKILL');
+      children.delete(child);
+      ready();
+      resolve({ type, phase, code, signal, stdout, stderr: stderr.replace(`${REVIEW_READY}\n`, ''), timedOut });
+    });
+  });
+  return { started, finished };
+}
+
+async function cmdReview(tokens) {
+  const root = gitRoot();
+  if (tokens[0] !== 'run') throw new Error('use riff review run --type discovery|functional|security|delivery|functional,security [--phase ID[,ID...]|--quick] [--since REF] [--timeout-minutes N]');
+  const options = parseOptions(tokens.slice(1));
+  const types = reviewTypes(optionRequired(options, 'type'));
+  if (process.env.RIFF_REVIEW_CHILD === '1') {
+    if (types.length !== 1) throw new Error('a review child runs exactly one type');
+    runSingleReview(root, types[0], options);
+    return;
+  }
+  const config = readJson(pathsFor(root).config, false) ?? {};
+  const minutes = options.timeout_minutes === undefined ? reviewerConfig(config).runTimeoutMinutes : Number(options.timeout_minutes);
+  if (!(minutes > 0)) throw new Error('--timeout-minutes must be a positive number');
+  const deadline = Date.now() + minutes * 60_000;
+  const children = new Set();
+  const stopChildren = (signal) => {
+    for (const child of children) { try { process.kill(-child.pid, 'SIGTERM'); } catch { /* gone */ } }
+    process.exit(signal === 'SIGINT' ? 130 : 143);
+  };
+  process.once('SIGINT', stopChildren);
+  process.once('SIGTERM', stopChildren);
+  // --phase a,b reviews every phase of a batch on the same candidate.
+  const phases = options.phase ? [...new Set(String(options.phase).split(',').map((item) => item.trim()).filter(Boolean))] : [null];
+  const runs = [];
+  for (const job of phases.flatMap((phase) => types.map((type) => ({ type, phase })))) {
+    const child = spawnReview(root, job, options, deadline, children);
+    runs.push(child.finished);
+    await child.started;
+  }
+  const results = await Promise.all(runs);
+  const outcomes = results.map((result) => {
+    if (result.timedOut) {
+      withLockRetry(root, () => event(root, 'review_timeout', { reviewType: result.type, phase: result.phase, minutes }));
+      return { type: result.type, phase: result.phase, status: 'timeout', error: `the ${result.type} review exceeded ${minutes} minutes and was stopped; nothing was recorded. Retry later or raise --timeout-minutes.` };
+    }
+    if (result.code !== 0) return { type: result.type, phase: result.phase, status: 'error', error: result.stderr.replace(/^RIFF: /, '').trim() || `review process exited ${result.code ?? result.signal}` };
+    try { return JSON.parse(result.stdout); }
+    catch { return { type: result.type, phase: result.phase, status: 'error', error: 'review process printed no JSON result' }; }
+  });
+  const failed = outcomes.filter((outcome) => ['timeout', 'error'].includes(outcome.status));
+  if (results.length === 1) {
+    // One review keeps the historical single-object output and error text.
+    if (failed.length) fail(failed[0].error);
+    process.stdout.write(`${JSON.stringify(outcomes[0], null, 2)}\n`);
+    return;
+  }
+  process.stdout.write(`${JSON.stringify({ reviews: outcomes, record: outcomes.map((outcome) => outcome.record).filter(Boolean) }, null, 2)}\n`);
+  if (failed.length) process.exitCode = 1;
 }
 
 function cmdContext(tokens) {
@@ -1518,7 +1835,8 @@ function cmdContext(tokens) {
   const discovery = currentDiscovery(root, state);
   process.stdout.write(`${JSON.stringify({
     schema: 'riff.wave-context/1',
-    phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome, done_when: phase.done_when ?? [], verify: phase.verify ?? [], verificationRequired: phase.verificationRequired ?? null, improvementPassRecorded: Boolean(phase.improvementPass) } : null,
+    phase: phase ? { id: phase.id, title: phase.title, status: phase.status, outcome: phase.outcome, done_when: phase.done_when ?? [], verify: phase.verify ?? [], verificationRequired: phase.verificationRequired ?? null, improvementPassRecorded: Boolean(phase.improvementPass),
+      reviewRounds: Object.fromEntries(['functional', 'security'].map((type) => [type, failedRounds(phase, type)])), maxFailedRounds: reviewLimits(root).maxFailedRounds, decisions: phase.decisions ?? [] } : null,
     checkpoint,
     modelAdvice: phase && state.modelAdvice?.phase === phase.id ? state.modelAdvice : null,
     modelAdvicePlan: phase && state.modelAdvicePlan?.phase === phase.id ? state.modelAdvicePlan : null,
@@ -1538,8 +1856,8 @@ function cmdWave(tokens) {
   try {
     const autonomy = autonomyMode(root);
     if (action === 'sync') {
-      state = syncRoadmap(root, { preserveLegacyVerification: options.preserve_legacy_verification === true });
-      process.stdout.write(`${state.phases.length} roadmap phases synchronized.\n`);
+      const synced = syncRoadmap(root, { preserveLegacyVerification: options.preserve_legacy_verification === true });
+      process.stdout.write(`${synced.state.phases.length} roadmap phases synchronized.\n${synced.notes.map((note) => `- ${note}\n`).join('')}`);
       return;
     }
     if (action === 'select' && options.parallel === true) {
@@ -1557,6 +1875,13 @@ function cmdWave(tokens) {
           const reason = optionRequired(options, 'reason');
           discoveryGate(root, state);
           resumable.attempts = 0;
+          // A resume records the owner's decision and allows one more round per review type, never a fresh
+          // count: repeated resumes cannot turn the round cap into an endless loop.
+          const maxFailed = reviewLimits(root).maxFailedRounds;
+          for (const record of Object.values(resumable.reviewRounds ?? {})) {
+            if (record?.failed >= maxFailed) { record.resetAtRound = Number(record.total ?? record.failed); record.failed = maxFailed - 1; }
+          }
+          if (resumable.reviewRounds) addDecision(resumable, { note: reason, source: `resume from ${resumable.status}` });
           resumable.baseCommit ??= baseline(root);
           markPhase(root, state, resumable, 'active', reason);
           process.stdout.write(`Resumed ${requested}.\n`);
@@ -1617,6 +1942,18 @@ function cmdWave(tokens) {
       saveState(root, state);
       event(root, 'targeted_retry', { phase: id, reason });
       process.stdout.write(`Recorded the one targeted correction for ${id}.\n`);
+    } else if (action === 'decision') {
+      activePhase(state, phase);
+      const note = String(optionRequired(options, 'note')).trim();
+      if (note.length < 10) throw new Error('--note must explain the decision and why (at least 10 characters)');
+      const type = options.type ?? null;
+      if (type !== null && !['functional', 'security', 'contract'].includes(type)) throw new Error('--type must be functional, security or contract');
+      addDecision(phase, { note, type });
+      saveState(root, state);
+      event(root, 'phase_decision', { phase: id, type, note: clip(note, 200) });
+      process.stdout.write(`Decision recorded for ${id}; every later review of this phase receives it.\n`);
+    } else if (action === 'risk') {
+      recordResidualRisk(root, state, phase, options);
     } else if (action === 'checkpoint') {
       checkpointPhase(root, state, phase, options);
     } else if (action === 'validate') {
@@ -1631,7 +1968,8 @@ function cmdWave(tokens) {
     } else if (action === 'complete') {
       const commit = optionRequired(options, 'commit');
       if (phase.status === 'completed' && phase.commit === run('git', ['rev-parse', commit], { cwd: root })) { process.stdout.write(`${id} already completed.\n`); return; }
-      completePhase(root, state, phase, commit);
+      if (options.accept_risks === true) acceptPhase(root, state, phase, commit, options);
+      else completePhase(root, state, phase, commit);
     } else throw new Error(`unknown wave action: ${action}`);
   } catch (error) { fail(error.message); }
 }
@@ -1934,15 +2272,13 @@ async function cmdDashboard(tokens) {
   process.stdout.write(`RIFF dashboard: ${url}\nShared dashboard with observation triage, independent from Codex or Claude.\n`);
 }
 
+// Only the files this tool call named. Bash calls name none; the pre-commit hook scans what they staged.
 function changedFiles(root, payload) {
   const files = new Set();
-  const command = String(payload?.tool_input?.command ?? '');
-  for (const match of command.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)) files.add(match[1].trim());
-  try {
-    const args = ['status', '--porcelain=v1'];
-    const output = run('git', args, { cwd: root });
-    for (const line of output.split('\n').filter(Boolean)) files.add(line.slice(3));
-  } catch { /* hook remains advisory */ }
+  const input = payload?.tool_input ?? {};
+  for (const key of ['file_path', 'notebook_path', 'path']) if (typeof input[key] === 'string' && input[key].trim()) files.add(input[key].trim());
+  const patch = [input.command, input.input, input.patch].filter((value) => typeof value === 'string').join('\n');
+  for (const match of patch.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$|^\*\*\* Move to: (.+)$/gm)) files.add((match[1] ?? match[2]).trim());
   return [...files].map((file) => path.resolve(root, file)).filter((file) => file.startsWith(`${root}${path.sep}`) && existsSync(file) && statSync(file).isFile());
 }
 
@@ -2001,11 +2337,20 @@ function plainFinding(finding) {
   return { ...finding, what_could_happen: 'A user may reach data or behavior that was not intended for them.', affected: 'Users and data handled by this boundary.', recommended_fix: 'Review the changed boundary and add the missing explicit control if the warning is valid.', decision_reason: 'RIFF continues because this is a heuristic warning that needs fresh human-readable review.' };
 }
 
+// Returns false when the finding is already a recorded, unresolved observation.
 function parkForFinding(root, finding) {
   let state;
-  try { state = readState(root); } catch { return; }
-  const active = state.phases.find((phase) => phase.status === 'active');
-  state.securityFindings.push({ ...finding, phase: active?.id ?? null, candidate: null, reviewedAt: now() });
+  try { state = readState(root); } catch { return true; }
+  // In a batch the finding belongs to the active phase that owns the file, else to the lead phase.
+  const actives = activePhases(state);
+  const file = String(finding.affected ?? '');
+  const active = actives.find((phase) => phase.owns?.length && ownsOverlap(phase.owns, [file])) ?? actives.find((phase) => phase.id === state.activeWave?.phase) ?? actives[0];
+  const entry = { ...finding, phase: active?.id ?? null, candidate: null, reviewedAt: now() };
+  // The same rule on the same file stays one observation; only a finding already marked resolved reopens.
+  const key = JSON.stringify([entry.kind, entry.summary, entry.affected, entry.phase]);
+  const known = observationList(state).find((item) => JSON.stringify([item.kind, item.summary, item.affected, item.phase]) === key);
+  if (known && known.status !== 'resolved') return false;
+  state.securityFindings.push(entry);
   if (active && ['HIGH', 'CRITICAL'].includes(finding.severity)) {
     active.status = 'parked';
     active.reason = finding.decision_reason;
@@ -2014,6 +2359,7 @@ function parkForFinding(root, finding) {
     state.humanAction = { phase: active.id, status: 'parked', kind: 'validation-failure', reason: finding.decision_reason };
   }
   saveState(root, state);
+  return true;
 }
 
 function accumulateValidation(root, files) {
@@ -2043,7 +2389,6 @@ function preTool(root, payload) {
     event(root, 'hook_block', { hook: 'secret_guard', tool: payload.tool_name });
     return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'RIFF blocked a likely production credential before it reached the tool. Remove the secret and use an approved secret store.' } };
   }
-  const oldRiff = '/Users/webstantly/DEV/frameworks/riff';
   const within = (parent, candidate) => {
     const relative = path.relative(parent, path.resolve(candidate));
     return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
@@ -2051,11 +2396,10 @@ function preTool(root, payload) {
   const strings = (value) => typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(strings) : [];
   const absolutePaths = strings(payload.tool_input).flatMap((value) =>
     [...value.matchAll(/(["'])(\/(?:Users|home|opt|var|tmp|private)\/.*?)\1|\/(?:Users|home|opt|var|tmp|private)\/[^\s"'`\\;,\)\]}]+/g)].map((match) => match[2] ?? match[0]));
-  const legacy = root !== oldRiff && absolutePaths.some((candidate) => within(oldRiff, candidate));
-  const outside = legacy || absolutePaths.some((candidate) => !within(root, candidate));
+  const outside = absolutePaths.some((candidate) => !within(root, candidate));
   if (outside) {
     event(root, 'hook_warning', { hook: 'boundary', tool: payload.tool_name });
-    return { hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: legacy ? 'Boundary warning: this tool references the read-only legacy RIFF repository. Do not modify it, change its branch, or run processes there.' : 'Boundary warning: this tool references a path outside the current Git repository. Confirm that external path is within the user-authorized scope before writing.' } };
+    return { hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: 'Boundary warning: this tool references a path outside the current Git repository. Confirm that external path is within the user-authorized scope before writing.' } };
   }
   return {};
 }
@@ -2063,12 +2407,11 @@ function preTool(root, payload) {
 function postTool(root, payload) {
   const files = changedFiles(root, payload);
   accumulateValidation(root, files);
-  const findings = [...files.flatMap((file) => scanFile(file)), ...files.map((file) => orphanFinding(root, file)).filter(Boolean)].map(plainFinding);
-  for (const finding of findings) {
-    event(root, 'hook_finding', { hook: finding.kind, severity: finding.severity, file: finding.summary });
-    parkForFinding(root, finding);
-  }
-  const blocking = findings.find((finding) => ['HIGH', 'CRITICAL'].includes(finding.severity));
+  const detected = [...files.flatMap((file) => scanFile(file)), ...files.map((file) => orphanFinding(root, file)).filter(Boolean)].map(plainFinding);
+  const findings = detected.filter((finding) => parkForFinding(root, finding));
+  for (const finding of findings) event(root, 'hook_finding', { hook: finding.kind, severity: finding.severity, file: finding.summary });
+  // A blocking finding still present in a touched file blocks again, even when it is already recorded.
+  const blocking = detected.find((finding) => ['HIGH', 'CRITICAL'].includes(finding.severity));
   if (blocking) return { decision: 'block', reason: `${blocking.summary} ${blocking.what_could_happen} Affected: ${blocking.affected} Fix: ${blocking.recommended_fix} ${blocking.decision_reason}` };
   if (findings.length) return { systemMessage: `RIFF recorded ${findings.length} focused warning(s). Review the changed boundary before issuing a candidate-bound receipt.`, hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: findings.map((finding) => finding.summary).join(' ') } };
   event(root, 'hook_post_tool', { tool: payload.tool_name, files: files.length });
@@ -2106,22 +2449,26 @@ function preCommit(root) {
   }
   let state;
   try { state = readState(root); } catch { return 0; }
-  const active = state.phases.find((phase) => phase.status === 'active');
-  if (!active) return 0;
+  // A batch commits every active phase at once, so each needs its own evidence for this staged tree.
+  const actives = activePhases(state);
+  if (!actives.length) return 0;
   const candidate = candidateTree(root);
-  try { requireValidation(root, active, candidate); }
-  catch (error) { process.stderr.write(`RIFF pre-commit blocked: ${error.message}\n`); return 1; }
-  const functional = receiptFor(root, active, 'functional');
-  const security = receiptFor(root, active, 'security');
-  if (!functional || functional.status !== 'pass' || functional.candidate !== candidate || !evidenceValid(root, functional.evidence)) {
-    process.stderr.write('RIFF pre-commit blocked: the active wave needs a fresh passing functional review receipt for this exact staged tree.\n');
-    return 1;
+  for (const active of actives) {
+    const label = actives.length > 1 ? ` (phase ${active.id})` : '';
+    try { requireValidation(root, active, candidate); }
+    catch (error) { process.stderr.write(`RIFF pre-commit blocked${label}: ${error.message}\n`); return 1; }
+    const functional = receiptFor(root, active, 'functional');
+    const security = receiptFor(root, active, 'security');
+    if (!functional || functional.status !== 'pass' || functional.candidate !== candidate || !evidenceValid(root, functional.evidence)) {
+      process.stderr.write(`RIFF pre-commit blocked${label}: the active wave needs a fresh passing functional review receipt for this exact staged tree.\n`);
+      return 1;
+    }
+    if (active.sensitive && (!security || security.status !== 'pass' || security.candidate !== candidate || !evidenceValid(root, security.evidence))) {
+      process.stderr.write(`RIFF pre-commit blocked${label}: this sensitive wave needs a fresh passing security receipt for this exact staged tree.\n`);
+      return 1;
+    }
   }
-  if (active.sensitive && (!security || security.status !== 'pass' || security.candidate !== candidate || !evidenceValid(root, security.evidence))) {
-    process.stderr.write('RIFF pre-commit blocked: this sensitive wave needs a fresh passing security receipt for this exact staged tree.\n');
-    return 1;
-  }
-  event(root, 'git_pre_commit', { phase: active.id, candidate });
+  event(root, 'git_pre_commit', { phase: actives.map((phase) => phase.id).join(','), candidate });
   return 0;
 }
 
@@ -2176,7 +2523,7 @@ function cmdStatus(tokens) {
   const data = dashboardData(root);
   if (parseOptions(tokens).json) {
     const review = (receipt) => receipt && { phase: receipt.phase, status: receipt.status, summary: receipt.summary ?? null, valid: receipt.valid };
-    // Stable contract for host integrations (Claude Code cockpit); extend, never rename.
+    // Stable contract for host integrations; extend, never rename.
     process.stdout.write(`${JSON.stringify({
       schema: 'riff.status/1',
       version: data.version,
@@ -2186,7 +2533,7 @@ function cmdStatus(tokens) {
       activePhases: data.activeWave ? data.activeWave.batch ?? [data.activeWave.phase] : [],
       next: data.nextReady ? { id: data.nextReady.id, title: data.nextReady.title ?? null } : null,
       humanAction: data.humanAction ?? null,
-      phases: readState(root).phases.map((phase) => ({ id: phase.id, title: phase.title ?? null, status: phase.status })),
+      phases: readState(root).phases.map((phase) => ({ id: phase.id, title: phase.title ?? null, status: phase.status, ...(phase.acceptance ? { acceptedWithRisks: true } : {}) })),
       findings: data.securityFindings.filter((finding) => finding.status === 'pending')
         .map((finding) => ({ id: finding.id, severity: finding.severity ?? null, summary: finding.summary ?? null, phase: finding.phase ?? null })),
       reviews: { functional: review(data.reviews.functional), security: review(data.reviews.security) },
@@ -2211,8 +2558,9 @@ function checkTerminalPhaseEvidence(root, state) {
   for (const phase of state.phases.filter((phase) => phase.status === 'completed')) {
     const tree = run('git', ['rev-parse', `${phase.commit}^{tree}`], { cwd: root });
     requireValidation(root, phase, tree);
-    for (const type of phase.sensitive ? ['functional', 'security'] : ['functional']) {
+    for (const type of reviewTypesFor(phase)) {
       const receipt = receiptFor(root, phase, type);
+      if (phase.acceptance?.source === 'owner' && phase.acceptance.commit === phase.commit && phase.acceptance.waived.some((entry) => entry.type === type)) continue;
       if (receipt?.status !== 'pass' || receipt.candidate !== tree || !evidenceValid(root, receipt.evidence)) throw new Error(`phase ${phase.id} lacks intact ${type} evidence`);
     }
     run('git', ['merge-base', '--is-ancestor', phase.commit, 'HEAD'], { cwd: root });
@@ -2224,7 +2572,7 @@ function cmdFinish(tokens) {
   const root = gitRoot();
   const state = readState(root);
   if (discoveryEnrolled(root, state)) {
-    const observationError = pendingObservationError(state, { id: null });
+    const observationError = pendingObservationError(state);
     if (observationError) throw new Error(observationError);
   }
   if (options.review) {
@@ -2237,8 +2585,7 @@ function cmdFinish(tokens) {
     const headTree = run('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root });
     if (candidate !== headTree) throw new Error('final delivery review must bind the current HEAD candidate tree');
     if (run('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: root })) throw new Error('final delivery review requires a clean tracked candidate');
-    let deliveryStatus;
-    try { deliveryStatus = readJson(localPath(root, options.review)).status; } catch (error) { throw error; }
+    const deliveryStatus = readJson(localPath(root, options.review)).status;
     if (!['pass', 'fail'].includes(deliveryStatus)) throw new Error('delivery review status must be pass or fail');
     const proof = reviewArtifact(root, options.review, candidate, 'delivery', deliveryStatus);
     state.deliveryReview = {
@@ -2265,8 +2612,8 @@ function cmdFinish(tokens) {
   if (run('git', ['status', '--porcelain'], { cwd: root })) throw new Error('commit or preserve pending project changes before finishing');
   // Expert-review findings never block delivery: they ship with the agent's documented interim decision and stay listed.
   const expert = observationList(state).filter((finding) => finding.status === 'expert_review');
-  const expertText = expert.length ? `Security points for an expert when one is available (${expert.length}), shipped with the interim decision in each note:\n${expert.map((finding) => `- ${finding.severity} ${finding.summary}: ${finding.review.note}`).join('\n')}\n` : '';
-  process.stdout.write(`Ready for explicit Git finalization at ${run('git', ['rev-parse', 'HEAD'], { cwd: root })}.\n${expertText}No push, merge or deployment performed.\n`);
+  const expertText = expert.length ? `Points for a human expert when one is available (${expert.length}: security findings and known residual risks), shipped with the interim decision in each note:\n${expert.map((finding) => `- ${finding.severity} ${finding.summary}: ${finding.review.note}`).join('\n')}\n` : '';
+  process.stdout.write(`Ready for explicit Git finalization at ${run('git', ['rev-parse', 'HEAD'], { cwd: root })}.\n${acceptedPhasesText(state)}${expertText}No push, merge or deployment performed.\n`);
 }
 
 function cmdPromote(tokens) {
@@ -2332,6 +2679,120 @@ function cmdImprove(tokens) {
   });
 }
 
+function gitCommonDir(directory) {
+  return realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: directory }));
+}
+
+// Copies one file from another checkout into this one when it is missing; an existing file is kept.
+function importFile(root, source, relative, dryRun, copied) {
+  const from = path.join(source, relative);
+  if (!existsSync(from) || !lstatSync(from).isFile()) return;
+  const to = localPath(root, relative);
+  if (existsSync(to)) return;
+  copied.push(relative);
+  if (dryRun) return;
+  ensureDir(to, true);
+  copyFileSync(from, to);
+}
+
+// Merges one phase's record and its evidence from a worktree checkout of the same repository.
+// State resolution is unchanged: each checkout keeps its own .riff-data until this explicit import.
+function cmdState(tokens) {
+  if (tokens[0] !== 'import') throw new Error('use riff state import --from WORKTREE_PATH --phase ID [--dry-run]');
+  const options = parseOptions(tokens.slice(1));
+  const root = gitRoot();
+  const source = gitRoot(path.resolve(String(optionRequired(options, 'from'))));
+  const id = phaseId(optionRequired(options, 'phase'));
+  const dryRun = options.dry_run === true;
+  if (realpathSync(source) === realpathSync(root)) throw new Error('--from is this checkout; pass the worktree that holds the phase state');
+  if (gitCommonDir(source) !== gitCommonDir(root)) throw new Error('--from must be a worktree of this repository');
+  const sourceDir = path.join(source, stateDirFor(source));
+  if (!existsSync(path.join(sourceDir, 'state.json')) || lstatSync(sourceDir).isSymbolicLink()) throw new Error(`no RIFF state in ${sourceDir}`);
+  const theirs = readJson(path.join(sourceDir, 'state.json'));
+  validateState(theirs);
+  const incoming = theirs.phases.find((phase) => phase.id === id);
+  if (!incoming) throw new Error(`phase ${id} is not in the worktree state`);
+  withLock(root, () => {
+    const state = readState(root);
+    const index = state.phases.findIndex((phase) => phase.id === id);
+    if (index < 0) throw new Error(`phase ${id} is not in this checkout's state; run riff wave sync first`);
+    const current = state.phases[index];
+    if (TERMINAL_PHASE_STATES.has(current.status) && JSON.stringify(current) !== JSON.stringify(incoming)) throw new Error(`phase ${id} is already ${current.status} here; its history is not overwritten`);
+    const otherActive = activePhases(state).filter((phase) => phase.id !== id);
+    if (incoming.status === 'active' && otherActive.length && !canRunBeside(current, otherActive)) throw new Error(`phase ${otherActive[0].id} is active here; finish or park it before importing active phase ${id}, or give both phases owns paths that don't overlap`);
+    if (incoming.commit) {
+      try { run('git', ['cat-file', '-e', `${incoming.commit}^{commit}`], { cwd: root }); }
+      catch { throw new Error(`commit ${incoming.commit} of phase ${id} is not in this repository`); }
+    }
+    const report = { phase: id, from: source, status: `${current.status} -> ${incoming.status}`, findings: 0, improvements: 0, observationReviews: 0, files: [] };
+    // Plan fields stay this checkout's: only execution history comes from the worktree.
+    const plan = Object.fromEntries(NORMALIZED_PLAN_FIELDS.filter((field) => Object.hasOwn(current, field)).map((field) => [field, current[field]]));
+    state.phases[index] = { ...incoming, ...plan, done_when: current.done_when?.length ? current.done_when : incoming.done_when, verify: current.verify?.length ? current.verify : incoming.verify };
+    const known = new Set((state.securityFindings ?? []).map((finding) => JSON.stringify(finding)));
+    for (const finding of (theirs.securityFindings ?? []).filter((item) => item?.phase === id && !known.has(JSON.stringify(item)))) { state.securityFindings.push(finding); report.findings += 1; }
+    const improvementIds = new Set((state.improvements ?? []).map((item) => item.id));
+    for (const item of (theirs.improvements ?? []).filter((entry) => entry?.phase === id && !improvementIds.has(entry.id))) { state.improvements = [...(state.improvements ?? []), item]; report.improvements += 1; }
+    const observationIds = new Set(observationList(theirs).filter((finding) => finding.phase === id).map((finding) => finding.id));
+    for (const [observation, review] of Object.entries(theirs.observationReviews ?? {})) {
+      if (!observationIds.has(observation)) continue;
+      const mine = state.observationReviews?.[observation];
+      if (mine && String(mine.at) >= String(review.at)) continue;
+      state.observationReviews = { ...(state.observationReviews ?? {}), [observation]: review };
+      report.observationReviews += 1;
+    }
+    const history = new Set((state.observationHistory ?? []).map((entry) => JSON.stringify(entry)));
+    const addedHistory = (theirs.observationHistory ?? []).filter((entry) => observationIds.has(entry.id) && !history.has(JSON.stringify(entry)));
+    if (addedHistory.length) state.observationHistory = [...(state.observationHistory ?? []), ...addedHistory];
+    if (theirs.lastValidation?.phase === id && (!state.lastValidation || String(state.lastValidation.at) <= String(theirs.lastValidation.at))) state.lastValidation = theirs.lastValidation;
+    for (const type of ['functional', 'security']) {
+      const review = theirs.reviews?.[type];
+      if (review?.phase === id && (!state.reviews[type] || String(state.reviews[type].reviewedAt) <= String(review.reviewedAt))) state.reviews[type] = review;
+    }
+    if (incoming.status === 'active' && !otherActive.length) state.activeWave = theirs.activeWave?.phase === id ? { ...theirs.activeWave } : null;
+    setActiveWave(state, state.activeWave?.phase ?? id);
+    if (theirs.humanAction?.phase === id) state.humanAction = theirs.humanAction;
+    else if (state.humanAction?.phase === id) state.humanAction = null;
+    if (incoming.status === 'completed' && incoming.commit) state.lastCommit = incoming.commit;
+    // Evidence: receipts, content-addressed evidence copies, the validation report and its manifest.
+    const stateDir = stateDirFor(root);
+    const sourceState = path.relative(source, sourceDir);
+    const receipts = ['functional', 'security'].map((type) => `receipts/${id}-${type}.json`);
+    for (const receipt of receipts) {
+      const from = path.join(sourceDir, receipt);
+      if (!existsSync(from)) continue;
+      const to = localPath(root, path.join(stateDir, receipt));
+      if (existsSync(to) && sha(readFileSync(to)) === sha(readFileSync(from))) continue;
+      report.files.push(path.join(stateDir, receipt));
+      if (!dryRun) { ensureDir(to, true); copyFileSync(from, to); }
+    }
+    const evidencePaths = [incoming.validation?.evidence?.path, ...receipts.map((receipt) => readJson(path.join(sourceDir, receipt), false)?.evidence?.path)].filter(Boolean);
+    for (const evidence of evidencePaths) {
+      const name = path.basename(evidence);
+      const from = path.join(sourceState, 'evidence', name);
+      const to = path.join(stateDir, 'evidence', name);
+      if (existsSync(path.join(source, from)) && !existsSync(localPath(root, to))) {
+        report.files.push(to);
+        if (!dryRun) { ensureDir(localPath(root, to), true); copyFileSync(path.join(source, from), localPath(root, to)); }
+      }
+    }
+    const reportPath = incoming.validation?.verification?.path;
+    if (reportPath && /^\.uxtest\/runs\/[^/]+\//.test(reportPath)) {
+      const runDir = path.dirname(reportPath);
+      if (existsSync(path.join(source, runDir))) for (const entry of readdirSync(path.join(source, runDir))) importFile(root, source, path.join(runDir, entry), dryRun, report.files);
+    }
+    const manifest = incoming.validation?.verificationManifest?.path;
+    if (manifest && !path.isAbsolute(manifest)) importFile(root, source, manifest, dryRun, report.files);
+    validateState(state);
+    if (!dryRun) {
+      saveState(root, state);
+      event(root, 'state_imported', { ...report, files: report.files.length });
+    }
+    let ancestor = true;
+    if (incoming.commit) { try { run('git', ['merge-base', '--is-ancestor', incoming.commit, 'HEAD'], { cwd: root }); } catch { ancestor = false; } }
+    process.stdout.write(`${dryRun ? 'Dry run, nothing written. Would import' : 'Imported'} phase ${id} from ${source}: ${report.status}; ${report.findings} finding(s), ${report.improvements} improvement(s), ${report.observationReviews} observation decision(s), ${report.files.length} file(s).\n${report.files.map((file) => `  ${file}\n`).join('')}${ancestor ? '' : `Commit ${incoming.commit.slice(0, 12)} is not in this checkout's HEAD yet; merge the worktree branch before riff finish --check.\n`}`);
+  });
+}
+
 function cmdIncident(tokens) {
   if (tokens[0] !== 'log') throw new Error('use incident log --evidence FILE');
   const options = parseOptions(tokens.slice(1));
@@ -2362,7 +2823,7 @@ async function cmdModelAdvice(tokens) {
   const root = gitRoot();
   const files = pathsFor(root);
   const readConfig = () => readJson(localPath(root, files.config));
-  const preference = (config) => config.preferences?.modelAdvice ?? { mode: 'local', allowJevSummary: false };
+  const preference = (config) => config.preferences?.modelAdvice ?? { mode: 'off', allowJevSummary: false };
   if (action === 'show') { const state = readState(root); print({ preference: preference(readConfig()), advice: state.modelAdvice ?? null, plan: state.modelAdvicePlan ?? null }); return; }
   await withLock(root, async () => {
     const config = readConfig();
@@ -2419,7 +2880,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery[,TYPE...] [--phase ID[,ID...]|--quick]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave complete phase-1 --commit HEAD\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery|functional,security [--phase ID[,ID...]|--quick] [--since REF] [--timeout-minutes 25]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|decision|risk|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave validate phase-1 --rerun   (same command, paths and manifest as the last run, restaged)\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave decision phase-1 --note "Kept the verbatim quote; redaction happens at display" [--type functional|security|contract]\n  riff wave risk phase-1 --kind crash-window|runtime-unverified|edge-case --severity MEDIUM --summary "..." --note "why it stays open" [--finding "review finding title"]\n  riff wave complete phase-1 --commit HEAD\n  riff wave complete phase-1 --commit HEAD --accept-risks --reason "owner decision"   (owner instruction only)\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n  riff state import --from WORKTREE_PATH --phase phase-1 [--dry-run]\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -2445,6 +2906,9 @@ else if (['report', 'promote', 'incident', 'finish'].includes(command)) {
 }
 else if (command === 'review') {
   try { await cmdReview(tokens); } catch (error) { fail(error.message); }
+}
+else if (command === 'state') {
+  try { cmdState(tokens); } catch (error) { fail(error.message); }
 }
 else if (command === 'improve') {
   try { cmdImprove(tokens); } catch (error) { fail(error.message); }
@@ -2474,5 +2938,4 @@ else if (command === 'wave') {
 else if (command === 'hook') {
   try { if (['post-tool', 'pre-compact'].includes(tokens[0])) withLock(gitRoot(), () => cmdHook(tokens)); else cmdHook(tokens); } catch (error) { fail(error.message); }
 }
-else if (command === 'next') fail('riff next is intentionally deferred; use the wave skill or riff wave select');
 else fail(`unknown command ${command}; run riff --help`);

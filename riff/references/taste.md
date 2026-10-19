@@ -14,9 +14,9 @@ Explicit user instructions and repository instructions take precedence. Preserve
 
 ## Establish and reuse
 
-Production `start` and `onboard` establish a small project-owned `taste.md`: stack and version evidence, load-bearing architectural conventions, a table of topic paths with “Read when” triggers, and links to non-obvious decisions already in `PROJECT.md`. Use [architecture](taste/architecture.md) as a starting point, not a checklist to copy blindly.
+Production `start` and `onboard` establish a small project-owned `taste.md`: stack and version evidence, load-bearing architectural conventions, a table of topic paths with “Read when” triggers, and links to non-obvious decisions already in `PROJECT.md`.
 
-Seed only applicable `taste/frontend.md`, `taste/backend.md`, `taste/security.md` and `taste/testing.md` from their matching references in this directory and verified project patterns. Omit irrelevant topics and empty placeholders. Keep each topic short enough to scan; split by responsibility only when needed. Include visual direction and skill routing in frontend taste. Reference shared sources instead of duplicating their full text.
+Seed `taste/frontend.md` from its reference in this directory when the project has a UI. Seed `taste/testing.md` from its reference. Create backend or security topics only from verified project patterns, never from generic advice. Omit irrelevant topics and empty placeholders. Keep each topic short enough to scan; split by responsibility only when needed. Include visual direction and skill routing in frontend taste. Reference shared sources instead of duplicating their full text.
 
 Existing Claude `taste.md`, `taste/` and project `references/taste/stacks/` are shared artifacts: read and preserve them, including legacy monolithic taste files. Merge only evidence-backed additions or corrections; do not rename, overwrite, reformat wholesale, or copy foreign `.riff` state. Resolve symlinks before writing: a project path linked to the framework, another consumer or a managed skill is read-only. Put a project-specific addition in a regular project-owned file and link it from a writable project index instead.
 

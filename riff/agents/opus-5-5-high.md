@@ -1,6 +1,6 @@
 ---
 name: opus-5-5-high
-description: RIFF worker for catalog profile opus_5_5_high (claude-opus-5-5, high effort). Opus work with a specific difficult diagnosis, architectural tradeoff or conflicting evidence requiring deeper reasoning than Medium. Use when a RIFF dispatch names this profile.
+description: RIFF worker for catalog profile opus_5_5_high (claude-opus-5-5, high effort). Escalation for planning or diagnosis: a specific difficult problem, architectural tradeoff or conflicting evidence requiring deeper reasoning than Medium. Use when a RIFF dispatch names this profile.
 model: claude-opus-5-5
 effort: high
 ---

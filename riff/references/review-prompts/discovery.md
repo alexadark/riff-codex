@@ -10,3 +10,9 @@ Read every listed dossier file, not a subset. Check in particular:
 - Wireframes and design handoff cover the states a user will meet (empty, loading, error, success).
 - Each phase has observable `done_when` criteria and a way to verify them.
 - Contradictions between files, unresolved decisions that block implementation, promised documents that are missing.
+
+Severity bar for a dossier:
+
+- HIGH: a contradiction between documents, or a missing decision that forces an implementer to guess on the main path; a plan that would lose data or expose private data.
+- MEDIUM at most: a rare case (a narrow race, a multi-step failure sequence, an operator mistake) that the dossier can handle with an operating instruction for the team. Recommend the instruction instead of more machinery.
+- When the context says this is a scoped review of an evolution, judge the change and the existing behavior it touches. Unrelated pre-existing gaps are LOW, not blockers of this change.
