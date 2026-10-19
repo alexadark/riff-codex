@@ -37,7 +37,7 @@ import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 import { recommendPlan } from '../lib/model-advice-plan.mjs';
 import { decideImprovement, ideasFile, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = path.resolve(path.dirname(SCRIPT), '..');
 const FRAMEWORK_DIR = '.riff-cli';

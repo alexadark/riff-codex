@@ -8,7 +8,7 @@
     {
       "name": "riff",
       "source": ".",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "description": "RIFF skills (/riff:start, /riff:wave, /riff:quick...) and model-profile subagents",
       "author": {
         "name": "Alexandra Spalato"

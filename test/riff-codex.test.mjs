@@ -15,7 +15,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -381,7 +381,7 @@ test('boundary warnings distinguish the current root, descendants, siblings and 
   assert.match(sibling.hookSpecificOutput.additionalContext, /outside the current Git repository/);
   const parent = invokeHook(root, 'pre-tool', { command: `cat ${root}/../outside.md` });
   assert.match(parent.hookSpecificOutput.additionalContext, /outside the current Git repository/);
-  const legacyPath = path.join('/Users/webstantly/DEV/frameworks', 'riff', 'README.md');
+  const legacyPath = path.join(homedir(), 'DEV', 'frameworks', 'riff', 'README.md');
   const legacy = invokeHook(root, 'pre-tool', { command: `cat ${legacyPath}` });
   assert.match(legacy.hookSpecificOutput.additionalContext, /read-only legacy RIFF/);
 });
