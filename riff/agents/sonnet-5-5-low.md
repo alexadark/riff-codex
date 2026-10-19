@@ -1,6 +1,6 @@
 ---
 name: sonnet-5-5-low
-description: RIFF worker for catalog profile sonnet_5_5_low (claude-sonnet-5-5, low effort). Exploration, locating code and short summaries where judgment matters more than for Haiku. Use when a RIFF dispatch names this profile.
+description: RIFF worker for catalog profile sonnet_5_5_low (claude-sonnet-5-5, low effort). Read-only exploration, locating code and short summaries where judgment matters more than for Haiku. Use when a RIFF dispatch names this profile.
 model: claude-sonnet-5-5
 effort: low
 ---

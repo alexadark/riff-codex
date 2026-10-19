@@ -1431,7 +1431,8 @@ function cmdDiscovery(tokens) {
   state.discovery.failedRounds = status === 'pass' ? 0 : (state.discovery.failedRounds ?? 0) + 1;
   // The next evolution is reviewed as a diff from the dossier accepted here.
   if (status === 'pass') {
-    state.discovery.lastPassCommit = run('git', ['rev-parse', 'HEAD'], { cwd: root });
+    // A dossier reviewed before the first commit has no commit to diff from yet.
+    try { state.discovery.lastPassCommit = run('git', ['rev-parse', 'HEAD'], { cwd: root }); } catch { delete state.discovery.lastPassCommit; }
     state.discovery.lastPassAt = state.discovery.review.reviewedAt;
   }
   saveState(root, state);
@@ -1738,7 +1739,7 @@ function runSingleReview(root, type, options) {
 const REVIEW_KILL_GRACE_MS = 30_000;
 
 // Runs one child CLI per review (type and phase) in its own process group, bounded by the shared deadline.
-// `ready` resolves once the child has resolved its target, so the next child can start.
+// `started` resolves once the child has resolved its target, so the next child can start.
 function spawnReview(root, { type, phase }, options, deadline, children) {
   const args = [SCRIPT, 'review', 'run', '--type', type, ...(phase ? ['--phase', phase] : []), ...(options.quick ? ['--quick'] : []), ...(options.since ? ['--since', String(options.since)] : [])];
   let ready;
@@ -2343,8 +2344,7 @@ function parkForFinding(root, finding) {
   try { state = readState(root); } catch { return true; }
   // In a batch the finding belongs to the active phase that owns the file, else to the lead phase.
   const actives = activePhases(state);
-  const file = String(finding.affected ?? '');
-  const active = actives.find((phase) => phase.owns?.length && ownsOverlap(phase.owns, [file])) ?? actives.find((phase) => phase.id === state.activeWave?.phase) ?? actives[0];
+  const active = actives.find((phase) => finding.file && phase.owns?.length && ownsOverlap(phase.owns, [finding.file])) ?? actives.find((phase) => phase.id === state.activeWave?.phase) ?? actives[0];
   const entry = { ...finding, phase: active?.id ?? null, candidate: null, reviewedAt: now() };
   // The same rule on the same file stays one observation; only a finding already marked resolved reopens.
   const key = JSON.stringify([entry.kind, entry.summary, entry.affected, entry.phase]);
@@ -2389,6 +2389,7 @@ function preTool(root, payload) {
     event(root, 'hook_block', { hook: 'secret_guard', tool: payload.tool_name });
     return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'RIFF blocked a likely production credential before it reached the tool. Remove the secret and use an approved secret store.' } };
   }
+  const oldRiff = path.join(homedir(), 'DEV', 'frameworks', 'riff');
   const within = (parent, candidate) => {
     const relative = path.relative(parent, path.resolve(candidate));
     return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
@@ -2396,10 +2397,11 @@ function preTool(root, payload) {
   const strings = (value) => typeof value === 'string' ? [value] : value && typeof value === 'object' ? Object.values(value).flatMap(strings) : [];
   const absolutePaths = strings(payload.tool_input).flatMap((value) =>
     [...value.matchAll(/(["'])(\/(?:Users|home|opt|var|tmp|private)\/.*?)\1|\/(?:Users|home|opt|var|tmp|private)\/[^\s"'`\\;,\)\]}]+/g)].map((match) => match[2] ?? match[0]));
-  const outside = absolutePaths.some((candidate) => !within(root, candidate));
+  const legacy = root !== oldRiff && absolutePaths.some((candidate) => within(oldRiff, candidate));
+  const outside = legacy || absolutePaths.some((candidate) => !within(root, candidate));
   if (outside) {
     event(root, 'hook_warning', { hook: 'boundary', tool: payload.tool_name });
-    return { hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: 'Boundary warning: this tool references a path outside the current Git repository. Confirm that external path is within the user-authorized scope before writing.' } };
+    return { hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: legacy ? 'Boundary warning: this tool references the read-only legacy RIFF repository. Do not modify it, change its branch, or run processes there.' : 'Boundary warning: this tool references a path outside the current Git repository. Confirm that external path is within the user-authorized scope before writing.' } };
   }
   return {};
 }
@@ -2407,7 +2409,9 @@ function preTool(root, payload) {
 function postTool(root, payload) {
   const files = changedFiles(root, payload);
   accumulateValidation(root, files);
-  const detected = [...files.flatMap((file) => scanFile(file)), ...files.map((file) => orphanFinding(root, file)).filter(Boolean)].map(plainFinding);
+  // Each finding keeps its file so a batch can attribute it to the phase that owns that file.
+  const detected = files.flatMap((file) => [...scanFile(file), orphanFinding(root, file)].filter(Boolean)
+    .map((finding) => ({ ...plainFinding(finding), file: path.relative(root, file).replaceAll(path.sep, '/') })));
   const findings = detected.filter((finding) => parkForFinding(root, finding));
   for (const finding of findings) event(root, 'hook_finding', { hook: finding.kind, severity: finding.severity, file: finding.summary });
   // A blocking finding still present in a touched file blocks again, even when it is already recorded.
@@ -2938,4 +2942,5 @@ else if (command === 'wave') {
 else if (command === 'hook') {
   try { if (['post-tool', 'pre-compact'].includes(tokens[0])) withLock(gitRoot(), () => cmdHook(tokens)); else cmdHook(tokens); } catch (error) { fail(error.message); }
 }
+else if (command === 'next') fail('riff next is intentionally deferred; use the wave skill or riff wave select');
 else fail(`unknown command ${command}; run riff --help`);

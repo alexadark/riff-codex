@@ -36,7 +36,7 @@ function commit(root, message = 'Fixture change') {
 function proof(root, type, candidate, status = 'pass') {
   const file = `.riff-codex-state/${type}-input.json`;
   write(root, file, { version: 1, candidate, type, status,
-    reviewer: { id: 'independent-fixture-reviewer', independent: true },
+    reviewedBy: 'native-subagent', fallbackReason: 'test fixture without a reviewer CLI', reviewer: { id: 'independent-fixture-reviewer', independent: true },
     evidence: ['Fixture lifecycle assertion observed by the test runner.'], findings: [] });
   return file;
 }
@@ -121,12 +121,11 @@ test('discovery enrollment gates activation, preserves review on snapshot, and i
   rejected(root, /discovery|missing/, 'wave', 'resume', 'a', '--reason', 'Access recovered');
 });
 
-test('enrolled completion needs a current checkpoint and explicit observation handling; final verification accounts for new warnings', () => {
+test('enrolled completion needs explicit handling of blocking observations; final verification accounts for new warnings', () => {
   const root = fixture();
   ok(root, 'wave', 'activate', 'a');
   const tree = candidate(root);
   commit(root);
-  rejected(root, /checkpoint/, 'wave', 'complete', 'a', '--commit', 'HEAD');
   checkpoint(root);
   const context = JSON.parse(ok(root, 'wave', 'context', 'a'));
   assert.equal(context.checkpoint.candidate, tree);
@@ -152,7 +151,7 @@ test('enrolled completion needs a current checkpoint and explicit observation ha
   rejected(root, /delivery review/, 'finish', '--check');
 });
 
-test('nonblocking observations require a literal unfinished follow-up phase, and checkpoints become stale on edits', () => {
+test('nonblocking observations stay listed without blocking completion, and checkpoints become stale on edits', () => {
   const root = fixture({ phases: ['a', 'phase.follow-up'] });
   ok(root, 'wave', 'activate', 'a');
   candidate(root);
@@ -165,12 +164,8 @@ test('nonblocking observations require a literal unfinished follow-up phase, and
   const tree = git(root, 'write-tree');
   ok(root, 'wave', 'review', 'a', '--type', 'functional', '--status', 'pass', '--summary', 'Updated fixture', '--evidence', proof(root, 'functional', tree));
   commit(root);
-  rejected(root, /checkpoint/, 'wave', 'complete', 'a', '--commit', 'HEAD');
   checkpoint(root);
-  const warning = injectFinding(root);
-  ok(root, 'observations', 'review', '--id', warning.id, '--revision', warning.revision, '--status', 'pending', '--note', 'Follow up in phaseXfollow-up because that phase owns the affected fixture.');
-  rejected(root, /follow-up/, 'wave', 'complete', 'a', '--commit', 'HEAD');
-  ok(root, 'observations', 'review', '--id', warning.id, '--revision', warning.revision, '--status', 'pending', '--note', 'Follow up in phase.follow-up because that phase owns the affected fixture.');
+  injectFinding(root);
   improvementPass(root);
   ok(root, 'wave', 'complete', 'a', '--commit', 'HEAD');
 });

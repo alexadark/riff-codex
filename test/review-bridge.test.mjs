@@ -28,7 +28,7 @@ const dir = path.dirname(process.argv[1]);
 const plan = JSON.parse(fs.readFileSync(path.join(dir, 'fake-plan.json'), 'utf8'));
 const model = args[args.indexOf(via === 'codex' ? '-m' : '--model') + 1];
 const prompt = fs.readFileSync(0, 'utf8');
-fs.appendFileSync(path.join(dir, 'fake-calls.log'), via + ':' + model + ' ' + (prompt.includes('Review type: ') ? 'prompt-ok' : 'prompt-missing') + (prompt.includes('Already deferred to a human security expert') ? ' deferred' : '') + (prompt.includes('## Recheck round') && prompt.includes('- HIGH: Missing authorization check') ? ' recheck' : '') + '\\n');
+fs.appendFileSync(path.join(dir, 'fake-calls.log'), via + ':' + model + ' ' + (prompt.includes('Review type: ') ? 'prompt-ok' : 'prompt-missing') + (prompt.includes('Already deferred to a human') ? ' deferred' : '') + (prompt.includes('Re-review: ') && prompt.includes('Missing authorization check') ? ' recheck' : '') + '\\n');
 const behavior = plan[via + ':' + model] || 'pass';
 if (behavior === 'quota') { console.error("ERROR: You've hit your usage limit."); process.exit(1); }
 const verdicts = {
@@ -119,7 +119,7 @@ test('a functional review from Astra produces an artifact the existing wave revi
 test('several review types run in parallel and each artifact is recordable; an unknown type is refused', () => {
   const root = fixture();
   validatedCandidate(root);
-  const results = review(root, '--type', 'functional,security');
+  const { reviews: results } = review(root, '--type', 'functional,security');
   assert.deepEqual(results.map((result) => [result.type, result.status, result.reviewer.id]), [
     ['functional', 'pass', 'codex:gpt-6-astra@medium'],
     ['security', 'pass', 'codex:gpt-6-astra@high'],
@@ -143,7 +143,7 @@ test('the phases of a batch are reviewed in parallel, each on its own owned path
   for (const id of ['a', 'b']) write(root, `src/${id}/feature.txt`, `${id}\n`);
   git(root, 'add', '--', 'src');
   for (const id of ['a', 'b']) ok(root, 'wave', 'validate', id, '--run', '--command', JSON.stringify([process.execPath, '-e', '0']), '--paths', '["src"]');
-  const results = review(root, '--type', 'functional', '--phase', 'a,b');
+  const { reviews: results } = review(root, '--type', 'functional', '--phase', 'a,b');
   assert.deepEqual(results.map((result) => [result.phase, result.status]), [['a', 'pass'], ['b', 'pass']]);
   for (const result of results) assert.equal(record(root, result.record).status, 0);
   assert.equal(read(root, '.riff-data/receipts/b-functional.json').status, 'pass');
@@ -180,18 +180,18 @@ test('an unavailable reviewer falls back visibly; malformed output gets one retr
   assert.match(readFileSync(path.join(root, '.riff-data/events.ndjson'), 'utf8'), /review_unavailable/);
 });
 
-test('discovery and delivery artifacts are accepted by their record commands, and a fourth failed dossier round is refused', () => {
+test('discovery and delivery artifacts are accepted by their record commands, and a third failed dossier round is refused', () => {
   const root = fixture();
   enroll(root);
   plan(root, { 'codex:gpt-6-astra': 'pass-with-high' });
-  for (let round = 1; round <= 3; round += 1) {
+  for (let round = 1; round <= 2; round += 1) {
     const failed = review(root, '--type', 'discovery');
     assert.equal(failed.status, 'fail');
     assert.equal(record(root, failed.record).status, 0);
     write(root, 'PROJECT.md', `Fixture contract revision ${round}\n`);
     ok(root, 'discovery', 'snapshot');
   }
-  rejected(root, /3 dossier review rounds failed/, 'review', 'run', '--type', 'discovery');
+  rejected(root, /2 dossier review rounds failed/, 'review', 'run', '--type', 'discovery');
   const fresh = fixture();
   enroll(fresh);
   const passed = review(fresh, '--type', 'discovery');
@@ -241,5 +241,5 @@ test('a finding deferred to a security expert lets phases and delivery continue,
   ok(root, 'improve', 'record', '--phase', 'a', '--file', '.riff-data/a-improvements.json');
   ok(root, 'wave', 'complete', 'a', '--commit', 'HEAD');
   assert.equal(record(root, review(root, '--type', 'delivery').record).status, 0);
-  assert.match(ok(root, 'finish', '--check'), /Security points for an expert.*\n- HIGH .*Interim: deny cross-user access by default/);
+  assert.match(ok(root, 'finish', '--check'), /Points for a human expert.*\n- HIGH .*Interim: deny cross-user access by default/);
 });

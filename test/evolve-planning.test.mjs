@@ -41,7 +41,7 @@ function review(root) {
   const snapshot = JSON.parse(ok(root, 'discovery', 'snapshot'));
   write(root, '.riff-codex-state/discovery-input.json', {
     version: 1, candidate: snapshot.digest, type: 'discovery', status: 'pass',
-    reviewer: { id: 'fixture-reviewer', independent: true },
+    reviewedBy: 'native-subagent', fallbackReason: 'test fixture without a reviewer CLI', reviewer: { id: 'fixture-reviewer', independent: true },
     evidence: ['Synthetic lifecycle fixture, not a product review.'], findings: [],
   });
   ok(root, 'discovery', 'review', '--evidence', '.riff-codex-state/discovery-input.json');

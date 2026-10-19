@@ -346,7 +346,7 @@ test('live Stripe secrets are detected before tools, after edits and before comm
     const before = invokeHook(root, 'pre-tool', { cmd: `echo ${secret}` });
     assert.equal(before.hookSpecificOutput.permissionDecision, 'deny');
     writeFileSync(path.join(root, 'credential.txt'), secret);
-    assert.equal(invokeHook(root, 'post-tool', {}, 'apply_patch').decision, 'block');
+    assert.equal(invokeHook(root, 'post-tool', { file_path: 'credential.txt' }, 'Write').decision, 'block');
     execFileSync('git', ['add', '--', 'credential.txt'], { cwd: root });
     const commit = spawnSync(process.execPath, [CLI, 'hook', 'git-pre-commit'], { cwd: root, encoding: 'utf8' });
     assert.equal(commit.status, 1, commit.stderr);
@@ -499,7 +499,7 @@ function improvementPass(root, id, proposals = []) {
 }
 function proofFile(root, type, candidate, status = 'pass') {
   const file = path.join(root, '.riff-codex-state', `${type}-review.json`);
-  writeJson(file, { version: 1, candidate, type, status, reviewer: { id: 'fresh-test-reviewer', independent: true }, evidence: ['README.md:1 inspected'], findings: [] });
+  writeJson(file, { version: 1, candidate, type, status, reviewedBy: 'native-subagent', fallbackReason: 'test fixture without a reviewer CLI', reviewer: { id: 'fresh-test-reviewer', independent: true }, evidence: ['README.md:1 inspected'], findings: [] });
   return file;
 }
 
@@ -766,6 +766,11 @@ test('phases with disjoint owns are built and completed together on one candidat
   assert.match(runCliFailure(root, 'wave', 'activate', 'd'), /resume or park it first/);
   const stateFile = path.join(root, '.riff-codex-state', 'state.json');
   assert.deepEqual(JSON.parse(readFileSync(stateFile, 'utf8')).activeWave.batch, ['a', 'b']);
+  // A hook finding goes to the batch phase that owns the file, not to the lead phase.
+  mkdirSync(path.join(root, 'src/b'), { recursive: true });
+  writeFileSync(path.join(root, 'src/b/later.js'), '// TODO tidy\n');
+  invokeHook(root, 'post-tool', { file_path: 'src/b/later.js' }, 'Write');
+  assert.equal(JSON.parse(readFileSync(stateFile, 'utf8')).securityFindings.at(-1).phase, 'b');
   for (const file of ['src/a/one.txt', 'src/b/two.txt']) { mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); writeFileSync(path.join(root, file), 'feature\n'); }
   execFileSync('git', ['add', '--', 'src'], { cwd: root });
   for (const id of ['a', 'b']) runCli(root, 'wave', 'validate', id, '--run', '--command', '["node","-e","process.exit(0)"]', '--paths', '["src"]');

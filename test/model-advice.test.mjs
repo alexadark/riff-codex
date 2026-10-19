@@ -134,7 +134,8 @@ test('CLI integration preserves wave state, consent, projections and private inp
     initial.model = { name: 'reviewer-only' };
     writeFileSync(stateFile, JSON.stringify(initial));
     const base = readState();
-    assert.equal(invoke('model-advice', 'show').preference.mode, 'local');
+    assert.equal(invoke('model-advice', 'show').preference.mode, 'off');
+    assert.equal(invoke('model-advice', 'configure', '--mode', 'local').mode, 'local');
     const request = brief({ phase: 'test', task: 'PRIVATE INPUT SENTINEL', localAdvice });
     const args = ['model-advice', 'recommend', '--input', '-'];
     const result = run(args, request);

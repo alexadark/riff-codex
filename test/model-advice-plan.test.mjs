@@ -116,6 +116,8 @@ test('CLI persists a separate role plan and wave instructions require advice bef
     state.model = { name: 'receipt-only' };
     state.modelAdvice = { sentinel: 'retain primary-only advice' };
     writeFileSync(stateFile, JSON.stringify(state));
+    // Advice is off by default; this project turns it on.
+    assert.equal(run(['model-advice', 'configure', '--mode', 'local'], {}).status, 0);
     const input = { ...plan(), phase: 'test', task: 'PRIVATE PLAN SENTINEL' };
     const args = ['model-advice', 'plan', '--input', '-'];
     const first = run(args, input);
