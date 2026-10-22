@@ -15,7 +15,7 @@ This page keeps installation internals and contributor references out of the get
 | `taste.md`, `taste/` | Shared project conventions, selective topic loading and frontend direction. |
 | `references/taste/stacks/` | Project-owned, source-backed stack research from `learn-stack`. |
 | `.riff-cli` | Symlink to the permanent checkout's `riff/` directory. Projects migrated from the old name keep `.riff-codex` as a compatibility link. |
-| `.claude/settings.local.json` | Claude Code: RIFF hooks merged with existing ones, `autoCompactWindow: 400000`, and the `riff` and `riff-cockpit` plugins enabled. Machine-local, excluded from Git. |
+| `.claude/settings.local.json` | Claude Code: RIFF hooks merged with existing ones, `autoCompactWindow: 400000`, and the `riff` plugin enabled (resync removes the retired `riff-cockpit`). Machine-local, excluded from Git. |
 | `.agents/skills/riff-codex-*` | Codex: project-local links to the RIFF skills. |
 | `.codex/hooks.json` | Codex: RIFF hooks merged with existing Codex hooks. |
 | `.riff-data/config.json` | Project preferences, recorded Codex hook approval, and the optional `reviewers` setting. |
@@ -40,7 +40,6 @@ Initialization excludes `.riff-data/`, `.riff-cli`, `.claude/settings.local.json
 | Hooks | `.claude/settings.local.json` | `.codex/hooks.json`, approved through `/hooks`, unless system-managed. |
 | Context injection | `SessionStart` on startup, resume, `clear` and `compact`. RIFF never edits the project's `CLAUDE.md`. | `SessionStart` hook. |
 | Compaction | `autoCompactWindow` set to 400,000 tokens; `doctor` warns when it's missing or higher. | Native Codex compaction. |
-| Cockpit | Plugin `riff-cockpit` from the same marketplace. | None. |
 | Not available | `deep-audit`, which routes to Codex Security. | None. |
 
 The plugin definitions expose skills; they aren't separate execution engines. Newly registered skills are exposed through the normal `riff init` and `riff resync` paths. Existing sessions keep the instructions loaded when they opened, so a newly exposed skill requires a fresh session. There is no separate consumer migration step.

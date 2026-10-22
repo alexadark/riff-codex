@@ -37,7 +37,7 @@ import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 import { recommendPlan } from '../lib/model-advice-plan.mjs';
 import { decideImprovement, ideasFile, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = path.resolve(path.dirname(SCRIPT), '..');
 const FRAMEWORK_DIR = '.riff-cli';
@@ -52,9 +52,9 @@ const LEGACY_HOOK_ID = 'riff-hook:';
 const CLAUDE_SETTINGS = path.join('.claude', 'settings.local.json');
 const CLAUDE_COMPACT_WINDOW = 400000;
 const CLAUDE_MARKETPLACE = 'riff';
-const CLAUDE_PLUGINS = [`riff@${CLAUDE_MARKETPLACE}`, `riff-cockpit@${CLAUDE_MARKETPLACE}`];
+const CLAUDE_PLUGINS = [`riff@${CLAUDE_MARKETPLACE}`];
 // Plugins RIFF once enabled and no longer ships; resync removes them from project settings.
-const RETIRED_CLAUDE_PLUGINS = [];
+const RETIRED_CLAUDE_PLUGINS = [`riff-cockpit@${CLAUDE_MARKETPLACE}`];
 const GIT_HOOK_MARKER = '# RIFF Codex managed wrapper';
 const LEGACY_GIT_HOOK_MARKER = '# RIFF managed wrapper';
 const PHASE_STATES = new Set(['ready', 'active', 'completed', 'parked', 'blocked', 'awaiting_human', 'skipped']);

@@ -3,12 +3,12 @@
   "owner": {
     "name": "Alexandra Spalato"
   },
-  "description": "RIFF for Claude Code: product discovery, vertical roadmaps, waves and the cockpit",
+  "description": "RIFF for Claude Code: product discovery, vertical roadmaps and waves",
   "plugins": [
     {
       "name": "riff",
       "source": ".",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "description": "RIFF skills (/riff:start, /riff:wave, /riff:quick...) and model-profile subagents",
       "author": {
         "name": "Alexandra Spalato"
@@ -26,11 +26,6 @@
         "./skills/status",
         "./skills/wave"
       ]
-    },
-    {
-      "name": "riff-cockpit",
-      "source": "./hosts/claude-code/riff-cockpit",
-      "description": "RIFF band and /cockpit pane with tabs and a dashboard button, read from the RIFF CLI"
     }
   ]
 }

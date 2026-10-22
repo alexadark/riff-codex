@@ -906,7 +906,7 @@ test('init installs Claude Code settings locally, preserves user choices and sta
   const settings = JSON.parse(readFileSync(settingsFile, 'utf8'));
   assert.deepEqual(settings.permissions, { allow: ['Bash(npm test)'] });
   assert.equal(settings.autoCompactWindow, 300000, 'a lower user window is kept');
-  assert.deepEqual(settings.enabledPlugins, { 'riff-cockpit@riff': false, 'riff@riff': true });
+  assert.deepEqual(settings.enabledPlugins, { 'riff@riff': true }, 'resync drops the retired cockpit plugin');
   assert.deepEqual(settings.hooks.PreToolUse[0], userHook);
   const managed = Object.values(settings.hooks).flat().flatMap((group) => group.hooks).filter((hook) => hook.command.includes('riff-codex-hook:'));
   assert.equal(managed.length, 6, 'resync does not duplicate managed hooks');
