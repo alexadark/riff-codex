@@ -25,7 +25,7 @@ A stronger model at lower effort usually beats a mid-tier model at higher effort
 
 Under Codex, use the equivalent OpenAI profiles: Luna High for read-only fan-out and bounded units, Sol (`gpt-6.1-sol`) for well-specified work, Astra Medium for dependent or ambiguous work, Astra High for hard diagnosis.
 
-Explicit user model choices and actual runtime availability win over this table. Changing model never resets the correction budget or the review round count, and never weakens a gate. Reviews keep going to another model family through `riff review run` (`gpt-6-astra`, then `gpt-6.1-sol`, then Claude Opus; configure `reviewers.chain`). Never send OpenAI execution through OpenRouter.
+Explicit user model choices and actual runtime availability win over this table. Changing model never resets the correction budget or the review round count, and never weakens a gate. Reviews keep going to another model family through `riff review run` (`gpt-6.1-sol`, then DeepSeek V4.1 Flash through opencode; configure `reviewers.chain`). Never send OpenAI execution through OpenRouter.
 
 ## Planning
 

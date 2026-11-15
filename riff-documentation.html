@@ -670,7 +670,7 @@ find it later, and read the ingredients while cooking.</pre><span class="copy-st
 <li>Node.js 20 or newer, with npm included. These run and install RIFF.</li>
 <li>Bun, which runs the dashboard and is required by the full setup check.</li>
 <li>A GitHub account with access to the private <code>alexadark/riff-codex</code> repository.</li>
-<li>Recommended, even if you build in Claude Code: the Codex CLI signed in to ChatGPT with <code>codex login</code>. It runs the default reviewer, GPT-6 Astra. Without it, reviews fall back to a fresh Claude session and are labeled same-family.</li>
+<li>Recommended, even if you build in Claude Code: the Codex CLI signed in to ChatGPT with <code>codex login</code>. It runs the default reviewer, GPT-6.1 Sol. Without it, reviews fall back to DeepSeek V4.1 Flash through opencode, when opencode is installed with a provider that serves it.</li>
 </ul>
 <p>In Terminal, <code>git --version</code>, <code>node --version</code>, <code>npm --version</code>, <code>bun --version</code>, <code>claude --version</code>, <code>codex --version</code> and <code>codex login status</code> tell you whether those tools are available. Install any missing tool before continuing.</p>
 <h3 class="subhead">2. Download RIFF</h3>
@@ -836,17 +836,16 @@ riff doctor</pre><span class="copy-status" role="status"></span></div>
 <p>A quick change outside any phase uses <code>--quick</code>. That review is advisory: the agent fixes what it finds, and no receipt is recorded.</p>
 <h3 class="subhead">Who reviews</h3>
 <div class="table-wrap"><table><thead><tr><th>Order</th><th>Reviewer</th><th>Runs through</th></tr></thead><tbody>
-<tr><td>1</td><td><span class="badge b-codex">GPT-6 Astra</span></td><td>The Codex CLI, as <code>codex exec</code> in a read-only sandbox, with no saved session.</td></tr>
-<tr><td>2</td><td><span class="badge b-codex">GPT-6.1 Sol</span></td><td>The Codex CLI, the same way.</td></tr>
-<tr><td>3</td><td><span class="badge b-opus">Claude Opus, fresh</span></td><td>The Claude CLI, as <code>claude -p</code> with read-only tools and no saved session.</td></tr>
+<tr><td>1</td><td><span class="badge b-codex">GPT-6.1 Sol</span></td><td>The Codex CLI, as <code>codex exec</code> in a read-only sandbox, with no saved session.</td></tr>
+<tr><td>2</td><td><span class="badge b-haiku">DeepSeek V4.1 Flash</span></td><td>The opencode CLI, as <code>opencode run --standalone</code> with a dedicated RIFF agent that can only read, list and search files (no shell, no edit, no <code>.env</code>), the session archived. The model is <code>venice/deepseek-v4-1-flash</code>, so opencode needs the Venice provider set up.</td></tr>
 </tbody></table></div>
-<p>Effort is medium by default and high for security and delivery reviews. RIFF moves to the next reviewer only when one can't run: the CLI is missing or not signed in, the model isn't available on your plan, a quota or rate limit is reached, the call times out, or its output still doesn't match the expected format after one retry. <strong>A negative review is never a reason to try another reviewer.</strong></p>
-<p>The builder's model family comes from the host. A fresh Claude reviewer in a Claude Code project is therefore labeled <strong>same family</strong>, in the review record and on the dashboard, so you can see that the second opinion came from the same kind of model.</p>
+<p>Effort is medium by default and high for security and delivery reviews; opencode takes no effort setting and runs the model's default. RIFF moves to the next reviewer only when one can't run: the CLI is missing or not signed in, the model isn't available on your plan, a quota or rate limit is reached, the call times out, or its output still doesn't match the expected format after one retry. <strong>A negative review is never a reason to try another reviewer.</strong></p>
+<p>The builder's model family comes from the host. A reviewer from that family, such as a Claude reviewer you add to the chain of a Claude Code project, is labeled <strong>same family</strong>, in the review record and on the dashboard, so you can see that the second opinion came from the same kind of model.</p>
 <h3 class="subhead">From review to receipt</h3>
 <ol>
 <li>RIFF checks that the candidate is frozen and that a new review is allowed. A review that failed can't be repeated on the unchanged candidate, and a dossier gets three failed rounds at most before RIFF records a blocker.</li>
 <li>The reviewer returns a verdict, its evidence and its findings. A HIGH or CRITICAL finding always makes the verdict a failure, whatever the model chose.</li>
-<li>RIFF writes the artifact to <code>.riff-data/reviews/</code>, with the reviewer that ran, such as <code>codex:gpt-6-astra@high</code>, its CLI version, the reviewers skipped and why.</li>
+<li>RIFF writes the artifact to <code>.riff-data/reviews/</code>, with the reviewer that ran, such as <code>codex:gpt-6.1-sol@high</code> or <code>opencode:venice/deepseek-v4-1-flash@default</code>, its CLI version, the reviewers skipped and why.</li>
 <li>RIFF prints the command that records the review. The agent runs it itself, corrects what the reviewer found, and asks for a new review of the corrected candidate. You aren't asked to approve anything.</li>
 </ol>
 <p>If no reviewer in the chain can run, the agent uses a fresh subagent that didn't write the code and says so in its summary.</p>
@@ -854,10 +853,10 @@ riff doctor</pre><span class="copy-status" role="status"></span></div>
 <p>A security finding never stops the wave. The agent corrects it, reviews again on the new candidate, and marks the earlier observation resolved. A plain code defect is always corrected.</p>
 <div class="note"><p>Some points need a security expert's judgment rather than a code fix: a threat model, a compliance requirement, a cryptographic or infrastructure choice, a configuration outside the repository. The agent records them as <code>expert_review</code>, applies the most cautious interim decision that keeps the app working, such as denying by default or narrowing access, and writes that decision in the note. These points don't block phases or delivery. Later reviewers are told about them, and <code>riff finish --check</code> lists them with their interim decisions for the final report. A finding that survives three corrections also goes to the expert, with its history.</p></div>
 <h3 class="subhead">Check and adjust the reviewers</h3>
-<p><code>riff doctor</code> shows whether the Codex and Claude CLIs in the chain are available, and whether Codex is signed in, without calling a model. A warning on <code>reviewer codex</code> means reviews will fall back to Claude until you install the Codex CLI or run <code>codex login</code>.</p>
+<p><code>riff doctor</code> shows whether the CLIs in the chain (Codex, opencode, Claude if you add it) are available, and whether Codex is signed in, without calling a model. A warning on <code>reviewer codex</code> means reviews will fall back to DeepSeek until you install the Codex CLI or run <code>codex login</code>.</p>
 <p>To change the order, the models, the effort or the time limit, add a <code>reviewers</code> object to <code>.riff-data/config.json</code>. Without it, the defaults above apply; <code>init</code> and <code>resync</code> don't write one.</p>
 <div class="command"><div class="command-bar"><span>In .riff-data/config.json</span><button class="copy-button" type="button" data-copy="reviewers-config">Copy</button></div><pre id="reviewers-config">"reviewers": {
-  "chain": [{ "via": "codex", "model": "gpt-6-astra" }, { "via": "claude", "model": "opus" }],
+  "chain": [{ "via": "codex", "model": "gpt-6.1-sol" }, { "via": "opencode", "model": "venice/deepseek-v4-1-flash" }, { "via": "claude", "model": "opus" }],
   "effort": { "default": "medium", "security": "high", "delivery": "high" },
   "timeoutSeconds": 1200
 }</pre><span class="copy-status" role="status"></span></div>

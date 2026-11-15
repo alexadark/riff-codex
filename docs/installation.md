@@ -15,7 +15,7 @@ You need:
 - **Node.js 20 or newer**, which runs RIFF's commands. Its installer includes **npm**.
 - **Bun**, which runs the local dashboard. RIFF's installation check also requires it.
 - **Access to the private GitHub repository** `alexadark/riff-codex`.
-- **The Codex CLI signed in to ChatGPT** (`codex login`), recommended even if you build in Claude Code. RIFF uses it to have another model family, GPT-6 Astra by default, review the work. Without it, reviews fall back to a fresh Claude session and are labeled as same-family.
+- **The Codex CLI signed in to ChatGPT** (`codex login`), recommended even if you build in Claude Code. RIFF uses it to have another model family, GPT-6.1 Sol by default, review the work. Without it, reviews fall back to DeepSeek V4.1 Flash through [opencode](https://opencode.ai), which needs a provider that serves `venice/deepseek-v4-1-flash` in your opencode config.
 
 To see which tools are already installed, run these in Terminal:
 
@@ -121,17 +121,17 @@ Read the project brief and roadmap it produces, then enter:
 
 ### Independent reviews
 
-When a phase, a dossier or the final version is ready, RIFF runs `riff review run`. It asks another model to attack the work read-only: GPT-6 Astra through the Codex CLI, then GPT-6.1 Sol, then a fresh Claude session, moving to the next one only when a reviewer can't run (missing CLI, not signed in, quota). A negative review is never skipped. The agent corrects what the reviewer finds and records the result itself, without asking you. Each review takes about a minute.
+When a phase, a dossier or the final version is ready, RIFF runs `riff review run`. It asks another model to attack the work read-only: GPT-6.1 Sol through the Codex CLI, then DeepSeek V4.1 Flash through opencode, moving to the next one only when a reviewer can't run (missing CLI, not signed in, quota). A negative review is never skipped. The agent corrects what the reviewer finds and records the result itself, without asking you. Each review takes about a minute.
 
 Security findings are corrected during the wave and never stop it. A point that needs a security expert's judgment rather than a code fix gets the most cautious interim decision that keeps the app working, documented in its note. Delivery isn't blocked: `riff finish --check` lists these points so you can show them to an expert when one is available.
 
 Reviews run the same way whichever host builds. A review files its result under `.riff-data/reviews/`, and the dashboard shows which reviewer ran, with a label when it comes from the same model family as the builder.
 
-`riff doctor` shows whether the Codex and Claude reviewers are available. To change the order, the models or the effort, add a `reviewers` object to `.riff-data/config.json`, for example:
+`riff doctor` shows whether the reviewer CLIs of the chain (Codex, opencode) are available. To change the order, the models or the effort, add a `reviewers` object to `.riff-data/config.json`, for example:
 
 ```json
 "reviewers": {
-  "chain": [{ "via": "codex", "model": "gpt-6-astra" }, { "via": "claude", "model": "opus" }],
+  "chain": [{ "via": "codex", "model": "gpt-6.1-sol" }, { "via": "opencode", "model": "venice/deepseek-v4-1-flash" }, { "via": "claude", "model": "opus" }],
   "effort": { "default": "medium", "security": "high", "delivery": "high" }
 }
 ```

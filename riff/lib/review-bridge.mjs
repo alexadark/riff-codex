@@ -9,13 +9,23 @@ export const SCHEMA_FILE = path.join(PROMPTS, 'output.schema.json');
 export const REVIEW_TYPES = ['discovery', 'functional', 'security', 'delivery'];
 const SEVERITIES = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const BLOCKING = new Set(['HIGH', 'CRITICAL']);
-const FAMILY = { codex: 'openai', claude: 'anthropic' };
+const FAMILY = { codex: 'openai', claude: 'anthropic', opencode: 'opencode' };
+
+// The model family of a chain entry: an explicit `family`, else the CLI's family, else (for opencode,
+// which serves models from many providers) the vendor named in the model ID.
+function familyOf(entry) {
+  if (entry.family) return entry.family;
+  if (entry.via !== 'opencode') return FAMILY[entry.via];
+  const name = String(entry.model ?? '').toLowerCase();
+  for (const vendor of ['deepseek', 'qwen', 'kimi', 'glm', 'mistral', 'llama', 'gemini', 'grok']) if (name.includes(vendor)) return vendor;
+  return 'opencode';
+}
 
 export const DEFAULT_REVIEWERS = {
   chain: [
-    { via: 'codex', model: 'gpt-6-astra' },
     { via: 'codex', model: 'gpt-6.1-sol' },
-    { via: 'claude', model: 'opus' },
+    // DeepSeek V4.1 Flash through opencode (provider "venice" in the opencode config), when Codex is out of quota.
+    { via: 'opencode', model: 'venice/deepseek-v4-1-flash' },
   ],
   effort: { default: 'medium', security: 'high', delivery: 'high' },
   timeoutSeconds: 1200,
@@ -55,7 +65,9 @@ export function buildPrompt(type, context) {
 }
 
 function binary(via, env) {
-  return via === 'codex' ? env.RIFF_REVIEW_CODEX_BIN || 'codex' : env.RIFF_REVIEW_CLAUDE_BIN || 'claude';
+  if (via === 'codex') return env.RIFF_REVIEW_CODEX_BIN || 'codex';
+  if (via === 'opencode') return env.RIFF_REVIEW_OPENCODE_BIN || 'opencode';
+  return env.RIFF_REVIEW_CLAUDE_BIN || 'claude';
 }
 
 // Child CLIs must not believe they run inside the calling host session.
@@ -75,7 +87,7 @@ function version(bin, env) {
 export function unavailableReason(text) {
   const value = String(text ?? '');
   if (/not logged in|please run \/login|codex login|unauthori[sz]ed|\b401\b|authentication/i.test(value)) return 'not-logged-in';
-  if (/usage limit|rate.?limit|quota|\b429\b|too many requests|credit balance/i.test(value)) return 'quota';
+  if (/usage limit|rate.?limit|quota|\b429\b|too many requests|credit balance|insufficient (?:balance|credits?|funds)|payment required|\b402\b/i.test(value)) return 'quota';
   if (/model.{0,80}(not (found|supported|available|exist)|does not exist|unknown|unavailable|not included)|model_not_found|invalid model/i.test(value)) return 'model-unavailable';
   return null;
 }
@@ -126,6 +138,56 @@ function runClaude(entry, effort, prompt, root, settings, env) {
   return { raw: String(wrapper.result ?? ''), model };
 }
 
+// The last JSON object in a model's free text: the whole text, a fenced block, or the outermost braces.
+function extractJson(text) {
+  const value = String(text ?? '').trim();
+  const fenced = [...value.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)].map((match) => match[1].trim());
+  for (const candidate of [value, ...fenced.reverse(), value.slice(value.indexOf('{'), value.lastIndexOf('}') + 1)]) {
+    try { JSON.parse(candidate); return candidate; } catch {}
+  }
+  return value;
+}
+
+// opencode's built-in "plan" agent only denies edits: its shell tool stays allowed, even without --auto. The
+// review runs a dedicated agent instead, defined inline, that can only read, list and search files (secrets
+// excluded). The inline config only applies to a private server (--standalone), not the background service.
+const OPENCODE_REVIEW_AGENT = 'riff-review';
+const OPENCODE_REVIEW_PERMISSION = {
+  '*': 'deny',
+  read: { '*': 'allow', '*.env': 'deny', '*.env.*': 'deny', '*.env.example': 'allow' },
+  grep: 'allow', glob: 'allow', list: 'allow',
+};
+
+function opencodeEnv(env) {
+  let config = {};
+  try { config = JSON.parse(env.OPENCODE_CONFIG_CONTENT || '{}') ?? {}; } catch {}
+  const agent = { mode: 'primary', description: 'RIFF read-only reviewer', permission: OPENCODE_REVIEW_PERMISSION };
+  return { ...env, OPENCODE_CONFIG_CONTENT: JSON.stringify({ ...config, agent: { ...(config.agent ?? {}), [OPENCODE_REVIEW_AGENT]: agent } }) };
+}
+
+// opencode has no output schema flag: the schema goes into the prompt and the verdict is the last text part
+// of the JSON event stream.
+function runOpencode(entry, effort, prompt, root, settings, env) {
+  const bin = binary('opencode', env);
+  const schema = readFileSync(SCHEMA_FILE, 'utf8');
+  const model = entry.variant ? `${entry.model}#${entry.variant}` : entry.model;
+  const args = ['run', '--standalone', '-m', model, '--agent', OPENCODE_REVIEW_AGENT, '--format', 'json', '--archived'];
+  const input = `${prompt}\n\n## Output\n\nYou are read-only: you can read, list and search files, nothing else. When the review is done, answer with one JSON object that matches this JSON Schema and nothing else (no prose, no code fence):\n\n${schema}`;
+  const result = spawnSync(bin, args, { input, cwd: root, encoding: 'utf8', env: opencodeEnv(env), timeout: settings.timeoutMs ?? settings.timeoutSeconds * 1000, maxBuffer: 64 * 1024 * 1024 });
+  const text = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+  if (result.error?.code === 'ENOENT') return { unavailable: 'cli-missing' };
+  if (result.error?.code === 'ETIMEDOUT' || result.signal === 'SIGTERM') return { unavailable: 'timeout' };
+  const events = String(result.stdout ?? '').split('\n').map((line) => { try { return JSON.parse(line); } catch { return null; } }).filter(Boolean);
+  const failure = events.find((event) => event.type === 'error');
+  if (result.status !== 0 || failure) {
+    const detail = failure ? JSON.stringify(failure.error ?? failure) : text;
+    return { unavailable: unavailableReason(detail) ?? `error: ${errorTail(detail)}` };
+  }
+  const texts = events.filter((event) => event.type === 'text' && typeof event.part?.text === 'string').map((event) => event.part.text);
+  if (!texts.length) return { invalid: 'no output message' };
+  return { raw: extractJson(texts[texts.length - 1]), model: entry.model };
+}
+
 export function parseVerdict(raw) {
   let value;
   try { value = JSON.parse(raw); } catch { return { error: 'output is not JSON' }; }
@@ -150,8 +212,10 @@ export function runReviewChain({ type, prompt, root, config, env = process.env, 
   const childEnvironment = childEnv(env);
   for (const entry of settings.chain) {
     if (!FAMILY[entry.via]) { skipped.push({ id: `${entry.via}:${entry.model}`, reason: 'unsupported-via' }); continue; }
-    const id = `${entry.via}:${entry.model}@${effort}`;
-    const runner = entry.via === 'codex' ? runCodex : runClaude;
+    // opencode takes no effort setting: its ID names the variant it ran with, or "default".
+    const label = entry.via === 'opencode' ? entry.variant ?? 'default' : effort;
+    const id = `${entry.via}:${entry.model}@${label}`;
+    const runner = { codex: runCodex, claude: runClaude, opencode: runOpencode }[entry.via];
     const attempt = () => {
       const remaining = deadline ? deadline - Date.now() : Infinity;
       if (remaining < MIN_REVIEWER_MS) return { unavailable: 'run-timeout' };
@@ -166,11 +230,11 @@ export function runReviewChain({ type, prompt, root, config, env = process.env, 
     if (outcome.invalid) outcome = attempt();
     if (outcome.invalid) outcome = { unavailable: `invalid-output: ${outcome.invalid}` };
     if (outcome.unavailable) { skipped.push({ id, reason: outcome.unavailable }); continue; }
-    const reviewerFamily = FAMILY[entry.via];
+    const reviewerFamily = familyOf(entry);
     return {
       verdict: outcome.verdict,
       reviewer: {
-        id: outcome.model && outcome.model !== entry.model ? `${entry.via}:${outcome.model}@${effort}` : id,
+        id: outcome.model && outcome.model !== entry.model ? `${entry.via}:${outcome.model}@${label}` : id,
         independent: true,
         family: reviewerFamily,
         sameFamily: family ? family === reviewerFamily : null,

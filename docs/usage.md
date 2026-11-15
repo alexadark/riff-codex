@@ -111,7 +111,7 @@ To change this preference, run `riff init --configure` in your project's Termina
 
 ### How the reviews happen
 
-Each review comes from `riff review run`, which asks another model to attack the work read-only: GPT-6 Astra through the Codex CLI by default, then GPT-6.1 Sol, then a fresh Claude session. It moves to the next reviewer only when one can't run, never because a review is negative. The agent corrects what the reviewer finds and records the result itself, without asking you. The dashboard shows which reviewer ran, labels a reviewer from the same model family as the builder, and notes any fallback.
+Each review comes from `riff review run`, which asks another model to attack the work read-only: GPT-6.1 Sol through the Codex CLI by default, then DeepSeek V4.1 Flash through opencode. It moves to the next reviewer only when one can't run, never because a review is negative. The agent corrects what the reviewer finds and records the result itself, without asking you. The dashboard shows which reviewer ran, labels a reviewer from the same model family as the builder, and notes any fallback.
 
 A security finding never stops the wave. The agent corrects it and gets a new review. A point that needs a security expert's judgment rather than a code fix gets the most cautious interim decision that keeps the app working, written in its note, and `riff finish --check` lists it at the end. See [independent reviews](installation.md#independent-reviews) to change the reviewers.
 

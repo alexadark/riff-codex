@@ -88,7 +88,7 @@ A local result also has a specific scope: it does not prove that an outside serv
 
 ## Who reviews the work
 
-The agent that wrote the code never reviews it alone. `riff review run --type discovery|functional|security|delivery` builds an adversarial prompt from the phase criteria and the diff, then runs a reviewer read-only on the frozen candidate. It tries a chain in order: GPT-6 Astra through the Codex CLI, GPT-6.1 Sol, then a fresh Claude session. It moves on only when a reviewer can't run (CLI missing, not signed in, model unavailable, quota, timeout, or output that stays invalid after one retry). A negative review is a result, never a reason to try the next reviewer.
+The agent that wrote the code never reviews it alone. `riff review run --type discovery|functional|security|delivery` builds an adversarial prompt from the phase criteria and the diff, then runs a reviewer read-only on the frozen candidate. It tries a chain in order: GPT-6.1 Sol through the Codex CLI, then DeepSeek V4.1 Flash through opencode. It moves on only when a reviewer can't run (CLI missing, not signed in, model unavailable, quota, timeout, or output that stays invalid after one retry). A negative review is a result, never a reason to try the next reviewer.
 
 The bridge writes the review to `.riff-data/reviews/` and prints the command that records it. The agent runs that command itself, so the receipt names the reviewer that actually ran, the reviewers skipped and why, and whether it belongs to the same model family as the builder. A HIGH or CRITICAL finding always fails the review, and a failed review can't be repeated on an unchanged candidate. A dossier gets three failed rounds at most before RIFF records a blocker.
 

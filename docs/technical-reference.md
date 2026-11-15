@@ -96,10 +96,10 @@ Ready work is selected by priority after its prerequisites are complete. Review 
 `riff review run` is implemented in [`riff/lib/review-bridge.mjs`](../riff/lib/review-bridge.mjs), with prompt templates and the output schema in [`riff/references/review-prompts/`](../riff/references/review-prompts/).
 
 - **Candidate.** `functional` and `security` review the staged tree of the active phase, or the phase named by `--phase`. `--quick` reviews a staged change outside any phase; the result is advisory and prints no record command. `discovery` reviews the dossier digest from `discovery snapshot`. `delivery` reviews the committed `HEAD` tree with a clean worktree.
-- **Chain.** By default: `codex:gpt-6-astra`, `codex:gpt-6.1-sol`, then a fresh `claude:opus`. Codex runs as `codex exec --ignore-user-config -s read-only --ephemeral --output-schema`; Claude runs as `claude -p --no-session-persistence --tools Read,Grep,Glob --json-schema`. Effort is `medium`, `high` for `security` and `delivery`.
+- **Chain.** By default: `codex:gpt-6.1-sol`, then `opencode:venice/deepseek-v4-1-flash`. Codex runs as `codex exec --ignore-user-config -s read-only --ephemeral --output-schema`; opencode (`RIFF_REVIEW_OPENCODE_BIN` or `opencode`) runs as `opencode run --standalone -m <model> --agent riff-review --format json --archived` in the project root. The `riff-review` agent is defined through `OPENCODE_CONFIG_CONTENT`: every tool is denied except read (`.env` files excluded), grep, glob and list. The built-in `plan` agent isn't used because it only denies edits and keeps the shell allowed; `--standalone` is needed because the background service ignores the caller's inline config; the schema is appended to the prompt and the verdict is the last `text` event of the JSONL stream, an `error` event counting as unavailability. opencode takes no effort: its ID ends in `@<variant>` (`-m model#variant`) or `@default`, and the family comes from the model ID (`deepseek`, `qwen`, `kimi`...) unless the entry sets `family`. A `claude` entry runs as `claude -p --no-session-persistence --tools Read,Grep,Glob --json-schema`. Effort is `medium`, `high` for `security` and `delivery`.
 - **Fallback.** The next reviewer runs only on real unavailability: CLI missing, not logged in, model unavailable, quota or rate limit, timeout, or an error. Output that doesn't match the schema is retried once, then counts as unavailable. A negative review never triggers the next reviewer.
 - **Verdict.** A HIGH or CRITICAL finding forces `fail`. The bridge refuses a run on a candidate whose last review of that type failed, and stops a dossier after three failed rounds.
-- **Artifact.** `.riff-data/reviews/<type>-<candidate>-<time>.json`, with `reviewer.id` such as `codex:gpt-6-astra@high`, `family`, `sameFamily`, the CLI version, and `skipped` reviewers with their reasons. The printed command (`riff wave review ...`, `riff discovery review --evidence FILE` or `riff finish --review FILE`) is run by the agent; the bridge records nothing itself.
+- **Artifact.** `.riff-data/reviews/<type>-<candidate>-<time>.json`, with `reviewer.id` such as `codex:gpt-6.1-sol@high`, `family`, `sameFamily`, the CLI version, and `skipped` reviewers with their reasons. The printed command (`riff wave review ...`, `riff discovery review --evidence FILE` or `riff finish --review FILE`) is run by the agent; the bridge records nothing itself.
 - **Same family.** The builder's family comes from the host running the command (`anthropic` under Claude Code, `openai` under Codex), or from `reviewers.builderFamily`. The dashboard labels a same-family review.
 - **Security deferral.** Phase-scoped findings already marked `expert_review` are passed to the reviewer so they aren't reported again unless the candidate makes them worse.
 
@@ -107,7 +107,7 @@ Optional settings in `.riff-data/config.json`. Without a `reviewers` key, the de
 
 ```json
 "reviewers": {
-  "chain": [{ "via": "codex", "model": "gpt-6-astra" }, { "via": "codex", "model": "gpt-6.1-sol" }, { "via": "claude", "model": "opus", "fresh": true }],
+  "chain": [{ "via": "codex", "model": "gpt-6.1-sol" }, { "via": "opencode", "model": "venice/deepseek-v4-1-flash" }, { "via": "claude", "model": "opus" }],
   "effort": { "default": "medium", "security": "high", "delivery": "high" },
   "timeoutSeconds": 1200
 }

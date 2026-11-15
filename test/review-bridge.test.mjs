@@ -22,14 +22,22 @@ const fs = require('node:fs');
 const path = require('node:path');
 const via = process.env.FAKE_VIA_OVERRIDE || path.basename(process.argv[1]).replace('fake-', '');
 const args = process.argv.slice(2);
-if (args[0] === '--version') { console.log(via === 'codex' ? 'codex-cli 0.0.0-fake' : '0.0.0 (Claude Code fake)'); process.exit(0); }
+if (args[0] === '--version') { console.log({ codex: 'codex-cli 0.0.0-fake', opencode: 'opencode v0.0.0-fake' }[via] ?? '0.0.0 (Claude Code fake)'); process.exit(0); }
 if (args[0] === 'login') process.exit(0);
 const dir = path.dirname(process.argv[1]);
 const plan = JSON.parse(fs.readFileSync(path.join(dir, 'fake-plan.json'), 'utf8'));
-const model = args[args.indexOf(via === 'codex' ? '-m' : '--model') + 1];
+const model = args[args.indexOf(via === 'claude' ? '--model' : '-m') + 1];
 const prompt = fs.readFileSync(0, 'utf8');
 fs.appendFileSync(path.join(dir, 'fake-calls.log'), via + ':' + model + ' ' + (prompt.includes('Review type: ') ? 'prompt-ok' : 'prompt-missing') + (prompt.includes('Already deferred to a human') ? ' deferred' : '') + (prompt.includes('Re-review: ') && prompt.includes('Missing authorization check') ? ' recheck' : '') + '\\n');
 const behavior = plan[via + ':' + model] || 'pass';
+// opencode reports a provider failure as an error event in its JSONL stream.
+const emit = (event) => console.log(JSON.stringify({ timestamp: 0, sessionID: 'ses_fake', ...event }));
+if (via === 'opencode') {
+  // The review must run the dedicated read-only agent on a private server, where its inline config applies.
+  const agent = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT || '{}').agent?.[args[args.indexOf('--agent') + 1]];
+  if (!args.includes('--standalone') || args[args.indexOf('--agent') + 1] !== 'riff-review' || agent?.permission?.['*'] !== 'deny' || agent.permission.shell) { console.error('fake opencode: unsafe reviewer agent'); process.exit(3); }
+}
+if (behavior === 'quota' && via === 'opencode') { emit({ type: 'error', error: { name: 'APIError', data: { message: 'Insufficient balance (402)' } } }); process.exit(0); }
 if (behavior === 'quota') { console.error("ERROR: You've hit your usage limit."); process.exit(1); }
 const verdicts = {
   pass: { status: 'pass', summary: 'Fake reviewer saw the outcome.', evidence: ['Read README.md and the staged diff.'], findings: [] },
@@ -37,6 +45,13 @@ const verdicts = {
 };
 const body = behavior === 'invalid' ? 'not json' : JSON.stringify(verdicts[behavior]);
 if (via === 'codex') fs.writeFileSync(args[args.indexOf('-o') + 1], body);
+else if (via === 'opencode') {
+  emit({ type: 'step_start', part: { type: 'step-start' } });
+  emit({ type: 'text', part: { type: 'text', text: 'Reading the diff first.' } });
+  emit({ type: 'tool_use', part: { type: 'tool', tool: 'read', state: { status: 'completed' } } });
+  emit({ type: 'text', part: { type: 'text', text: 'Here is the verdict:\\n\\\`\\\`\\\`json\\n' + body + '\\n\\\`\\\`\\\`' } });
+  emit({ type: 'step_finish', part: { type: 'step-finish', reason: 'stop' } });
+}
 else console.log(JSON.stringify({ is_error: false, result: body, structured_output: behavior === 'invalid' ? undefined : JSON.parse(body), modelUsage: { 'claude-opus-5-5': {} } }));
 `;
 
@@ -46,7 +61,8 @@ function cli(root, env, ...args) {
 }
 function baseEnv(root) {
   return { HOME: path.join(root, '.fixture-home'), CODEX_HOME: path.join(root, '.fixture-home/.codex'), RIFF_IDEAS_FILE: path.join(root, '.fixture-home/ideas.ndjson'),
-    RIFF_REVIEW_CODEX_BIN: path.join(root, '.fixture-home/fake-codex'), RIFF_REVIEW_CLAUDE_BIN: path.join(root, '.fixture-home/fake-claude'), CLAUDECODE: '1' };
+    RIFF_REVIEW_CODEX_BIN: path.join(root, '.fixture-home/fake-codex'), RIFF_REVIEW_CLAUDE_BIN: path.join(root, '.fixture-home/fake-claude'),
+    RIFF_REVIEW_OPENCODE_BIN: path.join(root, '.fixture-home/fake-opencode'), CLAUDECODE: '1' };
 }
 function ok(root, ...args) {
   const result = cli(root, {}, ...args);
@@ -73,7 +89,7 @@ function fixture() {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'riff-review-bridge-')));
   roots.push(root);
   git(root, 'init', '-q');
-  for (const via of ['codex', 'claude']) { write(root, `.fixture-home/fake-${via}`, FAKE); chmodSync(path.join(root, `.fixture-home/fake-${via}`), 0o755); }
+  for (const via of ['codex', 'claude', 'opencode']) { write(root, `.fixture-home/fake-${via}`, FAKE); chmodSync(path.join(root, `.fixture-home/fake-${via}`), 0o755); }
   plan(root, {});
   write(root, '.gitignore', '.fixture-home/\n.riff-codex\n.agents/\n.codex/\n.claude/\n');
   write(root, 'README.md', 'baseline\n');
@@ -99,21 +115,21 @@ function validatedCandidate(root) {
 }
 test.after(() => roots.forEach((root) => rmSync(root, { recursive: true, force: true })));
 
-test('a functional review from Astra produces an artifact the existing wave review command accepts', () => {
+test('a functional review from Sol produces an artifact the existing wave review command accepts', () => {
   const root = fixture();
   validatedCandidate(root);
   const result = review(root, '--type', 'functional');
   assert.equal(result.status, 'pass');
-  assert.equal(result.reviewer.id, 'codex:gpt-6-astra@medium');
+  assert.equal(result.reviewer.id, 'codex:gpt-6.1-sol@medium');
   assert.equal(result.reviewer.sameFamily, false);
   assert.equal(result.reviewer.cli, 'codex-cli 0.0.0-fake');
   assert.deepEqual(result.reviewer.skipped, []);
-  assert.deepEqual(calls(root), ['codex:gpt-6-astra prompt-ok']);
+  assert.deepEqual(calls(root), ['codex:gpt-6.1-sol prompt-ok']);
   const recorded = record(root, result.record);
   assert.equal(recorded.status, 0, recorded.text);
   const receipt = read(root, '.riff-data/receipts/a-functional.json');
-  assert.equal(receipt.reviewer.id, 'codex:gpt-6-astra@medium');
-  assert.equal(receipt.model, 'codex:gpt-6-astra');
+  assert.equal(receipt.reviewer.id, 'codex:gpt-6.1-sol@medium');
+  assert.equal(receipt.model, 'codex:gpt-6.1-sol');
 });
 
 test('several review types run in parallel and each artifact is recordable; an unknown type is refused', () => {
@@ -121,8 +137,8 @@ test('several review types run in parallel and each artifact is recordable; an u
   validatedCandidate(root);
   const { reviews: results } = review(root, '--type', 'functional,security');
   assert.deepEqual(results.map((result) => [result.type, result.status, result.reviewer.id]), [
-    ['functional', 'pass', 'codex:gpt-6-astra@medium'],
-    ['security', 'pass', 'codex:gpt-6-astra@high'],
+    ['functional', 'pass', 'codex:gpt-6.1-sol@medium'],
+    ['security', 'pass', 'codex:gpt-6.1-sol@high'],
   ]);
   assert.equal(calls(root).length, 2);
   for (const result of results) {
@@ -151,11 +167,11 @@ test('the phases of a batch are reviewed in parallel, each on its own owned path
 
 test('a blocking finding fails the review even when the model says pass, without falling back or parking the phase, and the unchanged candidate cannot be re-reviewed', () => {
   const root = fixture();
-  plan(root, { 'codex:gpt-6-astra': 'pass-with-high' });
+  plan(root, { 'codex:gpt-6.1-sol': 'pass-with-high' });
   validatedCandidate(root);
   const result = review(root, '--type', 'security');
   assert.equal(result.status, 'fail');
-  assert.equal(result.reviewer.id, 'codex:gpt-6-astra@high');
+  assert.equal(result.reviewer.id, 'codex:gpt-6.1-sol@high');
   assert.deepEqual(result.reviewer.skipped, []);
   assert.equal(calls(root).length, 1);
   assert.match(result.record, /--severity HIGH --what-could-happen/);
@@ -166,24 +182,44 @@ test('a blocking finding fails the review even when the model says pass, without
   assert.equal(calls(root).length, 1);
 });
 
-test('an unavailable reviewer falls back visibly; malformed output gets one retry; an empty chain is an error', () => {
+test('Sol out of quota falls back to DeepSeek through opencode, which records the review', () => {
   const root = fixture();
-  plan(root, { 'codex:gpt-6-astra': 'quota', 'codex:gpt-6.1-sol': 'invalid' });
+  plan(root, { 'codex:gpt-6.1-sol': 'quota' });
   validatedCandidate(root);
   const result = review(root, '--type', 'functional');
-  assert.equal(result.reviewer.id, 'claude:claude-opus-5-5@medium');
-  assert.equal(result.reviewer.sameFamily, true);
-  assert.deepEqual(result.reviewer.skipped.map((item) => item.reason), ['quota', 'invalid-output: output is not JSON']);
-  assert.deepEqual(calls(root).map((line) => line.split(' ')[0]), ['codex:gpt-6-astra', 'codex:gpt-6.1-sol', 'codex:gpt-6.1-sol', 'claude:opus']);
-  plan(root, { 'codex:gpt-6-astra': 'quota', 'codex:gpt-6.1-sol': 'quota', 'claude:opus': 'quota' });
-  rejected(root, /no reviewer in the chain could run/, 'review', 'run', '--type', 'functional');
+  assert.equal(result.status, 'pass');
+  assert.equal(result.reviewer.id, 'opencode:venice/deepseek-v4-1-flash@default');
+  assert.equal(result.reviewer.family, 'deepseek');
+  assert.equal(result.reviewer.sameFamily, false);
+  assert.equal(result.reviewer.cli, 'opencode v0.0.0-fake');
+  assert.deepEqual(result.reviewer.skipped, [{ id: 'codex:gpt-6.1-sol@medium', reason: 'quota' }]);
+  assert.deepEqual(calls(root), ['codex:gpt-6.1-sol prompt-ok', 'opencode:venice/deepseek-v4-1-flash prompt-ok']);
+  const recorded = record(root, result.record);
+  assert.equal(recorded.status, 0, recorded.text);
+  const receipt = read(root, '.riff-data/receipts/a-functional.json');
+  assert.equal(receipt.reviewer.id, 'opencode:venice/deepseek-v4-1-flash@default');
+  assert.equal(receipt.model, 'opencode:venice/deepseek-v4-1-flash');
+});
+
+test('malformed output gets one retry before the next reviewer runs; an opencode error event counts as unavailable; an empty chain is an error', () => {
+  const root = fixture();
+  plan(root, { 'codex:gpt-6.1-sol': 'invalid' });
+  validatedCandidate(root);
+  const result = review(root, '--type', 'functional');
+  assert.equal(result.reviewer.id, 'opencode:venice/deepseek-v4-1-flash@default');
+  assert.deepEqual(result.reviewer.skipped.map((item) => item.reason), ['invalid-output: output is not JSON']);
+  assert.deepEqual(calls(root).map((line) => line.split(' ')[0]), ['codex:gpt-6.1-sol', 'codex:gpt-6.1-sol', 'opencode:venice/deepseek-v4-1-flash']);
+  plan(root, { 'codex:gpt-6.1-sol': 'quota', 'opencode:venice/deepseek-v4-1-flash': 'quota' });
+  const failed = cli(root, {}, 'review', 'run', '--type', 'functional');
+  assert.notEqual(failed.status, 0, failed.text);
+  assert.match(failed.text, /no reviewer in the chain could run: codex:gpt-6.1-sol@medium \(quota\), opencode:venice\/deepseek-v4-1-flash@default \(quota\)/);
   assert.match(readFileSync(path.join(root, '.riff-data/events.ndjson'), 'utf8'), /review_unavailable/);
 });
 
 test('discovery and delivery artifacts are accepted by their record commands, and a third failed dossier round is refused', () => {
   const root = fixture();
   enroll(root);
-  plan(root, { 'codex:gpt-6-astra': 'pass-with-high' });
+  plan(root, { 'codex:gpt-6.1-sol': 'pass-with-high' });
   for (let round = 1; round <= 2; round += 1) {
     const failed = review(root, '--type', 'discovery');
     assert.equal(failed.status, 'fail');
@@ -208,10 +244,10 @@ test('discovery and delivery artifacts are accepted by their record commands, an
   ok(fresh, 'improve', 'record', '--phase', 'a', '--file', '.riff-data/a-improvements.json');
   ok(fresh, 'wave', 'complete', 'a', '--commit', 'HEAD');
   const delivery = review(fresh, '--type', 'delivery');
-  assert.equal(delivery.reviewer.id, 'codex:gpt-6-astra@high');
+  assert.equal(delivery.reviewer.id, 'codex:gpt-6.1-sol@high');
   const recorded = record(fresh, delivery.record);
   assert.equal(recorded.status, 0, recorded.text);
-  assert.equal(read(fresh, '.riff-data/state.json').deliveryReview.reviewer.id, 'codex:gpt-6-astra@high');
+  assert.equal(read(fresh, '.riff-data/state.json').deliveryReview.reviewer.id, 'codex:gpt-6.1-sol@high');
 });
 
 test('a finding deferred to a security expert lets phases and delivery continue, is passed to later reviewers and is listed at the end', () => {
@@ -220,7 +256,7 @@ test('a finding deferred to a security expert lets phases and delivery continue,
   assert.equal(record(root, review(root, '--type', 'discovery').record).status, 0);
   git(root, 'add', '--', 'docs/specs/readiness.json');
   commit(root, 'Dossier');
-  plan(root, { 'codex:gpt-6-astra': 'pass-with-high' });
+  plan(root, { 'codex:gpt-6.1-sol': 'pass-with-high' });
   validatedCandidate(root);
   const failed = review(root, '--type', 'security');
   assert.equal(record(root, failed.record.replace(/'<[^']*>'/g, "'Needs a threat model'")).status, 0);
