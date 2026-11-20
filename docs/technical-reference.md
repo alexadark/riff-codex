@@ -50,6 +50,8 @@ RIFF keeps six event handlers in each host (`SessionStart`, `PreCompact`, `PreTo
 
 Installation rejects hook directories outside the project or its Git common directory. Existing hook sources are preserved through local backups and atomic wrapper replacement; an external symlink target is never overwritten. State mutations use a process lock.
 
+Git keeps one hooks folder for every linked worktree of a repository, and the `.riff-cli` link exists only in the checkout where RIFF was initialized. The wrappers therefore look for the CLI in the current checkout, then in the main checkout, then at the absolute RIFF folder recorded at installation. When none is reachable, or Node is missing, they skip RIFF's checks in a checkout without RIFF state and block, with a message, a checkout that has it. Run `riff resync` in each project after updating RIFF to rewrite older wrappers; `riff doctor` warns about a wrapper that predates worktree support.
+
 The pre-commit scan reads filenames and content from the Git index. Unstaged edits or local deletions cannot hide content that would be committed. An index read failure blocks the commit. Private `.env` and `.env.*` files are rejected in any directory; `.example` templates are allowed but still scanned for secrets. Live Stripe secret and restricted keys are checked before tools, after edits, and before commits.
 
 The pre-tool guard recognizes ordinary force-push flags and table-drop commands, alongside its existing destructive patterns. Normal pushes and `--force-with-lease` retain their existing behavior. Path warnings compare complete directory boundaries, so a sibling named `riff-codex` isn't mistaken for `riff`. These are focused heuristic safeguards, not a shell sandbox or a complete secret scanner.

@@ -37,7 +37,7 @@ import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 import { recommendPlan } from '../lib/model-advice-plan.mjs';
 import { decideImprovement, ideasFile, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
 
-const VERSION = '0.4.1';
+const VERSION = '0.4.2';
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = path.resolve(path.dirname(SCRIPT), '..');
 const FRAMEWORK_DIR = '.riff-cli';
@@ -325,6 +325,35 @@ function installationPreflight(root) {
   for (const name of [stateDirFor(root), '.codex/hooks.json', CLAUDE_SETTINGS, '.agents/skills']) localPath(root, name);
 }
 
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
+}
+
+// Git hooks live in the common directory and run in every linked worktree, where the
+// machine-local framework link is absent. Resolve the CLI from this checkout, then the
+// main checkout, then the absolute install path; block only when this checkout has RIFF
+// state and no CLI or Node can run.
+function gitHookCliResolver(frameworkDir) {
+  return [
+    'riff_top=$(git rev-parse --show-toplevel)',
+    `riff_cli="$riff_top/${frameworkDir}/bin/riff.mjs"`,
+    'if [ ! -f "$riff_cli" ]; then',
+    '  riff_common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)',
+    `  [ -n "$riff_common" ] && riff_cli="$(dirname "$riff_common")/${frameworkDir}/bin/riff.mjs"`,
+    'fi',
+    `[ -f "$riff_cli" ] || riff_cli=${shellQuote(path.join(PLUGIN_ROOT, 'bin', 'riff.mjs'))}`,
+    'if [ ! -f "$riff_cli" ] || ! command -v node >/dev/null 2>&1; then',
+    `  if [ -f "$riff_top/${STATE_DIR}/state.json" ] || [ -f "$riff_top/${CODEX_STATE_DIR}/state.json" ]; then`,
+    '    echo "RIFF: this checkout has RIFF state but the RIFF CLI or Node is unavailable; run riff resync in the main checkout, or commit with --no-verify if you accept skipping RIFF checks." >&2',
+    '    exit 1',
+    '  fi',
+    '  echo "RIFF: CLI unavailable and no RIFF state in this checkout; skipping RIFF Git checks." >&2',
+    '  exit 0',
+    'fi',
+    '',
+  ].join('\n');
+}
+
 function installGitHook(root, name, migration) {
   const directory = gitHooksDir(root);
   ensureDir(directory);
@@ -356,9 +385,9 @@ function installGitHook(root, name, migration) {
       }
     }
   }
-  const previousLine = `'${String(prior ?? '').replaceAll("'", "'\"'\"'")}'`;
+  const previousLine = shellQuote(prior ?? '');
   const arg = name === 'commit-msg' ? ' "$@"' : '';
-  const wrapper = `#!/bin/sh\n${GIT_HOOK_MARKER}\n# RIFF_CODEX_PREVIOUS_JSON=${JSON.stringify(prior ?? '')}\nRIFF_CODEX_PREVIOUS=${previousLine}\nif [ -n "$RIFF_CODEX_PREVIOUS" ] && [ -x "$RIFF_CODEX_PREVIOUS" ]; then "$RIFF_CODEX_PREVIOUS" "$@" || exit $?; fi\n/usr/bin/env node "$(git rev-parse --show-toplevel)/${frameworkDirFor(root)}/bin/riff.mjs" hook git-${name}${arg}\n`;
+  const wrapper = `#!/bin/sh\n${GIT_HOOK_MARKER}\n# RIFF_CODEX_PREVIOUS_JSON=${JSON.stringify(prior ?? '')}\nRIFF_CODEX_PREVIOUS=${previousLine}\nif [ -n "$RIFF_CODEX_PREVIOUS" ] && [ -x "$RIFF_CODEX_PREVIOUS" ]; then "$RIFF_CODEX_PREVIOUS" "$@" || exit $?; fi\n${gitHookCliResolver(frameworkDirFor(root))}exec /usr/bin/env node "$riff_cli" hook git-${name}${arg}\n`;
   const temporary = `${target}.riff-${process.pid}`;
   writeFileSync(temporary, wrapper, { flag: 'wx', mode: 0o755 });
   renameSync(temporary, target);
@@ -2078,8 +2107,10 @@ function doctor(root, recordApproval = false) {
   for (const name of ['pre-commit', 'commit-msg']) {
     try {
       const target = path.join(gitHooksDir(root), name);
-      const valid = existsSync(target) && !lstatSync(target).isSymbolicLink() && readFileSync(target, 'utf8').includes(GIT_HOOK_MARKER);
-      add(valid ? 'ok' : 'error', `Git ${name}`, valid ? 'installed and chained' : 'missing RIFF wrapper');
+      const text = existsSync(target) && !lstatSync(target).isSymbolicLink() ? readFileSync(target, 'utf8') : '';
+      const valid = text.includes(GIT_HOOK_MARKER);
+      if (valid && !text.includes('--git-common-dir')) add('warn', `Git ${name}`, 'wrapper predates linked-worktree support; run riff resync');
+      else add(valid ? 'ok' : 'error', `Git ${name}`, valid ? 'installed and chained' : 'missing RIFF wrapper');
     } catch (error) { add('error', `Git ${name}`, error.message); }
   }
   try { dashboardData(root); add('ok', 'dashboard state', 'readable'); }
@@ -2449,7 +2480,8 @@ function preCommit(root) {
   }
   for (const finding of findings) {
     process.stderr.write(`RIFF pre-commit warning: ${finding.summary}\nRecommended check: ${finding.recommended_fix}\nWhy RIFF continues: ${finding.decision_reason}\n`);
-    event(root, 'git_pre_commit_warning', { hook: finding.kind, severity: finding.severity, summary: finding.summary });
+    // A linked worktree without its own state must not gain a stray state folder.
+    if (existsSync(pathsFor(root).riff)) event(root, 'git_pre_commit_warning', { hook: finding.kind, severity: finding.severity, summary: finding.summary });
   }
   let state;
   try { state = readState(root); } catch { return 0; }
@@ -2483,7 +2515,7 @@ function cmdHook(tokens) {
   if (name === 'git-commit-msg') {
     const messageFile = tokens.find((token) => !token.startsWith('--') && token !== name);
     const summary = messageFile && existsSync(messageFile) ? readFileSync(messageFile, 'utf8').split('\n')[0].slice(0, 160) : null;
-    event(root, 'git_commit_msg', { summary });
+    if (existsSync(pathsFor(root).riff)) event(root, 'git_commit_msg', { summary });
     return;
   }
   let payload = {};

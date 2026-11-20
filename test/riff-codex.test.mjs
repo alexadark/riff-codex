@@ -339,6 +339,70 @@ test('pre-commit rejects private env files but permits sanitized example templat
   }
 });
 
+function gitCommit(cwd, ...args) {
+  return spawnSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-q', ...args], { cwd, encoding: 'utf8' });
+}
+
+function linkedWorktree(root, name) {
+  const worktree = path.join(path.dirname(root), `${path.basename(root)}-${name}`);
+  roots.push(worktree);
+  execFileSync('git', ['worktree', 'add', '-q', '-b', name, worktree], { cwd: root });
+  return realpathSync(worktree);
+}
+
+test('Git hooks resolve the CLI from the main checkout in a linked worktree', () => {
+  const root = lifecycleFixture();
+  assert.ok(existsSync(path.join(root, '.riff-data', 'state.json')), 'init creates the main checkout state');
+  const hook = readFileSync(path.join(root, '.git', 'hooks', 'pre-commit'), 'utf8');
+  assert.match(hook, /--git-common-dir/);
+  assert.ok(hook.includes(path.join(PLUGIN_ROOT, 'bin', 'riff.mjs')), 'the wrapper keeps an absolute install path as a fallback');
+
+  const main = gitCommit(root, '--allow-empty', '-m', 'Main checkout commit');
+  assert.equal(main.status, 0, main.stderr);
+  assert.doesNotMatch(main.stderr, /skipping RIFF/);
+
+  const worktree = linkedWorktree(root, 'feature');
+  assert.equal(existsSync(path.join(worktree, '.riff-cli')), false, 'the framework link is machine-local and absent from new worktrees');
+  const empty = gitCommit(worktree, '--allow-empty', '-m', 'Worktree commit');
+  assert.equal(empty.status, 0, empty.stderr);
+  assert.doesNotMatch(empty.stderr, /Cannot find module/);
+  writeFileSync(path.join(worktree, 'feature.txt'), 'feature\n');
+  execFileSync('git', ['add', '--', 'feature.txt'], { cwd: worktree });
+  const file = gitCommit(worktree, '-m', 'Worktree file');
+  assert.equal(file.status, 0, file.stderr);
+  assert.equal(existsSync(path.join(worktree, '.riff-data')), false, 'hooks never create state in a worktree without it');
+
+  // The CLI really runs in the worktree: its secret scan still blocks.
+  writeFileSync(path.join(worktree, '.env'), 'SERVICE_URL=https://example.invalid\n');
+  execFileSync('git', ['add', '-f', '--', '.env'], { cwd: worktree });
+  const secret = gitCommit(worktree, '-m', 'Private env');
+  assert.equal(secret.status, 1);
+  assert.match(secret.stderr, /Private environment file/);
+});
+
+test('Git hooks without any reachable CLI skip checkouts without state and block those with state', () => {
+  const root = lifecycleFixture();
+  const worktree = linkedWorktree(root, 'offline');
+  for (const name of ['pre-commit', 'commit-msg']) {
+    const file = path.join(root, '.git', 'hooks', name);
+    writeFileSync(file, readFileSync(file, 'utf8').replaceAll(path.join(PLUGIN_ROOT, 'bin', 'riff.mjs'), path.join(root, 'missing-install', 'bin', 'riff.mjs')));
+  }
+  renameSync(path.join(root, '.riff-cli'), path.join(root, '.riff-cli-away'));
+  try {
+    const skipped = gitCommit(worktree, '--allow-empty', '-m', 'No CLI, no state');
+    assert.equal(skipped.status, 0, skipped.stderr);
+    assert.match(skipped.stderr, /skipping RIFF Git checks/);
+    assert.doesNotMatch(skipped.stderr, /Cannot find module/);
+
+    const blocked = gitCommit(root, '--allow-empty', '-m', 'No CLI, with state');
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.stderr, /RIFF CLI or Node is unavailable; run riff resync/);
+    assert.doesNotMatch(blocked.stderr, /Cannot find module/);
+  } finally {
+    renameSync(path.join(root, '.riff-cli-away'), path.join(root, '.riff-cli'));
+  }
+});
+
 test('live Stripe secrets are detected before tools, after edits and before commits', () => {
   const root = fixture();
   for (const prefix of ['sk', 'rk']) {
