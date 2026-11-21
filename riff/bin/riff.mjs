@@ -781,8 +781,61 @@ function cmdDelivery(tokens) {
   });
 }
 
+const PLUGIN_CACHE_MARKER = `${path.sep}plugins${path.sep}cache${path.sep}`;
+
+// Read-only prerequisite check for riff init: what installation would touch and what should stop it.
+function initCheck(root) {
+  const problems = [];
+  const notes = [];
+  try { installationPreflight(root); } catch (error) { problems.push(error.message); }
+  if (PLUGIN_ROOT.includes(PLUGIN_CACHE_MARKER)) problems.push(`this RIFF copy is inside a plugin cache (${PLUGIN_ROOT}); the .riff-cli link would break at the next plugin update. Run init from the RIFF source checkout`);
+  const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
+  if (path.dirname(common) !== realpathSync(root)) notes.push(`this is a linked worktree; Git hooks are shared with the main checkout ${path.dirname(common)}. Prefer running init there`);
+  const worktrees = run('git', ['worktree', 'list', '--porcelain'], { cwd: root }).split('\n').filter((line) => line.startsWith('worktree ')).map((line) => line.slice('worktree '.length));
+  for (const worktree of worktrees) {
+    if (!existsSync(worktree) || realpathSync(worktree) === realpathSync(root)) continue;
+    let changes = 0;
+    try { changes = run('git', ['status', '--porcelain'], { cwd: worktree }).split('\n').filter(Boolean).length; } catch {}
+    notes.push(`linked worktree ${worktree}${changes ? ` has ${changes} uncommitted change(s): someone may be working there; wait until that work is finished` : ' shares the Git hooks'}`);
+  }
+  let hooksPath = null;
+  try { hooksPath = run('git', ['config', '--local', '--get', 'core.hooksPath'], { cwd: root }) || null; } catch {}
+  if (hooksPath) notes.push(`core.hooksPath is set to ${hooksPath}`);
+  try {
+    const directory = gitHooksDir(root);
+    for (const name of ['pre-commit', 'commit-msg']) {
+      const target = path.join(directory, name);
+      if (!existsSync(target)) continue;
+      const content = readFileSync(target, 'utf8');
+      if (content.includes(GIT_HOOK_MARKER) || content.includes(LEGACY_GIT_HOOK_MARKER)) notes.push(`RIFF ${name} wrapper already installed: init refreshes it`);
+      else notes.push(`existing ${name} hook will be kept and chained: ${target}`);
+    }
+  } catch {}
+  if (pathExists(path.join(root, STATE_DIR))) notes.push(`${STATE_DIR}/ already exists: init updates the managed files like resync and keeps the state`);
+  const touches = ['Git pre-commit and commit-msg hooks (shared by every worktree)', '.git/info/exclude', CLAUDE_SETTINGS, '.codex/hooks.json', '.agents/skills/riff-codex-*', `${STATE_DIR}/`, `${frameworkDirFor(root)} (link to ${PLUGIN_ROOT})`, 'the dashboard registry in ~/.config/riff-dashboard'];
+  return { ok: problems.length === 0, root, riff: PLUGIN_ROOT, version: VERSION, problems, notes, touches, nonInteractiveDefaults: 'language=en, scope=production, autonomy=loop (pass --language, --scope and --autonomy explicitly)' };
+}
+
 async function cmdInit(tokens) {
   const options = parseOptions(tokens);
+  if (options.check === true) {
+    const candidate = path.resolve(options.project_root ?? process.cwd());
+    let root;
+    try { root = path.resolve(run('git', ['rev-parse', '--show-toplevel'], { cwd: candidate })); } catch { fail(`not inside a Git repository: ${candidate}`); }
+    const result = initCheck(root);
+    if (options.json === true) process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+    else process.stdout.write([
+      `RIFF ${VERSION} init check for ${root} (nothing was changed)`,
+      `RIFF source: ${PLUGIN_ROOT}`,
+      ...(result.problems.length ? ['Problems (init would fail or break something):', ...result.problems.map((line) => `- ${line}`)] : ['No blocking problem.']),
+      ...(result.notes.length ? ['Notes:', ...result.notes.map((line) => `- ${line}`)] : []),
+      'init will touch:', ...result.touches.map((line) => `- ${line}`),
+      `Without a terminal, init defaults to ${result.nonInteractiveDefaults}.`,
+      '',
+    ].join('\n'));
+    process.exitCode = result.ok ? 0 : 1;
+    return;
+  }
   if (options.autonomy && !AUTONOMY_MODES.has(options.autonomy)) fail('--autonomy must be loop or guided');
   const candidate = path.resolve(options.project_root ?? process.cwd());
   ensureGitRepository(candidate, options.git_init);
@@ -2988,7 +3041,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff delivery [--merge standing|ask|none] [--deploy standing|ask|none]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery|functional,security [--phase ID[,ID...]|--quick] [--since REF] [--timeout-minutes 25]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|decision|risk|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave validate phase-1 --rerun   (same command, paths and manifest as the last run, restaged)\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave decision phase-1 --note "Kept the verbatim quote; redaction happens at display" [--type functional|security|contract]\n  riff wave risk phase-1 --kind crash-window|runtime-unverified|edge-case --severity MEDIUM --summary "..." --note "why it stays open" [--finding "review finding title"]\n  riff wave complete phase-1 --commit HEAD\n  riff wave complete phase-1 --commit HEAD --accept-risks --reason "owner decision"   (owner instruction only)\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n  riff state import --from WORKTREE_PATH --phase phase-1 [--dry-run]\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff init --check [--json]   (prerequisites only; changes nothing)\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff delivery [--merge standing|ask|none] [--deploy standing|ask|none]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery|functional,security [--phase ID[,ID...]|--quick] [--since REF] [--timeout-minutes 25]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|decision|risk|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave validate phase-1 --rerun   (same command, paths and manifest as the last run, restaged)\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave decision phase-1 --note "Kept the verbatim quote; redaction happens at display" [--type functional|security|contract]\n  riff wave risk phase-1 --kind crash-window|runtime-unverified|edge-case --severity MEDIUM --summary "..." --note "why it stays open" [--finding "review finding title"]\n  riff wave complete phase-1 --commit HEAD\n  riff wave complete phase-1 --commit HEAD --accept-risks --reason "owner decision"   (owner instruction only)\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n  riff state import --from WORKTREE_PATH --phase phase-1 [--dry-run]\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);

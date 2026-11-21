@@ -5,7 +5,9 @@ description: Map an existing codebase and bring it into RIFF as a baseline. Use 
 
 # Map and onboard an existing project
 
-`riff` means `node .riff-cli/bin/riff.mjs`. The brownfield path is: install RIFF, then onboard, then the `evolve` skill for new features, then the `wave` skill.
+`riff` means `node .riff-cli/bin/riff.mjs`; before installation it means `node <RIFF source>/riff/bin/riff.mjs`, the RIFF source checkout rather than a plugin cache copy. The brownfield path is: check prerequisites, install RIFF, then onboard, then the `evolve` skill for new features, then the `wave` skill.
+
+A map-only request needs no installation. Without RIFF state it runs in degraded mode: say so in one line, report the map, and write `MAP.md` only where the brief or the owner says.
 
 ## Goal
 
@@ -20,6 +22,14 @@ Understand the existing application from its code, then record it as the RIFF ba
 ## Verify
 
 Check every map finding against the current code before relying on it, including findings from an earlier `MAP.md`. Confirm the actual stack and reuse its stack references.
+
+## Prerequisites before installing
+
+`riff init` changes repository plumbing shared by every worktree: Git `pre-commit` and `commit-msg` hooks, `.git/info/exclude`, `.claude/settings.local.json`, `.codex/hooks.json`, `.agents/skills/riff-codex-*`, `.riff-data/` and the dashboard registry. Before it:
+
+1. Run `node <RIFF source>/riff/bin/riff.mjs init --check` from the project's main checkout. It changes nothing; it lists linked worktrees and their uncommitted work, `core.hooksPath`, existing hooks it will chain, a RIFF copy inside a plugin cache, and the files `init` will touch.
+2. Stop and report when it fails, or when another agent or person is working in a linked worktree of this repository: plumbing changes wait for a moment without active work on the repository. Never attach an install to a repair brief.
+3. Install with `node <RIFF source>/riff/bin/riff.mjs init --non-interactive --language <en|fr> --autonomy <loop|guided>` (add `--scope scratch` for a prototype). Without a terminal, `init` takes the defaults silently (language `en`, scope `production`, autonomy `loop`), so pass them explicitly.
 
 ## How to work
 

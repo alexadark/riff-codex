@@ -5,7 +5,7 @@ description: Make a small, bounded change with RIFF checks but no roadmap phase.
 
 # Run a quick RIFF change
 
-`riff` means `node .riff-cli/bin/riff.mjs`. The CLI records nothing for a quick change apart from the Git hooks, so these checks rest on you.
+`riff` means `node .riff-cli/bin/riff.mjs`. The CLI records nothing for a quick change apart from the Git hooks, so these checks rest on you. Without RIFF state, say so in one line and skip the RIFF commands (degraded mode in the operating contract); as a subagent, hand state commands back to the main agent.
 
 ## Goal
 

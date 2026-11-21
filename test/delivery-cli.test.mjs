@@ -256,3 +256,33 @@ test('delivery without RIFF state reports defaults but refuses to write', () => 
   assert.equal(JSON.parse(ok(root, 'delivery')).merge.value, 'standing');
   rejected(root, /no RIFF configuration/, 'delivery', '--merge', 'ask');
 });
+
+test('init --check changes nothing and reports worktrees, chained hooks and what init touches', () => {
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'riff-init-check-')));
+  roots.push(root);
+  git(root, 'init', '-q');
+  write(root, 'README.md', 'baseline\n');
+  git(root, 'add', 'README.md');
+  commit(root, 'Baseline');
+  write(root, '.git/hooks/pre-commit', '#!/bin/sh\nexit 0\n');
+  const worktree = `${root}-wt`;
+  roots.push(worktree);
+  git(root, 'worktree', 'add', '-q', worktree);
+  write(worktree, 'draft.txt', 'in progress\n');
+  const report = ok(root, 'init', '--check');
+  assert.match(report, /nothing was changed/);
+  assert.match(report, /No blocking problem/);
+  assert.match(report, /has 1 uncommitted change/);
+  assert.match(report, /existing pre-commit hook will be kept and chained/);
+  assert.match(report, /\.git\/info\/exclude/);
+  const json = JSON.parse(ok(root, 'init', '--check', '--json'));
+  assert.equal(json.ok, true);
+  assert.equal(git(root, 'status', '--porcelain'), '');
+  assert.equal(readFileSync(path.join(root, '.git/hooks/pre-commit'), 'utf8'), '#!/bin/sh\nexit 0\n');
+  for (const name of ['.riff-data', '.riff-cli', '.claude', '.codex']) assert.throws(() => readFileSync(path.join(root, name, 'x')));
+  write(root, '.githooks/pre-commit', '#!/bin/sh\n');
+  git(root, 'add', '.githooks/pre-commit');
+  commit(root, 'Tracked hooks');
+  git(root, 'config', 'core.hooksPath', '.githooks');
+  rejected(root, /tracked by Git/, 'init', '--check');
+});

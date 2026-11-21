@@ -6,6 +6,16 @@ The canonical source for persistent state, wave behavior, delegation and recover
 
 When instructions conflict, follow this order: the owner's own instructions (their messages and personal host instructions such as a user-level `CLAUDE.md` or `AGENTS.md`), then the repository's rules (project `CLAUDE.md`, `AGENTS.md`, contributing rules, Git configuration such as `finish.push`), then the brief of the current task, then the RIFF agent profile, then a RIFF skill or reference. A lower level fills gaps; it never overrides a higher one. Explicit limits for one change (local only, no push, no deploy) always hold.
 
+## Without RIFF state
+
+A checkout runs in RIFF mode when `.riff-cli/bin/riff.mjs` resolves and `.riff-data/state.json` is readable. In a linked worktree without its own `.riff-cli`, the main checkout's CLI (`$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.riff-cli/bin/riff.mjs`) may be used for read-only commands; never write another checkout's state.
+
+Without RIFF state:
+
+- `debug`, `quick`, `learn-stack`, `issue` and a map-only `onboard` run in degraded mode. Start the reply with one line saying so: RIFF isn't set up in this checkout, so there is no RIFF state, receipt, observation triage or hook check, and the agent's own checks are the only guardrails. Then work normally and keep evidence in the report or a folder the brief names.
+- `wave`, `add-phase`, `evolve`, `status` and `dashboard` stop with one sentence naming the missing state and the next step (`onboard` for existing code, `start` for a new product).
+- Never install or repair RIFF as a side effect: no `riff init` or `riff resync`, no change to Git hooks, `core.hooksPath`, `.git/info/exclude`, `.claude/settings.local.json` or `.codex/hooks.json`. Repository plumbing changes only through `onboard`, after `riff init --check` passes.
+
 ## Subagents and workers
 
 A subagent does the code, evidence and artifact drafts of its package and never changes RIFF state. It ends its report with the state commands its package needs (`riff wave sync`, `riff observations review`, `riff incident log`, validation and review records), and the main agent runs them. A skill's "Done when" item that needs such a command is met when the subagent hands it back and the main agent runs it.

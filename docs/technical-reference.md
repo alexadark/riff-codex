@@ -64,6 +64,7 @@ Run these from an initialized application, unless noted otherwise.
 | --- | --- |
 | `riff init` | Connect the project for both hosts and choose initial preferences. |
 | `riff init --configure` | Revisit preferences. |
+| `riff init --check [--json]` | Check installation prerequisites without changing anything: linked worktrees and their uncommitted work, `core.hooksPath`, hooks to chain, a RIFF copy inside a plugin cache, and the files `init` will touch. Exits 1 on a blocking problem. Works before installation. |
 | `riff delivery [--merge standing\|ask\|none] [--deploy standing\|ask\|none]` | Print or set the project's merge and deployment policy (defaults: `merge=standing`, `deploy=ask`). Push follows `git config finish.push` and `finish.pushTo`, like `worktree-finish`. See the [Git delivery contract](../riff/references/git-delivery.md#merge-and-deployment-policy). |
 | `riff resync` | Refresh managed links, hooks and Claude Code settings; move an older `.riff-codex-state/` to `.riff-data/` when no phase is active. |
 | `riff doctor` | Check installation, configuration, hooks for both hosts, reviewer CLIs, dependencies, and state. |

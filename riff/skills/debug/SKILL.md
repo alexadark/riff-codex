@@ -5,7 +5,7 @@ description: Diagnose and fix a concrete failure, including a live production in
 
 # Debug a concrete failure
 
-`riff` means `node .riff-cli/bin/riff.mjs`.
+`riff` means `node .riff-cli/bin/riff.mjs`. A bug can't wait for RIFF: without RIFF state this skill runs in degraded mode (see below). As a subagent, hand the state commands back to the main agent (operating contract, "Subagents and workers").
 
 ## Goal
 
@@ -23,11 +23,20 @@ Find the smallest supported cause of the reported failure and fix it, without tu
 
 Re-run the failing behavior on the fix. For a UI failure, check the rendered screen in a real browser with the relevant design skills from the frontend taste.
 
+## Without RIFF state
+
+When `.riff-cli` or `.riff-data/state.json` is missing, start the reply with one line: "RIFF isn't set up in this checkout: debugging in degraded mode, without RIFF state, receipts, observation triage or hook checks." Then debug normally, with these limits:
+
+- Your own checks are the only guardrails: reproduce, fix and re-run the failing behavior as above.
+- Keep evidence in the report, or in a folder the brief names; don't create tracked files for it unless asked.
+- Skip `riff observations review` and `riff incident log`; list in the report what they would have recorded.
+- Don't install or repair RIFF and don't touch repository plumbing (Git hooks, `core.hooksPath`, `.git/info/exclude`, `.claude/settings.local.json`, `.codex/hooks.json`). Bringing the project into RIFF is a separate `onboard`, after its prerequisite check.
+
 ## Production incident
 
 When users or data are affected in production right now, protect people and data first:
 
-- Establish the verified impact, affected users or data, current symptoms and ownership. Preserve evidence in the RIFF state folder without exposing secrets.
+- Establish the verified impact, affected users or data, current symptoms and ownership. Preserve evidence in the RIFF state folder (without RIFF state: in the report or the folder the brief names) without exposing secrets.
 - Recommend the smallest safe, reversible containment. Ask before a destructive or external change that isn't already authorized. Read the security reference at a security boundary.
 - Don't resume normal waves while the incident is unstable.
 - Once it is stable, log the confirmed impact, cause and prevention with `riff incident log --evidence FILE` (format in the evidence reference). `INCIDENTS.md` is append-only and keyed by incident id. Review it for recurring causes only when asked.
