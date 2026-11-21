@@ -24,7 +24,7 @@ Read back each created or updated issue: title, repository, number and URL. Repo
 ## How to work
 
 1. Check that the user explicitly asked to create or update issues. Read the project-framing reference, `PROJECT.md`, `ROADMAP.yaml` and `riff status`.
-2. Resolve the target repository from the checkout's remote; never guess one. Run `gh auth status`; missing access or an impossible third-party check is a blocker to report, not to work around.
+2. Resolve the target repository from the checkout's remote; never guess one. With several remotes (for example `origin` and a mirror), take the one the user or the repository configuration names, following `git-delivery.md` (never assume `origin`); if none is named and their GitHub repositories differ, ask which one. Run `gh auth status`; missing access or an impossible third-party check is a blocker to report, not to work around.
 3. Leave out microtasks, implementation checklists, old pull request numbers, branch names, stale review metadata, commit history and past delivery dossiers, unless the request asks for a current release reference.
 4. Search the open issues, then create with `gh issue create` or update with `gh issue edit`.
 
