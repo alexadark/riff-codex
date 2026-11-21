@@ -234,3 +234,25 @@ test('status --json and wave context --json expose stable host contracts without
   assert.equal(JSON.parse(ok(root, 'wave', 'context', 'b', '--json')).phase.id, 'b');
   assert.deepEqual(JSON.parse(ok(root, 'wave', 'context', 'b')), JSON.parse(ok(root, 'wave', 'context', 'b', '--json')));
 });
+
+test('delivery policy defaults to standing merge and asked deployment, follows finish.push and is set per project', () => {
+  const root = fixture({ enrolled: false });
+  const initial = JSON.parse(ok(root, 'delivery'));
+  assert.deepEqual([initial.merge.value, initial.deploy.value, initial.push.value], ['standing', 'ask', true]);
+  assert.equal(initial.merge.source, 'RIFF default');
+  git(root, 'config', '--local', 'finish.push', 'false');
+  const configured = JSON.parse(ok(root, 'delivery', '--merge', 'ask', '--deploy', 'none'));
+  assert.deepEqual([configured.merge.value, configured.deploy.value, configured.push.value], ['ask', 'none', false]);
+  assert.deepEqual(read(root, '.riff-data/config.json').delivery, { merge: 'ask', deploy: 'none' });
+  rejected(root, /--merge must be standing, ask or none/, 'delivery', '--merge', 'always');
+  const hook = spawnSync(process.execPath, [CLI, 'hook', 'session-start'], { cwd: root, input: '{}', encoding: 'utf8', env: { ...process.env, HOME: path.join(root, '.fixture-home') } });
+  assert.match(hook.stdout, /Delivery policy \(riff delivery\): merge=ask, deploy=none, push=off/);
+});
+
+test('delivery without RIFF state reports defaults but refuses to write', () => {
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'riff-delivery-bare-')));
+  roots.push(root);
+  git(root, 'init', '-q');
+  assert.equal(JSON.parse(ok(root, 'delivery')).merge.value, 'standing');
+  rejected(root, /no RIFF configuration/, 'delivery', '--merge', 'ask');
+});

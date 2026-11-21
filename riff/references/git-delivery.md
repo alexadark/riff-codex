@@ -14,7 +14,7 @@ Record the agreed change scope and phase IDs, branch, repository/remote, target 
 
 ## Authorization and draft publication
 
-An ordinary implementation request authorizes local work and commits. Respect existing explicit delivery authorization for the same change and target; do not ask again separately for push and PR creation. Honor local-only, no-push and other explicit limits. Without publication authorization, continue all local dependency-ready work, prepare the final branch and concise PR description, and report it as ready locally. Ask for publication only when that concrete result is ready; do not interrupt the loop after its first phase for this purpose. Never infer merge or deployment authorization from permission to open a PR.
+An ordinary implementation request authorizes local work and commits. Respect existing explicit delivery authorization for the same change and target; do not ask again separately for push and PR creation. Honor local-only, no-push and other explicit limits. Without publication authorization, continue all local dependency-ready work, prepare the final branch and concise PR description, and report it as ready locally. Ask for publication only when that concrete result is ready; do not interrupt the loop after its first phase for this purpose. Never infer merge or deployment authorization from permission to open a PR. A project [merge policy](#merge-and-deployment-policy) of `standing` with pushing allowed counts as publication authorization for the change.
 
 After the first completed phase with passing required validation and reviews, publish the verified committed head and open a draft PR when authorized. Each later completed phase pushes to that same branch and updates the same PR. Never publish an unreviewed intermediate candidate. A standalone quick change may open a ready PR after its bounded checks and functional review; unrelated roadmap phases do not become quick acceptance criteria.
 
@@ -31,17 +31,23 @@ The first draft does not need `finish --check`: unfinished phases are expected. 
 
 Creating or updating a PR never adds a wave pause. In `loop`, continue dependency-ready phases on the same branch. In `guided`, retain the existing between-phase and product-decision pauses. There is no separate stop-at-PR preference.
 
-When the agreed work and final gates are complete, report the PR as ready for review, with its verified URL and checks. An open PR is not a merge or deployment. Without merge authorization, leave it open. Continue independent authorized work on a separate scoped branch when available. Phases within this PR can depend on its earlier local commits without waiting for a merge. Work that actually requires an earlier PR to be integrated into the target base waits for that integration; do not confuse a completed phase with a merged PR, bypass the dependency, or manufacture a new phase status. This is a delivery scheduling boundary, not a product-decision blocker.
+When the agreed work and final gates are complete, report the PR as ready for review, with its verified URL and checks. An open PR is not a merge or deployment. Merge only as the policy below allows; otherwise leave it open. Continue independent authorized work on a separate scoped branch when available. Phases within this PR can depend on its earlier local commits without waiting for a merge. Work that actually requires an earlier PR to be integrated into the target base waits for that integration; do not confuse a completed phase with a merged PR, bypass the dependency, or manufacture a new phase status. This is a delivery scheduling boundary, not a product-decision blocker.
 
-## Standing merge authorization
+## Merge and deployment policy
 
-The operator (Alexandra) has granted standing merge and deployment authorization for every project, valid until she revokes it. A phase or change that is verified, reviewed and passing counts as approved. This standing authorization overrides "Without merge authorization, leave it open" above. Take the change to production without asking again:
+Each project sets its delivery policy; `riff delivery` prints the effective values and where they come from. The [precedence](operating-contract.md#precedence) applies: the owner's own instructions and an explicit limit for this change (local only, no push, no merge, no deploy) override the project policy.
 
-1. Complete the final gates above (whole-version verification, delivery review, `finish --check`) and mark the PR ready for review.
+- `merge` (`.riff-data/config.json` → `delivery.merge`, default `standing`): with `standing`, a change that is verified, reviewed and passing counts as approved for merging into its verified target base, without asking again. With `ask`, leave the PR or branch ready and ask once the concrete result is ready. With `none`, never merge.
+- `push` (Git configuration shared with `worktree-finish`): `git config --local finish.push false` keeps delivery local, with no push and no PR; `finish.pushTo <ref>` names the pushed branch instead of the target base. Without either, pushing the merged target base is allowed whenever merging is.
+- `deploy` (`delivery.deploy`, default `ask`): a deployment that the target base triggers on its own after a merge (CI/CD on that branch) is part of the merge. Any separate production deployment step (a deploy command, promoting a preview, a dashboard action) needs the owner's explicit approval for this change with `ask`, runs after the merge with `standing`, and never happens with `none`.
+
+Change it with `riff delivery --merge standing|ask|none --deploy standing|ask|none`. With merging allowed:
+
+1. Complete the final gates above (whole-version verification, delivery review, `finish --check`) and mark the PR ready for review. A standalone quick change needs its own bounded checks and review instead.
 2. Wait for the required GitHub checks. Read them with the host's PR status tools, never a polling loop. Pending or failing checks block the merge.
-3. Merge the PR into its verified target base with the repository's usual method. If the repository forbids auto-merge, merge directly once checks pass.
-4. Let the deployment run and report the final state: committed, pushed, merged, deployed, or the exact blocker.
+3. Merge into the verified target base with the repository's usual method (merge the PR, or the host's worktree finishing tool when the change lives in a local worktree branch). If the repository forbids auto-merge, merge directly once checks pass.
+4. Report the final state: committed, pushed, merged, deployed (or the deployment the merge triggered), or the exact blocker.
 
-Stop and ask only when a check fails after the retry budget, when the change writes data the operator has not seen (for example lowering a client balance or deleting records), or when an explicit local-only or no-merge limit applies to this change. The specialist security review happens later at the production boundary and does not gate this merge.
+Stop and ask only when a check fails after the retry budget, when the change writes data the owner has not seen (for example lowering a client balance or deleting records), or when the policy or an explicit limit forbids the step. The specialist security review happens later at the production boundary and does not gate this merge.
 
 Missing publication access blocks only the external operation; preserve commits and continue independent local work. Report unavailable access or external verification using the existing blocker vocabulary where applicable. Do not undo a completed phase because publication failed, reset its retry budget, or rerun unchanged passing checks merely to retry GitHub delivery. On resume, reconcile Git and PR identity before continuing.

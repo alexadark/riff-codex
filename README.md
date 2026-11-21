@@ -164,7 +164,7 @@ A “wave” means working through the next ready steps. Run the same command wh
 
 ### Branches and pull requests
 
-RIFF keeps one branch and one PR for a coherent evolution or initial version across successive waves. When you authorize publication, it opens a draft after the first validated phase and updates that same PR as later phases complete. In `loop`, creating a PR doesn't pause work; `guided` keeps its existing between-phase pauses. After whole-version verification and `finish --check`, RIFF marks the PR ready for review and returns its verified URL. Merge and deployment require their own authorization.
+RIFF keeps one branch and one PR for a coherent evolution or initial version across successive waves. When you authorize publication, it opens a draft after the first validated phase and updates that same PR as later phases complete. In `loop`, creating a PR doesn't pause work; `guided` keeps its existing between-phase pauses. After whole-version verification and `finish --check`, RIFF marks the PR ready for review and returns its verified URL. Merge and deployment follow the project's delivery policy (`riff delivery`): by default a verified, reviewed and passing change is merged and pushed, while a separate production deployment step waits for your approval. Your own instructions and explicit limits always win.
 
 Without publication authorization, RIFF completes local work and prepares the PR description before requesting delivery. A standalone `quick` change follows the same branch/PR workflow with its bounded checks. The skills perform Git and GitHub operations; the CLI verification commands don't push or create PRs themselves. See the [Git delivery contract](riff/references/git-delivery.md) for resume and concurrent-work rules.
 

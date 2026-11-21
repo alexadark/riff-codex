@@ -16,7 +16,7 @@ Make one bounded change that leaves the product roadmap unchanged, on its own br
 - The changed behavior works and was checked once.
 - A change that touches a sensitive boundary (authentication, access, customer data, payments, migrations, public APIs) was reviewed with `riff review run --type functional --quick`, plus `--type security`, and its HIGH or CRITICAL findings fixed before committing. Other quick changes need no external review: check them yourself.
 - Observations from the change are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review`, nothing unverified marked resolved.
-- The change is one atomic commit on its branch. The draft PR is created or updated only when publication is authorized; otherwise the result stays local.
+- The change is one atomic commit on its branch. Publication and merge follow the project's delivery policy (`riff delivery`, `references/git-delivery.md`); otherwise the result stays local.
 
 ## Verify
 
@@ -31,7 +31,7 @@ Make one bounded change that leaves the product roadmap unchanged, on its own br
 4. Merge a proven reusable lesson into taste, in proportion to the change.
 5. If the scope grows or a product decision appears, stop and recommend the `add-phase` skill.
 
-Model advice is optional and never switches the primary model; a request for advice alone stops before implementation. Report the outcome, commit, checks and PR URL or local-only status. Never claim a merge or a deployment.
+Model advice is optional and never switches the primary model; a request for advice alone stops before implementation. Report the outcome, commit, checks and PR URL or local-only status. Merge and deploy only as the delivery policy allows, and never claim a merge or a deployment that didn't happen.
 
 ## References
 
