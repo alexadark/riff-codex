@@ -2,6 +2,16 @@
 
 The canonical source for persistent state, wave behavior, delegation and recovery. [Evidence](evidence.md) holds the artifact formats, [Git delivery](git-delivery.md) the branch and PR rules, [model routing](model-routing.md) the subagent choice.
 
+## Precedence
+
+When instructions conflict, follow this order: the owner's own instructions (their messages and personal host instructions such as a user-level `CLAUDE.md` or `AGENTS.md`), then the repository's rules (project `CLAUDE.md`, `AGENTS.md`, contributing rules, Git configuration such as `finish.push`), then the brief of the current task, then the RIFF agent profile, then a RIFF skill or reference. A lower level fills gaps; it never overrides a higher one. Explicit limits for one change (local only, no push, no deploy) always hold.
+
+## Subagents and workers
+
+A subagent does the code, evidence and artifact drafts of its package and never changes RIFF state. It ends its report with the state commands its package needs (`riff wave sync`, `riff observations review`, `riff incident log`, validation and review records), and the main agent runs them. A skill's "Done when" item that needs such a command is met when the subagent hands it back and the main agent runs it.
+
+A writing worker commits its package on its own branch in its own worktree; the main agent merges that branch. A worker never commits to, merges into or pushes the integration or default branch, and returns a patch instead of commits only when its brief says so.
+
 ## Product artifacts
 
 - `PROJECT.md` is the product contract and dossier index: vocabulary, users, outcomes, constraints, decisions, assumptions, exclusions. It links detailed contracts instead of copying them. A production `start` follows [discovery](discovery.md); scratch work and the `quick` skill stay light.
@@ -58,7 +68,7 @@ Delegate where it pays, following [model routing](model-routing.md): exploration
 - Database migrations stay with the integrator: workers don't add migration files or regenerate snapshots, so two of them can't collide in the migration journal.
 - Worktrees don't isolate databases, ports, caches or credentials: give writers separate test resources or serialize that work.
 - A worker brief names the outcome, worktree path, owned files, contracts, exclusions, acceptance criteria, commands and expected evidence; send the smallest sufficient context.
-- Workers return commits or patches with observed checks and open questions. They never activate phases, touch RIFF state, publish or claim the phase complete. Integrate them one at a time, resolve semantic conflicts, then verify the assembled journey: passing worker checks never prove the phase.
+- Workers commit on their own branch and return the branch, commits, observed checks and open questions (a patch only when the brief asks for one). They never activate phases, touch RIFF state, publish or claim the phase complete. Merge their branches one at a time, resolve semantic conflicts, then verify the assembled journey: passing worker checks never prove the phase.
 - Remove clean task-owned worktrees after integration; keep any with unresolved work.
 
 RIFF state stays per checkout: a worktree that runs a whole phase works on a copy of `.riff-data` (a symlinked state directory is refused). When that phase is done, merge its branch, then bring its record back from the main checkout with `riff state import --from <worktree path> --phase <id>` (try `--dry-run` first). It merges the phase record, findings, improvements, observation decisions, receipts, evidence and validation report; it refuses another repository, an active-phase clash and overwriting a phase already terminal here, and keeps this checkout's plan fields.

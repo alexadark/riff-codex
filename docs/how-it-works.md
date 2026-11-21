@@ -68,7 +68,7 @@ Solid arrows show the working cycle. Dotted arrows show information being displa
 
 The original “band of six” slogan is RIFF's signature. RIFF doesn't require a fixed team of six agents on every request.
 
-The primary agent can delegate independent packages within a phase. Concurrent writers use separate worktrees and return changes for integration. Reviews can run in parallel on the same frozen candidate. A single owner coordinates phase state, architecture and final acceptance.
+The primary agent can delegate independent packages within a phase. Concurrent writers use separate worktrees and commit on their own branches; the primary agent merges them. Reviews can run in parallel on the same frozen candidate. A single owner coordinates phase state, architecture and final acceptance.
 
 ## How product changes are replanned
 

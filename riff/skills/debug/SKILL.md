@@ -15,7 +15,7 @@ Find the smallest supported cause of the reported failure and fix it, without tu
 
 - The reported failure is reproduced, its cause is explained with evidence, and a minimal fix is in place when the fix is authorized.
 - The failed behavior passes once. A narrow regression check exists only if this case needs one.
-- Observations are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review`, nothing unverified marked resolved, no technical judgment handed to the user.
+- Observations are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review` (by the main agent, when RIFF state exists), nothing unverified marked resolved, no technical judgment handed to the user.
 - Inside an active wave, validation and review evidence went through the wave commands.
 - A failure that teaches something reusable left a verified prevention rule in the project taste, merged before final validation.
 

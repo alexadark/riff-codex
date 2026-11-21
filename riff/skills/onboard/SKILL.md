@@ -14,7 +14,7 @@ Understand the existing application from its code, then record it as the RIFF ba
 ## Done when
 
 - **Map:** user-visible flows are linked to entry points, data boundaries, external systems and sensitive surfaces, with verified facts kept apart from inference. If the map will be reused, `MAP.md` in the RIFF state folder records the inspected revision, sources and remaining uncertainties. No target architecture, implementation plan or exhaustive file inventory.
-- **Onboard:** `PROJECT.md` summarizes current capabilities, architecture, constraints, risks and vocabulary, separating implemented facts from preferences, assumptions and open decisions. `ROADMAP.yaml` lists only requested future outcomes, often none; each phase has a justified P0 to P3 priority, `done_when` and `verify`. `riff wave sync` passed, and the skill stopped there.
+- **Onboard:** `PROJECT.md` summarizes current capabilities, architecture, constraints, risks and vocabulary, separating implemented facts from preferences, assumptions and open decisions. `ROADMAP.yaml` lists only requested future outcomes, often none; each phase has a justified P0 to P3 priority, `done_when` and `verify`. `riff wave sync` passed (a subagent hands it to the main agent), and the skill stopped there.
 - The project taste holds the verified conventions of the actual code and design, merged into existing Claude or project taste without overwriting it. For a UI product, it includes the frontend direction and design-skill routing.
 
 ## Verify
