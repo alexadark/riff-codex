@@ -5,7 +5,7 @@ description: Add one justified vertical phase to an existing RIFF roadmap. Use w
 
 # Add a roadmap phase
 
-`riff` means `node .riff-cli/bin/riff.mjs`. The CLI refuses to change or remove a phase with execution history, keeps a second phase from becoming active, and, for an enrolled project, refuses to activate work until the revised dossier has a fresh passing review.
+`riff` means `node .riff-cli/bin/riff.mjs`. The CLI refuses to change or remove a phase with execution history, keeps a second phase from becoming active, and, for an enrolled project, refuses to activate work until the revised dossier has a fresh passing review. Without RIFF state, stop with one sentence naming the missing state and the next step (operating contract, "Without RIFF state"); as a subagent, hand state commands back to the main agent.
 
 ## Goal
 

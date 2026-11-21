@@ -5,7 +5,7 @@ description: Open or summarize the RIFF project dashboard. Use when the user inv
 
 # Show the RIFF dashboard
 
-`riff` means `node .riff-cli/bin/riff.mjs`. The dashboard reads the projects' saved state and never calls a model or an agent CLI.
+`riff` means `node .riff-cli/bin/riff.mjs`. The dashboard reads the projects' saved state and never calls a model or an agent CLI. Without RIFF state, answer in one sentence: RIFF isn't set up in this checkout, then name the next step (`onboard` for existing code, `start` for a new product); don't show a CLI error. In a linked worktree without its own state, run the command from the main checkout, `$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")`, read-only, and say whose state you report.
 
 ## Goal
 

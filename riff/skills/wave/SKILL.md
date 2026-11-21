@@ -5,7 +5,7 @@ description: Build or resume RIFF roadmap phases until each is verified and comm
 
 # Run a RIFF wave
 
-`riff` means `node .riff-cli/bin/riff.mjs`. The CLI enforces phase order, executed validation, review receipts, retries and completion; when it refuses a step, its message names what is missing.
+`riff` means `node .riff-cli/bin/riff.mjs`. The CLI enforces phase order, executed validation, review receipts, retries and completion; when it refuses a step, its message names what is missing. Without RIFF state, stop with one sentence naming the missing state and the next step (operating contract, "Without RIFF state"); as a subagent, hand state commands back to the main agent.
 
 ## Goal
 

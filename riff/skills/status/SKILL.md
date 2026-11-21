@@ -5,7 +5,7 @@ description: Report where a RIFF project stands from its saved state. Use when t
 
 # Report RIFF status
 
-`riff` means `node .riff-cli/bin/riff.mjs`. `riff status` only reads the state.
+`riff` means `node .riff-cli/bin/riff.mjs`. `riff status` only reads the state. Without RIFF state, answer in one sentence: RIFF isn't set up in this checkout, then name the next step (`onboard` for existing code, `start` for a new product); don't show a CLI error. In a linked worktree without its own state, run the command from the main checkout, `$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")`, read-only, and say whose state you report.
 
 ## Goal
 

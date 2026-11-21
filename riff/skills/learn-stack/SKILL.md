@@ -5,7 +5,7 @@ description: Research and save source-backed stack conventions for the current p
 
 # Learn stack conventions
 
-No RIFF command checks this work: the rules below rest on you. `.riff-cli/references/taste.md` sets precedence between taste sources and the shared artifacts.
+No RIFF command checks this work: the rules below rest on you. Without RIFF state, read the taste references from the RIFF source or plugin folder instead of `.riff-cli/`, and write the project files all the same. `.riff-cli/references/taste.md` sets precedence between taste sources and the shared artifacts.
 
 ## Goal
 

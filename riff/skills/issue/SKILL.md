@@ -5,7 +5,7 @@ description: Publish framed RIFF product outcomes as grouped GitHub issues on ex
 
 # Publish a RIFF GitHub issue
 
-`riff` means `node .riff-cli/bin/riff.mjs`. No RIFF command publishes to GitHub: everything here rests on you, and the project frame and roadmap stay the source of truth.
+`riff` means `node .riff-cli/bin/riff.mjs`. No RIFF command publishes to GitHub: everything here rests on you, and the project frame and roadmap stay the source of truth. Without RIFF state it runs in degraded mode (operating contract, "Without RIFF state"): say so in one line and skip the `riff` commands.
 
 ## Goal
 

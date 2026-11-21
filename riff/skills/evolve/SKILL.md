@@ -5,7 +5,7 @@ description: Plan a change to an existing RIFF product, from one request to seve
 
 # Evolve an existing product
 
-`riff` means `node .riff-cli/bin/riff.mjs`. The CLI refuses to change the contract of an active or finished phase, to remove a phase with execution history, and, for an enrolled project, to activate a phase until the revised dossier has a fresh passing review.
+`riff` means `node .riff-cli/bin/riff.mjs`. The CLI refuses to change the contract of an active or finished phase, to remove a phase with execution history, and, for an enrolled project, to activate a phase until the revised dossier has a fresh passing review. Without RIFF state, stop with one sentence naming the missing state and the next step (operating contract, "Without RIFF state"); as a subagent, hand state commands back to the main agent.
 
 ## Goal
 
