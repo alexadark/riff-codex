@@ -7,7 +7,7 @@ The canonical source for persistent state, wave behavior, delegation and recover
 Read this first; the sections below hold the detail.
 
 - Precedence: owner instructions, then repository rules, then the brief, then the RIFF profile, then a skill.
-- Without RIFF state: `debug`, `quick`, `learn-stack`, `issue` and a map-only `onboard` run degraded; `wave`, `add-phase`, `evolve`, `status` and `dashboard` stop and name the next step. Never install RIFF as a side effect.
+- Without RIFF state: `debug`, `quick`, `learn-stack`, `issue` and a map-only `onboard` run degraded; `wave`, `add-phase`, `evolve` and `status` stop and name the next step. Never install RIFF as a side effect.
 - Subagents never change RIFF state; they hand state commands back. Writing workers commit on their own branch in their own worktree; the main agent merges.
 - A phase is a vertical outcome with a priority, `done_when` and `verify`. States: `ready`, `active`, `completed`, `parked`, `blocked`, `awaiting_human`, `skipped`; selection takes the highest-priority ready phase whose dependencies are done.
 - `loop` mode stops only for a blocker kind: `credentials-or-access`, `third-party-verification`, `destructive-target`, `validation-failure`.
@@ -29,7 +29,7 @@ Without RIFF state:
 
 - `debug`, `quick`, `learn-stack`, `issue` and a map-only `onboard` run in degraded mode. Start the reply with one line saying so: RIFF isn't set up in this checkout, so there is no RIFF state, receipt, observation triage or hook check, and the agent's own checks are the only guardrails. Then work normally and keep evidence in the report or a folder the brief names.
 - `start` installs RIFF itself with `riff init` from the RIFF source (after `init --check` in a repository that already has code).
-- `wave`, `add-phase`, `evolve`, `status` and `dashboard` stop with one sentence naming the missing state and the next step (`onboard` for existing code, `start` for a new product).
+- `wave`, `add-phase`, `evolve` and `status` stop with one sentence naming the missing state and the next step (`onboard` for existing code, `start` for a new product).
 - Never install or repair RIFF as a side effect: no `riff init` or `riff resync`, no change to Git hooks, `core.hooksPath`, `.git/info/exclude`, `.claude/settings.local.json` or `.codex/hooks.json`. Repository plumbing changes only through `onboard`, after `riff init --check` passes.
 
 ## Subagents and workers

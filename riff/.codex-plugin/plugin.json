@@ -16,7 +16,7 @@
     "defaultPrompt": [
       "Use $riff:start to shape this product.",
       "Use $riff:wave to build the next ready phase.",
-      "Use $riff:dashboard to show project progress."
+      "Use $riff:status to show project progress or open the dashboard."
     ]
   }
 }

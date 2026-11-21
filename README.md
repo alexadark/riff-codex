@@ -184,7 +184,7 @@ riff init                       # Terminal, once for this project
 | You want to… | Claude Code | Codex |
 | --- | --- | --- |
 | See progress and the next step | `/riff:status` | `$riff:status` |
-| Open the dashboard | `/riff:dashboard` | `$riff:dashboard` |
+| Open the dashboard | `/riff:status` and ask for the dashboard, or `riff dashboard` | `$riff:status`, or `riff dashboard` |
 | Make a small, separate change | `/riff:quick Make the empty screen easier to understand.` | `$riff:quick ...` |
 | Fix something that is broken | `/riff:debug The save button does nothing.` | `$riff:debug ...` |
 | Add one already-clear outcome | `/riff:add-phase Let people share a recipe.` | `$riff:add-phase ...` |

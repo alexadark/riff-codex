@@ -139,10 +139,10 @@ For a short update:
 /riff:status
 ```
 
-For the visual progress board:
+For the visual progress board, ask the same skill for the dashboard:
 
 ```text
-/riff:dashboard
+/riff:status open the dashboard
 ```
 
 The dashboard shows progress; it does not run the work. You can also open it from Terminal with `riff dashboard`.

@@ -15,7 +15,6 @@
       },
       "skills": [
         "./skills/add-phase",
-        "./skills/dashboard",
         "./skills/debug",
         "./skills/evolve",
         "./skills/issue",
