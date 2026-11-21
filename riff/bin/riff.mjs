@@ -2189,6 +2189,26 @@ function claudeDoctor(root) {
   return results;
 }
 
+// A linked worktree holding a copy of this checkout's state with an active phase makes its
+// pre-commit hook ask for review receipts a batch worker can't produce.
+function copiedWorktreeStates(root) {
+  const notes = [];
+  let list = '';
+  try { list = run('git', ['worktree', 'list', '--porcelain'], { cwd: root }); } catch { return notes; }
+  for (const line of list.split('\n')) {
+    if (!line.startsWith('worktree ')) continue;
+    const worktree = line.slice('worktree '.length);
+    try {
+      if (!existsSync(worktree) || realpathSync(worktree) === realpathSync(root)) continue;
+      const file = [STATE_DIR, CODEX_STATE_DIR].map((dir) => path.join(worktree, dir, 'state.json')).find((candidate) => existsSync(candidate));
+      if (!file || lstatSync(path.dirname(file)).isSymbolicLink()) continue;
+      const active = (readJson(file).phases ?? []).filter((phase) => phase.status === 'active').map((phase) => phase.id);
+      if (active.length) notes.push(`linked worktree ${worktree} holds RIFF state with active phase ${active.join(', ')}: its commits need review receipts. Remove that copy if the worktree is a batch worker; keep it only if it runs the whole phase, then bring it back with riff state import`);
+    } catch { /* unreadable worktree state is that checkout's own business */ }
+  }
+  return notes;
+}
+
 function doctor(root, recordApproval = false) {
   const files = pathsFor(root);
   const results = [];
@@ -2255,6 +2275,7 @@ function doctor(root, recordApproval = false) {
       else add(valid ? 'ok' : 'error', `Git ${name}`, valid ? 'installed and chained' : 'missing RIFF wrapper');
     } catch (error) { add('error', `Git ${name}`, error.message); }
   }
+  for (const note of copiedWorktreeStates(root)) add('warn', 'worktree state', note);
   try { dashboardData(root); add('ok', 'dashboard state', 'readable'); }
   catch (error) { add('error', 'dashboard state', error.message); }
   for (const reviewer of reviewerAvailability(config)) add(reviewer.ok ? 'ok' : 'warn', `reviewer ${reviewer.via}`, reviewer.ok ? reviewer.detail : `${reviewer.detail}; riff review run will skip it`);

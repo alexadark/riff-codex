@@ -403,6 +403,30 @@ test('Git hooks without any reachable CLI skip checkouts without state and block
   }
 });
 
+test('batch workers commit in their own worktrees while phases are active, and doctor flags a copied state', () => {
+  const root = lifecycleFixture();
+  roadmapFixture(root, [{ ...fixturePhase('phase-a'), owns: ['a'] }, { ...fixturePhase('phase-b'), owns: ['b'] }]);
+  runCli(root, 'wave', 'activate', 'phase-a');
+  runCli(root, 'wave', 'activate', 'phase-b');
+  for (const [id, dir] of [['phase-a', 'a'], ['phase-b', 'b']]) {
+    const worker = linkedWorktree(root, `worker-${dir}`);
+    mkdirSync(path.join(worker, dir));
+    writeFileSync(path.join(worker, dir, 'index.txt'), `${id}\n`);
+    execFileSync('git', ['add', '--', dir], { cwd: worker });
+    const commit = gitCommit(worker, '-m', `Build ${id}`);
+    assert.equal(commit.status, 0, commit.stderr);
+  }
+  execFileSync('git', ['merge', '--no-commit', '--no-ff', '-q', 'worker-a', 'worker-b'], { cwd: root });
+  assert.ok(existsSync(path.join(root, 'a', 'index.txt')) && existsSync(path.join(root, 'b', 'index.txt')), 'both worker branches integrate into one candidate');
+  assert.doesNotMatch(runCli(root, 'doctor'), /worktree state/);
+
+  const copied = linkedWorktree(root, 'copied');
+  const stateDir = readdirSync(root).find((name) => ['.riff-data', '.riff-codex-state'].includes(name) && !lstatSync(path.join(root, name)).isSymbolicLink());
+  mkdirSync(path.join(copied, '.riff-data'));
+  writeFileSync(path.join(copied, '.riff-data', 'state.json'), readFileSync(path.join(root, stateDir, 'state.json')));
+  assert.match(runCli(root, 'doctor'), /linked worktree .*copied holds RIFF state with active phase phase-a, phase-b/);
+});
+
 function claudeHookCommand(root, eventName) {
   const settings = JSON.parse(readFileSync(path.join(root, '.claude', 'settings.local.json'), 'utf8'));
   return settings.hooks[eventName].flatMap((group) => group.hooks).find((hook) => hook.command.includes('riff-codex-hook:')).command;
