@@ -2,6 +2,21 @@
 
 The canonical source for persistent state, wave behavior, delegation and recovery. [Evidence](evidence.md) holds the artifact formats, [Git delivery](git-delivery.md) the branch and PR rules, [model routing](model-routing.md) the subagent choice.
 
+## At a glance
+
+Read this first; the sections below hold the detail.
+
+- Precedence: owner instructions, then repository rules, then the brief, then the RIFF profile, then a skill.
+- Without RIFF state: `debug`, `quick`, `learn-stack`, `issue` and a map-only `onboard` run degraded; `wave`, `add-phase`, `evolve`, `status` and `dashboard` stop and name the next step. Never install RIFF as a side effect.
+- Subagents never change RIFF state; they hand state commands back. Writing workers commit on their own branch in their own worktree; the main agent merges.
+- A phase is a vertical outcome with a priority, `done_when` and `verify`. States: `ready`, `active`, `completed`, `parked`, `blocked`, `awaiting_human`, `skipped`; selection takes the highest-priority ready phase whose dependencies are done.
+- `loop` mode stops only for a blocker kind: `credentials-or-access`, `third-party-verification`, `destructive-target`, `validation-failure`.
+- A wave builds the outcome, stages the candidate, runs `wave validate --run` once, gets the functional review (plus security when sensitive) on that tree, allows one targeted correction per failure and two failed review rounds per type, then commits and completes.
+- Phases with non-overlapping `owns` run as one batch: one worker per phase in its own worktree, without a copy of `.riff-data`, one shared candidate, all reviews at once.
+- Wait for long jobs with `timeout` and `wait "$PID"`, never with a `pgrep` or `ps | grep` loop.
+- Before stopping with an active phase, `wave checkpoint`; after compaction, `wave resume`.
+- Merge and deployment follow `riff delivery` and the owner's limits.
+
 ## Precedence
 
 When instructions conflict, follow this order: the owner's own instructions (their messages and personal host instructions such as a user-level `CLAUDE.md` or `AGENTS.md`), then the repository's rules (project `CLAUDE.md`, `AGENTS.md`, contributing rules, Git configuration such as `finish.push`), then the brief of the current task, then the RIFF agent profile, then a RIFF skill or reference. A lower level fills gaps; it never overrides a higher one. Explicit limits for one change (local only, no push, no deploy) always hold.
