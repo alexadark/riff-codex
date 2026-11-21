@@ -1282,6 +1282,19 @@ function checkpointPhase(root, state, phase, options) {
   process.stdout.write(`Checkpoint saved for ${phase.id} at ${candidate}.\n`);
 }
 
+const DEFAULT_VALIDATION_TIMEOUT_SECONDS = 60;
+
+// wave validate --run stops the command after 60 s unless --timeout-seconds or validation.runTimeoutSeconds says otherwise.
+function validationTimeoutSeconds(root, options) {
+  if (options.timeout_seconds !== undefined) {
+    const value = Number(options.timeout_seconds);
+    if (!(value > 0)) throw new Error('--timeout-seconds must be a positive number');
+    return value;
+  }
+  const configured = Number(readJson(pathsFor(root).config, false)?.validation?.runTimeoutSeconds);
+  return configured > 0 ? configured : DEFAULT_VALIDATION_TIMEOUT_SECONDS;
+}
+
 function validateCandidate(root, state, phase, options) {
   // --rerun repeats the last executed validation of the phase: same command, paths and manifest, restaged.
   if (options.rerun === true) {
@@ -1327,12 +1340,14 @@ function validateCandidate(root, state, phase, options) {
   phase.validation = null;
   state.lastValidation = null;
   saveState(root, state);
-  const observed = spawnSync(argv[0], argv.slice(1), { cwd: root, encoding: 'utf8', timeout: 60_000, maxBuffer: 8 * 1024 * 1024 });
+  const timeoutSeconds = validationTimeoutSeconds(root, options);
+  const observed = spawnSync(argv[0], argv.slice(1), { cwd: root, encoding: 'utf8', timeout: timeoutSeconds * 1000, maxBuffer: 8 * 1024 * 1024 });
   const output = `${observed.stdout ?? ''}${observed.stderr ?? ''}`.replace(/\b(?:sk-proj-|(?:sk|rk)_live_|gh[pousr]_)[A-Za-z0-9_-]+\b/g, '[REDACTED]');
   let unchanged = candidateTree(root) === candidate;
   try { run('git', ['diff', '--exit-code'], { cwd: root }); } catch { unchanged = false; }
   const status = observed.status === 0 && !observed.error && unchanged ? 'pass' : 'fail';
-  const summary = !unchanged ? 'Validation changed the candidate; stage and validate the corrected tree.' : observed.error?.message ?? `Command exited ${observed.status ?? observed.signal}`;
+  const timedOut = observed.error?.code === 'ETIMEDOUT';
+  const summary = !unchanged ? 'Validation changed the candidate; stage and validate the corrected tree.' : timedOut ? `Command exceeded ${timeoutSeconds} s and was stopped; raise --timeout-seconds or validation.runTimeoutSeconds in ${STATE_DIR}/config.json` : observed.error?.message ?? `Command exited ${observed.status ?? observed.signal}`;
   const validation = { phase: phase.id, status, command: argv, summary, candidate, executed: true, output, at: now(), allowedPaths: paths, changedPaths: changed, exitCode: observed.status };
   if (visual) validation.verificationManifest = { path: String(options.verification), hash: visual.hash };
   if (phase.verificationRequired && (!visual || visual.manifest.steps.some((step) => step.status !== 'pass'))) validation.status = 'fail';
@@ -2113,7 +2128,7 @@ function cmdWave(tokens) {
     } else if (action === 'validate') {
       activePhase(state, phase);
       const validation = validateCandidate(root, state, phase, options);
-      process.stdout.write(`Validation ${validation.status} recorded for ${id}.\n${validation.verification ? `Report: ${path.join(root, validation.verification.path)}\n` : 'Declaration only; use --run for completion evidence.\n'}`);
+      process.stdout.write(`Validation ${validation.status} recorded for ${id}.\n${validation.status === 'fail' && validation.summary ? `${validation.summary}\n` : ''}${validation.verification ? `Report: ${path.join(root, validation.verification.path)}\n` : 'Declaration only; use --run for completion evidence.\n'}`);
       if (validation.status === 'fail') process.exitCode = 1;
     } else if (action === 'review') {
       activePhase(state, phase);
@@ -3041,7 +3056,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff init --check [--json]   (prerequisites only; changes nothing)\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff delivery [--merge standing|ask|none] [--deploy standing|ask|none]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery|functional,security [--phase ID[,ID...]|--quick] [--since REF] [--timeout-minutes 25]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|decision|risk|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave validate phase-1 --rerun   (same command, paths and manifest as the last run, restaged)\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave decision phase-1 --note "Kept the verbatim quote; redaction happens at display" [--type functional|security|contract]\n  riff wave risk phase-1 --kind crash-window|runtime-unverified|edge-case --severity MEDIUM --summary "..." --note "why it stays open" [--finding "review finding title"]\n  riff wave complete phase-1 --commit HEAD\n  riff wave complete phase-1 --commit HEAD --accept-risks --reason "owner decision"   (owner instruction only)\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n  riff state import --from WORKTREE_PATH --phase phase-1 [--dry-run]\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff init --check [--json]   (prerequisites only; changes nothing)\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff delivery [--merge standing|ask|none] [--deploy standing|ask|none]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery|functional,security [--phase ID[,ID...]|--quick] [--since REF] [--timeout-minutes 25]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|decision|risk|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave validate phase-1 --rerun   (same command, paths and manifest as the last run, restaged)\n  riff wave validate phase-1 --run ... --timeout-seconds 300   (default 60, or validation.runTimeoutSeconds)\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave decision phase-1 --note "Kept the verbatim quote; redaction happens at display" [--type functional|security|contract]\n  riff wave risk phase-1 --kind crash-window|runtime-unverified|edge-case --severity MEDIUM --summary "..." --note "why it stays open" [--finding "review finding title"]\n  riff wave complete phase-1 --commit HEAD\n  riff wave complete phase-1 --commit HEAD --accept-risks --reason "owner decision"   (owner instruction only)\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n  riff state import --from WORKTREE_PATH --phase phase-1 [--dry-run]\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);

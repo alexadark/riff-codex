@@ -1,6 +1,6 @@
 ---
 name: start
-description: Plan a product before building it, from a light roadmap entry to a complete reviewed dossier, or turn a prototype into a production project. Use when the user invokes this skill or the former promote skill by name, or asks RIFF to define a project before building.
+description: Plan a product before building it, from a light roadmap entry to a complete reviewed dossier, or turn a prototype into a production project. Use when the user invokes this skill by name, or asks RIFF to define a project before building.
 ---
 
 # Start a RIFF project

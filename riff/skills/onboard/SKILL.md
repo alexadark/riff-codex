@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Map an existing codebase and bring it into RIFF as a baseline. Use when the user invokes this skill or the former map skill, or asks to map or onboard a project that already has code.
+description: Map an existing codebase and bring it into RIFF as a baseline. Use when the user invokes this skill by name, or asks to map or onboard a project that already has code.
 ---
 
 # Map and onboard an existing project

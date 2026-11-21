@@ -235,6 +235,20 @@ test('status --json and wave context --json expose stable host contracts without
   assert.deepEqual(JSON.parse(ok(root, 'wave', 'context', 'b')), JSON.parse(ok(root, 'wave', 'context', 'b', '--json')));
 });
 
+test('wave validate --run stops after 60 s by default, configurable per run or per project', () => {
+  const root = fixture({ enrolled: false });
+  ok(root, 'wave', 'activate', 'a');
+  write(root, 'README.md', 'feature\n');
+  git(root, 'add', '--', 'README.md');
+  const slow = JSON.stringify([process.execPath, '-e', 'setTimeout(() => {}, 5000)']);
+  rejected(root, /exceeded 1 s and was stopped/, 'wave', 'validate', 'a', '--run', '--command', slow, '--paths', '["README.md"]', '--timeout-seconds', '1');
+  rejected(root, /--timeout-seconds must be a positive number/, 'wave', 'validate', 'a', '--run', '--command', slow, '--paths', '["README.md"]', '--timeout-seconds', '0');
+  const config = read(root, '.riff-data/config.json');
+  write(root, '.riff-data/config.json', { ...config, validation: { runTimeoutSeconds: 1 } });
+  rejected(root, /exceeded 1 s/, 'wave', 'validate', 'a', '--run', '--command', slow, '--paths', '["README.md"]');
+  validate(root);
+});
+
 test('delivery policy defaults to standing merge and asked deployment, follows finish.push and is set per project', () => {
   const root = fixture({ enrolled: false });
   const initial = JSON.parse(ok(root, 'delivery'));
