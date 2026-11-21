@@ -46,7 +46,7 @@ The plugin definitions expose skills; they aren't separate execution engines. Ne
 
 ## Hook safeguards
 
-RIFF keeps six event handlers in each host (`SessionStart`, `PreCompact`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionEnd`) and two chained Git hooks. Post-tool hooks collect focused warnings and validation needs; they don't run tests or typechecks after every edit. Validation and candidate-bound review remain workflow checkpoints.
+RIFF keeps six event handlers in each host (`SessionStart`, `PreCompact`, `PreToolUse`, `PostToolUse`, `Stop`, `SessionEnd`) and two chained Git hooks. Post-tool hooks collect focused warnings and validation needs; they don't run tests or typechecks after every edit. In Claude Code they skip `Bash`, which names no edited file; the pre-commit hook scans what it stages. Validation and candidate-bound review remain workflow checkpoints.
 
 Installation rejects hook directories outside the project or its Git common directory, and a `core.hooksPath` folder tracked by Git (husky, `.githooks`): the wrappers hold machine-local paths that would break commits in other clones. Call the RIFF CLI from those tracked hooks instead. Existing hook sources are preserved through local backups and atomic wrapper replacement; an external symlink target is never overwritten. State mutations use a process lock.
 

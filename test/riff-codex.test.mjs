@@ -423,6 +423,10 @@ test('Claude Code session hooks resolve the CLI in a linked worktree without cre
   assert.equal(JSON.parse(blocked.stdout).hookSpecificOutput.permissionDecision, 'deny', 'the safety guard still runs in the worktree');
   assert.equal(existsSync(path.join(worktree, '.riff-data')), false, 'session hooks never create state in a worktree without it');
 
+  const settings = JSON.parse(readFileSync(path.join(root, '.claude', 'settings.local.json'), 'utf8'));
+  const postMatchers = settings.hooks.PostToolUse.filter((group) => group.hooks.some((hook) => hook.command.includes('riff-codex-hook:'))).map((group) => group.matcher);
+  assert.deepEqual(postMatchers, ['Edit|Write|MultiEdit|NotebookEdit|mcp__.*'], 'Claude Code Bash calls skip the post-edit hook');
+
   const main = runHook(root, 'SessionStart', { source: 'startup' });
   assert.equal(main.status, 0, main.stderr);
   assert.match(readFileSync(path.join(root, '.riff-data', 'events.ndjson'), 'utf8'), /hook_session_start/, 'the main checkout still records events');

@@ -246,11 +246,14 @@ function desiredHooks(script = SCRIPT, host = 'codex') {
   // additionalContextLimit is a Codex field; Claude Code edits through Edit, Write, MultiEdit and NotebookEdit.
   const limit = (size) => (host === 'codex' ? { additionalContextLimit: size } : {});
   const tools = host === 'codex' ? 'Bash|apply_patch|Edit|Write|mcp__.*' : 'Bash|Edit|Write|MultiEdit|NotebookEdit|mcp__.*';
+  // A Claude Code Bash call names no edited file, so the post-edit scan has nothing to read there;
+  // the pre-commit hook scans what Bash stages. Codex keeps Bash: apply_patch can arrive through it.
+  const editTools = host === 'codex' ? tools : 'Edit|Write|MultiEdit|NotebookEdit|mcp__.*';
   return {
     SessionStart: [{ matcher: 'startup|resume|clear|compact', hooks: [handler('session-start', { statusMessage: 'Loading RIFF project context', ...limit(800) })] }],
     PreCompact: [{ matcher: 'manual|auto', hooks: [handler('pre-compact', { statusMessage: 'Saving RIFF checkpoint' })] }],
     PreToolUse: [{ matcher: tools, hooks: [handler('pre-tool', { statusMessage: 'Checking RIFF safety boundary' })] }],
-    PostToolUse: [{ matcher: tools, hooks: [handler('post-tool', { statusMessage: 'Recording RIFF change signals', ...limit(900) })] }],
+    PostToolUse: [{ matcher: editTools, hooks: [handler('post-tool', { statusMessage: 'Recording RIFF change signals', ...limit(900) })] }],
     Stop: [{ hooks: [handler('stop', { statusMessage: 'Checking RIFF handoff' })] }],
     SessionEnd: [{ hooks: [handler('session-end', { timeout: 3 })] }],
   };
@@ -2533,6 +2536,7 @@ function parkForFinding(root, finding) {
 }
 
 function accumulateValidation(root, files) {
+  if (!files.length) return;
   let state;
   try { state = readState(root); } catch { return; }
   const needs = new Set(state.validationNeeds ?? []);
