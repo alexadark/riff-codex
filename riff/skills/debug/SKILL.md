@@ -5,7 +5,7 @@ description: Diagnose and fix a concrete failure, including a live production in
 
 # Debug a concrete failure
 
-`riff` means `node .riff-cli/bin/riff.mjs`. A bug can't wait for RIFF: without RIFF state this skill runs in degraded mode (see below). As a subagent, hand the state commands back to the main agent (operating contract, "Subagents and workers").
+`riff` means `node .riff-cli/bin/riff.mjs`. A bug can't wait for RIFF: without RIFF state this skill runs in degraded mode (see below). As a subagent, hand the state commands back to the main agent (operating contract, "Subagents and workers"). A blocked tool call or commit comes from a RIFF hook (operating contract, "When a RIFF hook blocks").
 
 ## Goal
 

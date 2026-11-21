@@ -23,6 +23,10 @@ A subagent does the code, evidence and artifact drafts of its package and never 
 
 A writing worker commits its package on its own branch in its own worktree; the main agent merges that branch. A worker never commits to, merges into or pushes the integration or default branch, and returns a patch instead of commits only when its brief says so.
 
+## When a RIFF hook blocks
+
+RIFF's host hooks run in every session of an initialized checkout, inside a wave or not. Before a tool call they refuse a high-confidence destructive command and a likely production credential. After an edit they block when a touched file still holds a HIGH or CRITICAL finding (a likely secret, a destructive migration), even if it was already recorded. The Git pre-commit hook scans the staged files the same way. The message names the file and the fix: remove the cause, don't work around the hook; a destructive operation proceeds only with explicit approval and a narrowed target.
+
 ## Product artifacts
 
 - `PROJECT.md` is the product contract and dossier index: vocabulary, users, outcomes, constraints, decisions, assumptions, exclusions. It links detailed contracts instead of copying them. A production `start` follows [discovery](discovery.md); scratch work and the `quick` skill stay light.
