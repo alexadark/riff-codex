@@ -26,3 +26,13 @@ test('the riff plugin exposes every skill except the Codex-only deep-audit', () 
   assert.deepEqual(plugin.skills, skills.map((name) => `./skills/${name}`));
   for (const entry of marketplace.plugins) assert.equal(existsSync(path.join(RIFF, entry.source)), true, entry.source);
 });
+
+test('the Claude marketplace, the Codex plugin and the CLI announce the same RIFF version', () => {
+  const marketplace = JSON.parse(readFileSync(path.join(RIFF, '.claude-plugin', 'marketplace.json'), 'utf8'));
+  const codex = JSON.parse(readFileSync(path.join(RIFF, '.codex-plugin', 'plugin.json'), 'utf8'));
+  const cli = readFileSync(path.join(RIFF, 'bin', 'riff.mjs'), 'utf8').match(/^const VERSION = '([^']+)';$/m)?.[1];
+  const claude = marketplace.plugins.find((entry) => entry.name === 'riff').version;
+  assert.match(cli ?? '', /^\d+\.\d+\.\d+$/);
+  assert.equal(claude, cli, 'bump .claude-plugin/marketplace.json with the CLI: Claude Code refreshes its plugin cache only on a new version');
+  assert.equal(codex.version, cli, 'bump .codex-plugin/plugin.json with the CLI');
+});

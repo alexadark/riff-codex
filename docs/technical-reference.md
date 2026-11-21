@@ -146,7 +146,7 @@ Read the [dashboard README](../riff/dashboard/README.md) and [projection contrac
 - [Quick](../riff/skills/quick/SKILL.md), [debug](../riff/skills/debug/SKILL.md), and [add phase](../riff/skills/add-phase/SKILL.md): everyday changes.
 - [Status](../riff/skills/status/SKILL.md), [dashboard](../riff/skills/dashboard/SKILL.md), [learn stack](../riff/skills/learn-stack/SKILL.md), [issue](../riff/skills/issue/SKILL.md) and [deep audit](../riff/skills/deep-audit/SKILL.md) (Codex only): less frequent workflows.
 
-For framework code changes, the existing test command is `npm test` from the RIFF checkout. Documentation changes need link, content, and rendering checks rather than a full application test run.
+For framework code changes, the existing test command is `npm test` from the RIFF checkout. Claude Code runs skills from its plugin cache, which it refreshes only when the version changes, while `.riff-cli/references/` follows the RIFF folder directly: release every change to `riff/` with a new version in `bin/riff.mjs`, `.claude-plugin/marketplace.json` and `.codex-plugin/plugin.json`, or skill text and references drift apart. `npm test` checks that the three versions agree. Documentation changes need link, content, and rendering checks rather than a full application test run.
 
 ## Executed evidence and production lifecycle
 
