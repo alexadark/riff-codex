@@ -13,7 +13,7 @@ Find the smallest supported cause of the reported failure and fix it, without tu
 
 ## Done when
 
-- The reported failure is reproduced, its cause is explained with evidence, and a minimal fix is in place when the fix is authorized.
+- The reported failure is reproduced, its cause is explained with evidence, and a minimal fix is in place when the fix is authorized. A bug report or a request to repair authorizes the fix; only a destructive or external action (data deletion, production change, publication, a message to someone) needs its own approval.
 - The failed behavior passes once. A narrow regression check exists only if this case needs one.
 - Observations are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review` (by the main agent, when RIFF state exists), nothing unverified marked resolved, no technical judgment handed to the user.
 - Inside an active wave, validation and review evidence went through the wave commands.
@@ -22,6 +22,21 @@ Find the smallest supported cause of the reported failure and fix it, without tu
 ## Verify
 
 Re-run the failing behavior on the fix. For a UI failure, check the rendered screen in a real browser with the relevant design skills from the frontend taste.
+
+Use the strongest evidence available, in this order: the real browser with screenshots; then the DOM, an HTTP response or JSON CLI output; then logs. When the stronger level is impossible (locked screen, no browser, no access), use the next one and name the level and the reason in the report; never present it as a browser check.
+
+## Regression with several symptoms
+
+When one change broke several things, or the symptoms may share a cause:
+
+1. List each symptom with its reproduction, its evidence and its status (reproduced, fixed, verified).
+2. Find the change that introduced it: `git bisect` with a scripted check when one exists, otherwise a keep/revert table commit by commit.
+3. Separate the root cause from secondary bugs it exposed; don't stop at the first plausible cause.
+4. Fix what protects data and users first, then the rest. Each fix gets its own verification against the symptoms it covers, and every symptom is re-run at the end.
+
+## Delivery
+
+Fix on a dedicated branch, in its own worktree when other work shares the checkout, with one commit per fix. Merge, push and deployment follow the project's delivery policy (`riff delivery`, `git-delivery.md`) and the host's instructions; never claim one that didn't happen.
 
 ## Without RIFF state
 
