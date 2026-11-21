@@ -787,6 +787,14 @@ function cmdDelivery(tokens) {
 const PLUGIN_CACHE_MARKER = `${path.sep}plugins${path.sep}cache${path.sep}`;
 
 // Read-only prerequisite check for riff init: what installation would touch and what should stop it.
+// The existing linked worktrees of root's repository, root itself excluded.
+function otherWorktrees(root) {
+  const self = realpathSync(root);
+  return run('git', ['worktree', 'list', '--porcelain'], { cwd: root }).split('\n')
+    .filter((line) => line.startsWith('worktree ')).map((line) => line.slice('worktree '.length))
+    .filter((worktree) => existsSync(worktree) && realpathSync(worktree) !== self);
+}
+
 function initCheck(root) {
   const problems = [];
   const notes = [];
@@ -794,9 +802,7 @@ function initCheck(root) {
   if (PLUGIN_ROOT.includes(PLUGIN_CACHE_MARKER)) problems.push(`this RIFF copy is inside a plugin cache (${PLUGIN_ROOT}); the .riff-cli link would break at the next plugin update. Run init from the RIFF source checkout`);
   const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
   if (path.dirname(common) !== realpathSync(root)) notes.push(`this is a linked worktree; Git hooks are shared with the main checkout ${path.dirname(common)}. Prefer running init there`);
-  const worktrees = run('git', ['worktree', 'list', '--porcelain'], { cwd: root }).split('\n').filter((line) => line.startsWith('worktree ')).map((line) => line.slice('worktree '.length));
-  for (const worktree of worktrees) {
-    if (!existsSync(worktree) || realpathSync(worktree) === realpathSync(root)) continue;
+  for (const worktree of otherWorktrees(root)) {
     let changes = 0;
     try { changes = run('git', ['status', '--porcelain'], { cwd: worktree }).split('\n').filter(Boolean).length; } catch {}
     notes.push(`linked worktree ${worktree}${changes ? ` has ${changes} uncommitted change(s): someone may be working there; wait until that work is finished` : ' shares the Git hooks'}`);
@@ -2193,13 +2199,10 @@ function claudeDoctor(root) {
 // pre-commit hook ask for review receipts a batch worker can't produce.
 function copiedWorktreeStates(root) {
   const notes = [];
-  let list = '';
-  try { list = run('git', ['worktree', 'list', '--porcelain'], { cwd: root }); } catch { return notes; }
-  for (const line of list.split('\n')) {
-    if (!line.startsWith('worktree ')) continue;
-    const worktree = line.slice('worktree '.length);
+  let worktrees = [];
+  try { worktrees = otherWorktrees(root); } catch { return notes; }
+  for (const worktree of worktrees) {
     try {
-      if (!existsSync(worktree) || realpathSync(worktree) === realpathSync(root)) continue;
       const file = [STATE_DIR, CODEX_STATE_DIR].map((dir) => path.join(worktree, dir, 'state.json')).find((candidate) => existsSync(candidate));
       if (!file || lstatSync(path.dirname(file)).isSymbolicLink()) continue;
       const active = (readJson(file).phases ?? []).filter((phase) => phase.status === 'active').map((phase) => phase.id);
