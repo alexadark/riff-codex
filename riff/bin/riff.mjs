@@ -37,7 +37,7 @@ import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 import { recommendPlan } from '../lib/model-advice-plan.mjs';
 import { decideImprovement, ideasFile, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
 
-const VERSION = '0.4.2';
+const VERSION = '0.4.3';
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = path.resolve(path.dirname(SCRIPT), '..');
 const FRAMEWORK_DIR = '.riff-cli';
@@ -166,8 +166,12 @@ function baseState() {
   };
 }
 
+// Set by the host hook entry point: a checkout without a state folder records no events.
+let statelessEventsSkipped = false;
+
 function event(root, type, data = {}) {
   const files = pathsFor(root);
+  if (statelessEventsSkipped && !existsSync(files.riff)) return;
   localPath(root, files.events);
   ensureDir(files.events, true);
   appendFileSync(files.events, `${JSON.stringify({ at: now(), type, ...data })}\n`);
@@ -218,10 +222,24 @@ function quote(value) {
   return `"${String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
+// Claude Code runs project hooks in every linked worktree of a session, for example a subagent
+// with worktree isolation, where the machine-local framework link is absent. Its commands
+// therefore resolve the CLI like the Git wrappers: this checkout, the main checkout, then the
+// absolute install path. Codex reads hooks only from the checkout's own .codex/hooks.json.
+function sessionHookCliResolver(frameworkDir) {
+  return [
+    `riff_cli="$(git rev-parse --show-toplevel 2>/dev/null)/${frameworkDir}/bin/riff.mjs";`,
+    `[ -f "$riff_cli" ] || riff_cli="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")/${frameworkDir}/bin/riff.mjs";`,
+    `[ -f "$riff_cli" ] || riff_cli=${shellQuote(path.join(PLUGIN_ROOT, 'bin', 'riff.mjs'))};`,
+  ].join(' ');
+}
+
 function desiredHooks(script = SCRIPT, host = 'codex') {
+  // A { frameworkDir } script asks for the worktree-aware resolver instead of a fixed path.
+  const cli = typeof script === 'object' ? `${sessionHookCliResolver(script.frameworkDir)} /usr/bin/env node "$riff_cli"` : `/usr/bin/env node ${quote(script)}`;
   const handler = (name, extra = {}) => ({
     type: 'command',
-    command: `/usr/bin/env node ${quote(script)} hook ${name} --id ${HOOK_ID}${name}`,
+    command: `${cli} hook ${name} --id ${HOOK_ID}${name}`,
     timeout: 10,
     ...extra,
   });
@@ -296,6 +314,13 @@ function gitHooksDir(root) {
   const common = realpathSync(run('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: root }));
   if (!inside(root, directory) && !inside(common, directory)) throw new Error('Git hooks directory is outside the project and Git common directory');
   localPath(inside(root, directory) ? root : common, directory);
+  // A core.hooksPath inside the project (husky, .githooks) is usually tracked: RIFF's wrapper holds
+  // machine-local paths and would break commits in every other clone.
+  if (inside(root, directory) && !inside(common, directory)) {
+    const relative = path.relative(root, directory);
+    const tracked = run('git', ['ls-files', '--', relative], { cwd: root });
+    if (tracked) throw new Error(`Git hooks directory ${relative} (core.hooksPath) is tracked by Git; RIFF will not write machine-local wrappers into tracked files. Call the RIFF CLI from those hooks (node .riff-cli/bin/riff.mjs hook git-pre-commit, and hook git-commit-msg "$1"), or unset core.hooksPath, then run RIFF again`);
+  }
   return directory;
 }
 
@@ -626,7 +651,7 @@ function syncManagedUnlocked(root, options) {
   const currentHash = hooksHash(merged);
   const claudeFile = localPath(root, CLAUDE_SETTINGS);
   ensureDir(claudeFile, true);
-  const claudeSettings = mergeClaudeSettings(readJson(claudeFile, false), projectCli);
+  const claudeSettings = mergeClaudeSettings(readJson(claudeFile, false), { frameworkDir: frameworkDirFor(root) });
   writeJson(claudeFile, claudeSettings);
   const preservedSkills = exposeSkills(root, migration);
   config.managed = { ...(config.managed ?? {}), version: VERSION, pluginRoot: PLUGIN_ROOT, cli: `${frameworkDirFor(root)}/bin/riff.mjs`, hooksHash: currentHash, claudeHooksHash: hooksHash(claudeSettings), preservedSkills };
@@ -2972,7 +2997,12 @@ else if (command === 'wave') {
   } catch (error) { fail(error.message); }
 }
 else if (command === 'hook') {
-  try { if (['post-tool', 'pre-compact'].includes(tokens[0])) withLock(gitRoot(), () => cmdHook(tokens)); else cmdHook(tokens); } catch (error) { fail(error.message); }
+  try {
+    // Session hooks also run in linked worktrees without RIFF state; they must not create a state folder there.
+    const root = gitRoot();
+    statelessEventsSkipped = true;
+    if (['post-tool', 'pre-compact'].includes(tokens[0]) && existsSync(pathsFor(root).riff)) withLock(root, () => cmdHook(tokens)); else cmdHook(tokens);
+  } catch (error) { fail(error.message); }
 }
 else if (command === 'next') fail('riff next is intentionally deferred; use the wave skill or riff wave select');
 else fail(`unknown command ${command}; run riff --help`);

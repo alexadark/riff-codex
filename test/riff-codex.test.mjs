@@ -403,6 +403,41 @@ test('Git hooks without any reachable CLI skip checkouts without state and block
   }
 });
 
+function claudeHookCommand(root, eventName) {
+  const settings = JSON.parse(readFileSync(path.join(root, '.claude', 'settings.local.json'), 'utf8'));
+  return settings.hooks[eventName].flatMap((group) => group.hooks).find((hook) => hook.command.includes('riff-codex-hook:')).command;
+}
+
+test('Claude Code session hooks resolve the CLI in a linked worktree without creating state', () => {
+  const root = lifecycleFixture();
+  const worktree = linkedWorktree(root, 'session');
+  const runHook = (cwd, eventName, payload) => spawnSync('/bin/sh', ['-c', claudeHookCommand(root, eventName)], { cwd, encoding: 'utf8', input: JSON.stringify(payload) });
+
+  for (const eventName of ['SessionStart', 'PreToolUse', 'PostToolUse', 'Stop', 'SessionEnd']) {
+    const result = runHook(worktree, eventName, { tool_name: 'Bash', tool_input: { command: 'ls' } });
+    assert.equal(result.status, 0, `${eventName}: ${result.stderr}`);
+    assert.doesNotMatch(result.stderr, /Cannot find module/);
+  }
+  const blocked = runHook(worktree, 'PreToolUse', { tool_name: 'Bash', tool_input: { command: 'git reset --hard HEAD~3' } });
+  assert.equal(blocked.status, 0, blocked.stderr);
+  assert.equal(JSON.parse(blocked.stdout).hookSpecificOutput.permissionDecision, 'deny', 'the safety guard still runs in the worktree');
+  assert.equal(existsSync(path.join(worktree, '.riff-data')), false, 'session hooks never create state in a worktree without it');
+
+  const main = runHook(root, 'SessionStart', { source: 'startup' });
+  assert.equal(main.status, 0, main.stderr);
+  assert.match(readFileSync(path.join(root, '.riff-data', 'events.ndjson'), 'utf8'), /hook_session_start/, 'the main checkout still records events');
+});
+
+test('init refuses to write RIFF wrappers into a tracked core.hooksPath folder', () => {
+  const root = fixture();
+  mkdirSync(path.join(root, '.githooks'));
+  writeFileSync(path.join(root, '.githooks', 'pre-commit'), '#!/bin/sh\nexit 0\n');
+  execFileSync('git', ['add', '.githooks/pre-commit'], { cwd: root });
+  execFileSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: root });
+  assert.match(runCliFailure(root, 'init', '--project-root', root, '--non-interactive'), /\.githooks \(core\.hooksPath\) is tracked by Git/);
+  assert.equal(readFileSync(path.join(root, '.githooks', 'pre-commit'), 'utf8'), '#!/bin/sh\nexit 0\n', 'the tracked hook is untouched');
+});
+
 test('live Stripe secrets are detected before tools, after edits and before commits', () => {
   const root = fixture();
   for (const prefix of ['sk', 'rk']) {
