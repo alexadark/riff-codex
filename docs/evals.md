@@ -31,8 +31,8 @@ npm run eval -- --old main --new HEAD --runs 2 --max-usd 4
 ## What a run can touch
 
 - Everything happens in one scratch folder under the system's temporary folder: both revisions, the fixture project and a home folder for the tools. It is removed at the end, also after Ctrl+C or a failure. Only a forced kill leaves it behind (`riff-ab-*`).
-- User settings, instructions, memory, plugins and MCP servers stay out: only the fixture's project settings load, and the RIFF skills come from the arm's revision. The first event of each session says what it loaded; a session that loaded anything else is stopped, the comparison ends, and its runs don't count. Settings managed by an organization still apply.
-- The environment is rebuilt from a short list. The model process keeps its login and the real home folder to find it; the commands it runs get the scratch home and none of the Claude login variables.
+- User settings, instructions, memory, skills, agents, plugins and MCP servers stay out: only the fixture's project settings load, and the RIFF skills come from the arm's revision. The first event of each session lists its MCP servers, plugins, skills and agents; a session that loaded one of yours, or another plugin, is stopped, the comparison ends, and its runs don't count. Your instruction files don't appear in that event: `/context` in the same setup showed none, but each run doesn't check them. Settings managed by an organization still apply.
+- The environment is rebuilt from a short list. The model process keeps its login and the real home folder to find it; the commands it runs get the scratch home and none of the Claude login variables. Claude Code may still bring your shell's aliases and functions into those commands.
 - The fixture has no Git remote, Git refuses every transport, and the GitHub CLI and package publishing have no credentials.
 - External reviewers are turned off, because their cost is outside the limit. A wave falls back on a native subagent for its reviews, so it doesn't measure the usual review chain.
 

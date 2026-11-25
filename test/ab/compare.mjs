@@ -8,7 +8,7 @@ import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { analyzeRun, exportTree, renderReport } from './analyze.mjs';
-import { commandEnv, isolationProblem, makeHome, modelArgs, modelEnv } from './isolation.mjs';
+import { commandEnv, isolationProblem, makeHome, modelArgs, modelEnv, userExtensions } from './isolation.mjs';
 
 const AB = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(AB, '..', '..');
@@ -127,7 +127,7 @@ function runModel({ dir, project, home, options, pluginDir, capUsd }) {
       try { event = JSON.parse(line); } catch { return; }
       if (event.type !== 'system' || event.subtype !== 'init') return;
       checked = true;
-      const problem = isolationProblem(event, pluginDir);
+      const problem = isolationProblem(event, pluginDir, userExtensions());
       if (problem) end(`not isolated: ${problem}`);
     });
     child.stderr.on('data', (chunk) => appendFileSync(path.join(dir, 'stderr.log'), chunk));
@@ -164,7 +164,7 @@ async function main() {
     for (const [arm, number] of order) {
       const run = `${arm}-${number}`;
       if (!stopped && interrupted) stopped = 'interrupted';
-      if (!stopped && !options.dry && spentUsd >= options.maxUsd) stopped = 'spending limit reached';
+      if (!stopped && !options.dry && options.maxUsd - spentUsd < 0.01) stopped = 'spending limit reached';
       if (stopped) {
         rows.push({ run, arm, counted: false, note: `not started: ${stopped}` });
         continue;
@@ -178,13 +178,19 @@ async function main() {
       const started = Date.now();
       const reason = await runModel({ dir, project, home, options, pluginDir: arms[arm].framework, capUsd });
       const minutes = (Date.now() - started) / 60000;
-      const measured = analyzeRun({ dir, skill: options.skill, base, env });
-      spentUsd += options.dry ? 0 : measured.costUsd ?? capUsd;
-      const note = reason ?? (measured.finished ? '' : `did not finish: ${measured.ending ?? 'no result'}`);
-      rows.push({ run, arm, capUsd, minutes, ...measured, counted: !reason && measured.finished, note });
       mkdirSync(kept);
       for (const file of KEPT_FILES) if (existsSync(path.join(dir, file))) copyFileSync(path.join(dir, file), path.join(kept, file));
-      writeFileSync(path.join(kept, 'changes.patch'), execFileSync('git', ['diff', base, measured.branch ?? base], { cwd: project, env }));
+      let measured;
+      try {
+        measured = analyzeRun({ dir, skill: options.skill, base, env });
+        writeFileSync(path.join(kept, 'changes.patch'), execFileSync('git', ['diff', base, measured.branch ?? base], { cwd: project, env }));
+      } catch (error) {
+        // A project the agent left broken is a result of that run, not a reason to stop the comparison.
+        measured = { finished: false, costUsd: null, measureError: String(error.message).slice(0, 300) };
+      }
+      spentUsd += options.dry ? 0 : measured.costUsd ?? capUsd;
+      const note = reason ?? (measured.measureError ? `could not be measured: ${measured.measureError}` : measured.finished ? '' : `did not finish: ${measured.ending ?? 'no result'}`);
+      rows.push({ run, arm, capUsd, minutes, ...measured, counted: !reason && measured.finished, note });
       rmSync(dir, { recursive: true, force: true });
       if (reason?.startsWith('not isolated') || reason?.startsWith('could not start')) stopped = reason;
     }

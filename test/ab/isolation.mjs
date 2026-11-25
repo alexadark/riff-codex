@@ -1,5 +1,6 @@
 // What a comparison run may see: no user settings, no credentials beyond the model's own, no Git transport.
-import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 
 const KEPT = ['PATH', 'USER', 'LOGNAME', 'LANG', 'LC_ALL', 'TERM', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy', 'NODE_EXTRA_CA_CERTS'];
@@ -51,7 +52,7 @@ export function modelEnv(dir, { home, prefix }) {
   return {
     ...commandEnv(dir, home),
     ...pick([...MODEL_AUTH, 'HOME']),
-    SHELL: '/bin/bash',
+    SHELL: existsSync('/bin/bash') ? '/bin/bash' : 'bash',
     CLAUDE_CODE_SHELL_PREFIX: prefix,
     CLAUDE_CODE_DISABLE_AUTO_MEMORY: '1',
     DISABLE_AUTOUPDATER: '1',
@@ -66,9 +67,19 @@ export function modelArgs({ prompt, model, effort, pluginDir, capUsd }) {
     '--output-format', 'stream-json', '--verbose', '--no-session-persistence'];
 }
 
+// Names of the user's own skills and agents, which an isolated session must not list.
+export function userExtensions() {
+  const config = process.env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), '.claude');
+  const names = (dir) => (existsSync(path.join(config, dir)) ? readdirSync(path.join(config, dir)).map((name) => name.replace(/\.md$/, '')) : []);
+  return { skills: names('skills'), agents: names('agents') };
+}
+
 // Reads the first event of a Claude Code stream: what the session really loaded. Null when isolated.
-export function isolationProblem(init, pluginDir) {
+export function isolationProblem(init, pluginDir, user = { skills: [], agents: [] }) {
   const problems = [];
+  const listed = new Set([...(init.skills ?? []), ...(init.slash_commands ?? []), ...(init.agents ?? [])]);
+  const leaked = [...user.skills, ...user.agents].filter((name) => listed.has(name));
+  if (leaked.length) problems.push(`user skills or agents ${leaked.join(', ')}`);
   const servers = (init.mcp_servers ?? []).map((server) => server.name);
   if (servers.length) problems.push(`MCP servers ${servers.join(', ')}`);
   const plugins = (init.plugins ?? []).filter((plugin) => plugin.path !== 'builtin');
