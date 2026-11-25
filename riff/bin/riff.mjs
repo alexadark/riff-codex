@@ -35,7 +35,8 @@ import { portAvailable, observationList, reviewObservation } from '../lib/dashbo
 import { DISCOVERY_MANIFEST, discoverySnapshot } from '../lib/delivery-contract.mjs';
 import { loadCatalog, MODES, recommend } from '../lib/model-advice.mjs';
 import { recommendPlan } from '../lib/model-advice-plan.mjs';
-import { decideImprovement, ideasFile, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
+import { decideImprovement, ideasFile, improvementPassError, parseProposals, readIdeas, recordImprovements } from '../lib/improvements.mjs';
+import { lessonSummary, planLesson, projectLessons, proveCheck, requireLessons, writeLesson } from '../lib/lessons.mjs';
 
 const VERSION = '0.5.0';
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -1265,6 +1266,11 @@ function requireEnrolledCompletionGates(root, state, phase) {
   if (observationError) throw new Error(observationError);
 }
 
+function requireImprovementPass(state, phase) {
+  const error = improvementPassError(state, phase);
+  if (error) throw new Error(error);
+}
+
 function checkpointPhase(root, state, phase, options) {
   activePhase(state, phase);
   const summary = optionRequired(options, 'summary').trim();
@@ -1346,10 +1352,11 @@ function validateCandidate(root, state, phase, options) {
   const unstaged = run('git', ['diff', '--name-only'], { cwd: root }).split('\n').filter(Boolean);
   if (unstaged.length) throw new Error(`unstaged changes to tracked files: ${unstaged.slice(0, 20).join(', ')}${unstaged.length > 20 ? ` (+${unstaged.length - 20} more)` : ''}. Stage the ones that belong to the phase and restore the others (git restore <file>)`);
   const visual = options.verification ? verificationEvidence(root, options.verification, candidate) : undefined;
+  const timeoutSeconds = validationTimeoutSeconds(root, options);
+  const lessons = requireLessons(root, base, candidate, { run: true, timeoutSeconds });
   phase.validation = null;
   state.lastValidation = null;
   saveState(root, state);
-  const timeoutSeconds = validationTimeoutSeconds(root, options);
   const observed = spawnSync(argv[0], argv.slice(1), { cwd: root, encoding: 'utf8', timeout: timeoutSeconds * 1000, maxBuffer: 8 * 1024 * 1024 });
   const output = `${observed.stdout ?? ''}${observed.stderr ?? ''}`.replace(/\b(?:sk-proj-|(?:sk|rk)_live_|gh[pousr]_)[A-Za-z0-9_-]+\b/g, '[REDACTED]');
   let unchanged = candidateTree(root) === candidate;
@@ -1358,6 +1365,7 @@ function validateCandidate(root, state, phase, options) {
   const timedOut = observed.error?.code === 'ETIMEDOUT';
   const summary = !unchanged ? 'Validation changed the candidate; stage and validate the corrected tree.' : timedOut ? `Command exceeded ${timeoutSeconds} s and was stopped; raise --timeout-seconds or validation.runTimeoutSeconds in ${STATE_DIR}/config.json` : observed.error?.message ?? `Command exited ${observed.status ?? observed.signal}`;
   const validation = { phase: phase.id, status, command: argv, summary, candidate, executed: true, output, at: now(), allowedPaths: paths, changedPaths: changed, exitCode: observed.status };
+  if (lessons.length) validation.lessons = lessons;
   if (visual) validation.verificationManifest = { path: String(options.verification), hash: visual.hash };
   if (phase.verificationRequired && (!visual || visual.manifest.steps.some((step) => step.status !== 'pass'))) validation.status = 'fail';
   validation.verification = writeReport(root, { title: phase.title, phase: phase.id, candidate, validation, evidence: visual, steps: phase.verificationRequired && !visual ? [{ name: 'Required verification', status: 'unverified', observed: 'No verification manifest was supplied.' }] : [] });
@@ -1467,6 +1475,7 @@ function completePhase(root, state, phase, commit) {
   if (!functional || functional.status !== 'pass' || functional.candidate !== commitTree || !evidenceValid(root, functional.evidence)) throw new Error('a passing functional receipt with intact evidence for the exact commit tree is required');
   if (phase.sensitive && (!security || security.status !== 'pass' || security.candidate !== commitTree || !evidenceValid(root, security.evidence))) throw new Error('a passing security receipt with intact evidence for the exact sensitive commit tree is required');
   requireEnrolledCompletionGates(root, state, phase);
+  requireImprovementPass(state, phase);
   markCompleted(root, state, phase, commit);
 }
 
@@ -1522,6 +1531,7 @@ function acceptPhase(root, state, phase, commit, options) {
   }
   if (!waived.length) throw new Error('every required review passed for this commit tree; use riff wave complete without --accept-risks');
   requireEnrolledCompletionGates(root, state, phase);
+  requireImprovementPass(state, phase);
   const at = now();
   addDecision(phase, { note: `Owner stopped review rounds and accepted the residual risks: ${reason}`, type: 'contract', source: 'owner', at });
   phase.acceptance = { source: 'owner', reason: clip(reason, 600), at, commit: run('git', ['rev-parse', commit], { cwd: root }), waived, risks: risks.map((risk) => ({ kind: risk.residual, severity: risk.severity, summary: clip(risk.summary, 200) })) };
@@ -1762,6 +1772,14 @@ function validationContext(root, phase, validation) {
     validation.verification?.path ? `- Report: ${validation.verification.path} (verdict ${validation.verification.verdict ?? 'unknown'})` : null,
     excerpt ? `- Output excerpt:\n\`\`\`\n${excerpt}\n\`\`\`` : '- Output: (empty)',
   ];
+  for (const lesson of validation.lessons ?? []) {
+    const enforced = lesson.enforced_by;
+    const how = lesson.proof ? `check ${lesson.proof.check.join(' ')} run by RIFF: fails on ${lesson.proof.before.slice(0, 12)} showing "${clip(lesson.proof.shows, 160)}", passes on this candidate` : enforced?.check ? `check not shown to fail before the fix: ${clip(enforced.evidence.cannot, 300)}` : enforced?.none ? `no check: ${clip(enforced.none, 300)}` : 'plain lesson, seen once';
+    lines.push(`- Lesson "${clip(lesson.title, 120)}" (seen ${lesson.seen}): ${how}`);
+  }
+  for (const proof of phase.regressions ?? []) {
+    lines.push(proof.cannot ? `- Regression check${proof.file ? ` ${proof.file}` : ''} not shown to fail before the fix: ${clip(proof.cannot, 300)}` : `- Regression check ${proof.file}, run by RIFF at candidate ${proof.candidate}: fails on ${proof.before.slice(0, 12)} showing "${clip(proof.shows, 160)}", passes after the fix`);
+  }
   const verification = verificationSteps(root, phase, validation);
   if (verification) {
     const origin = verification.attested
@@ -2650,6 +2668,8 @@ function preCommit(root) {
     // A linked worktree without its own state must not gain a stray state folder.
     if (existsSync(pathsFor(root).riff)) event(root, 'git_pre_commit_warning', { hook: finding.kind, severity: finding.severity, summary: finding.summary });
   }
+  try { requireLessons(root, baseline(root), candidateTree(root)); }
+  catch (error) { process.stderr.write(`RIFF pre-commit blocked: ${error.message}\n`); return 1; }
   let state;
   try { state = readState(root); } catch { return 0; }
   // A batch commits every active phase at once, so each needs its own evidence for this staged tree.
@@ -2871,7 +2891,8 @@ function cmdImprove(tokens) {
       return;
     }
     const phase = phaseById(state, optionRequired(options, 'phase'));
-    activePhase(state, phase);
+    // The owner can complete a parked phase with accepted risks, so its pass must be recordable too.
+    if (phase.status !== 'parked') activePhase(state, phase);
     const proposals = parseProposals(readJson(localPath(root, optionRequired(options, 'file'))));
     const { recorded, skipped } = recordImprovements({ state, phase, proposals, project: state.project?.name || path.basename(root), ideas, at: now() });
     saveState(root, state);
@@ -2881,6 +2902,58 @@ function cmdImprove(tokens) {
     for (const entry of skipped) lines.push(`  skipped duplicate of ${entry.duplicateOf}: ${entry.title}`);
     process.stdout.write(`${lines.join('\n')}\n`);
   });
+}
+
+function cmdLesson(tokens) {
+  const root = gitRoot();
+  const action = tokens[0] ?? 'list';
+  const options = parseOptions(tokens.slice(1));
+  const tracked = existsSync(pathsFor(root).state);
+  // A checkout without RIFF state (a worker's worktree) writes its taste and gains no state folder.
+  const locked = (work) => (tracked ? withLock(root, work) : work());
+  if (action === 'list') {
+    process.stdout.write(`${JSON.stringify(projectLessons(root).map(lessonSummary), null, 2)}\n`);
+  } else if (action === 'check') {
+    const checked = requireLessons(root, options.since ?? baseline(root), candidateTree(root), { run: true, timeoutSeconds: validationTimeoutSeconds(root, options) });
+    process.stdout.write(`${checked.length} changed lesson(s) checked.\n`);
+  } else if (action === 'record') {
+    const read = () => planLesson(root, readJson(localPath(root, optionRequired(options, 'file'))));
+    const planned = read();
+    const { enforced_by: enforced } = planned.data;
+    // The proof can run for a while; it holds no lock.
+    const proof = enforced?.check && !enforced.evidence.cannot
+      ? proveCheck(root, { candidate: candidateTree(root), file: enforced.file, check: enforced.check, before: enforced.evidence.before, shows: enforced.evidence.shows, timeoutSeconds: validationTimeoutSeconds(root, options) }) : null;
+    locked(() => {
+      const plan = read();
+      if (plan.data.seen !== planned.data.seen) throw new Error(`lesson "${plan.input.title}" changed while its check ran; record it again`);
+      if (proof) plan.data.enforced_by.evidence.before = proof.before;
+      writeLesson(root, plan);
+      if (tracked) event(root, 'lesson_recorded', { title: clip(plan.input.title, 160), seen: plan.data.seen, enforced: plan.data.enforced_by?.rung ?? (plan.data.enforced_by ? 'none' : null) });
+      process.stdout.write(`Lesson recorded in ${plan.topic}, seen ${plan.data.seen}.${proof ? ` Its check fails on ${proof.before.slice(0, 12)} and passes on the candidate.` : ''}\n${plan.existing ? 'The entry text is unchanged; amend it by hand when the rule changed.\n' : `Link ${plan.topic} from taste.md when it is a new topic.\n`}Stage it with the candidate.\n`);
+    });
+  } else if (action === 'prove') {
+    let entry;
+    if (options.cannot !== undefined) {
+      const reason = String(options.cannot).trim();
+      if (options.cannot === true || reason.length < 10) throw new Error('--cannot must state the reason the check cannot be shown failing before the fix (at least 10 characters)');
+      entry = { file: options.file ?? null, cannot: reason };
+      process.stdout.write(`Recorded: the regression check cannot be shown failing before the fix: ${reason}\n`);
+    } else {
+      entry = proveCheck(root, { candidate: candidateTree(root), before: options.before, file: optionRequired(options, 'file'), check: JSON.parse(optionRequired(options, 'check')), shows: optionRequired(options, 'shows'), timeoutSeconds: validationTimeoutSeconds(root, options) });
+      process.stdout.write(`${entry.file} fails on ${entry.before.slice(0, 12)} and passes on the candidate ${entry.candidate.slice(0, 12)}.\nOutput before the fix:\n${entry.output}\n`);
+    }
+    if (tracked) locked(() => {
+      const state = readState(root);
+      const phase = options.phase ? phaseById(state, options.phase) : state.activeWave?.batch?.length > 1 ? null : activePhases(state)[0];
+      if (phase) {
+        activePhase(state, phase);
+        phase.regressions = [...(phase.regressions ?? []), { ...entry, at: now() }];
+        saveState(root, state);
+      }
+      event(root, 'regression_check', { phase: phase?.id ?? null, ...entry, output: undefined });
+      if (!phase) process.stdout.write('No single active phase: kept in the event log; quote it in the report, or pass --phase ID.\n');
+    });
+  } else throw new Error('use lesson list, lesson record --file FILE, lesson check [--since REF], or lesson prove --file FILE --check ARGV --shows TEXT [--before REF] | --cannot REASON');
 }
 
 function gitCommonDir(directory) {
@@ -3084,7 +3157,7 @@ async function cmdModelAdvice(tokens) {
 function help() {
   process.stdout.write('Model advice (never switches the active model):\n  riff model-advice catalog|show\n  riff model-advice configure --mode off|local|jev [--allow-jev-summary]\n  riff model-advice recommend|plan --input FILE|- [--mode off|local|jev] [--allow-jev-summary] [--reason TEXT]\n\n');
   // Keep the lifecycle gates discoverable from the CLI without adding a second workflow.
-  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff init --check [--json]   (prerequisites only; changes nothing)\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff delivery [--merge standing|ask|none] [--deploy standing|ask|none]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery|functional,security [--phase ID[,ID...]|--quick] [--since REF] [--timeout-minutes 25]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|decision|risk|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave validate phase-1 --rerun   (same command, paths and manifest as the last run, restaged)\n  riff wave validate phase-1 --run ... --timeout-seconds 300   (default 60, or validation.runTimeoutSeconds)\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave decision phase-1 --note "Kept the verbatim quote; redaction happens at display" [--type functional|security|contract]\n  riff wave risk phase-1 --kind crash-window|runtime-unverified|edge-case --severity MEDIUM --summary "..." --note "why it stays open" [--finding "review finding title"]\n  riff wave complete phase-1 --commit HEAD\n  riff wave complete phase-1 --commit HEAD --accept-risks --reason "owner decision"   (owner instruction only)\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n  riff state import --from WORKTREE_PATH --phase phase-1 [--dry-run]\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
+  process.stdout.write(`RIFF ${VERSION}\n\nUsage:\n  riff init [--project-root PATH] [--git-init] [--configure] [--non-interactive] [--autonomy loop|guided]\n  riff init --check [--json]   (prerequisites only; changes nothing)\n  riff resync [--record-hooks-approved]\n  riff doctor [--record-hooks-approved]\n  riff dashboard [--port 4000|--no-open|--snapshot|--check]\n  riff status [--json]\n  riff delivery [--merge standing|ask|none] [--deploy standing|ask|none]\n  riff discovery [snapshot|check|review --evidence FILE]\n  riff review run --type discovery|functional|security|delivery|functional,security [--phase ID[,ID...]|--quick] [--since REF] [--timeout-minutes 25]\n  riff wave select --parallel\n  riff observations list\n  riff observations review --id ID --revision REV --status resolved --note "Verified correction"\n  riff wave [select|resume|sync|activate|context|checkpoint|validate|review|decision|risk|retry|park|block|await|complete] ...\n\nWave state examples:\n  riff wave sync [--preserve-legacy-verification]\n  riff wave context [phase-id] [--json]\n  riff wave checkpoint phase-1 --summary "Verified outcome" --next "Next action and references"\n  riff wave activate phase-1\n  riff wave validate phase-1 --run --command '["npm","test"]' --paths '["src","test"]'\n  riff wave validate phase-1 --rerun   (same command, paths and manifest as the last run, restaged)\n  riff wave validate phase-1 --run ... --timeout-seconds 300   (default 60, or validation.runTimeoutSeconds)\n  riff wave park phase-1 --kind validation-failure --reason "Formal retry failed"\n  riff wave review phase-1 --type functional --status pass --summary "Vertical outcome works" --evidence .riff-data/review.json\n  riff wave decision phase-1 --note "Kept the verbatim quote; redaction happens at display" [--type functional|security|contract]\n  riff wave risk phase-1 --kind crash-window|runtime-unverified|edge-case --severity MEDIUM --summary "..." --note "why it stays open" [--finding "review finding title"]\n  riff wave complete phase-1 --commit HEAD\n  riff wave complete phase-1 --commit HEAD --accept-risks --reason "owner decision"   (owner instruction only)\n\nEvidence and lifecycle:\n  riff report --evidence .riff-data/verification.json\n  riff promote [--apply --architecture FILE --roadmap FILE --functional FILE [--security FILE]]\n  riff incident log --evidence FILE\n  riff lesson list\n  riff lesson record --file .riff-data/lesson.json\n  riff lesson check [--since REF]\n  riff lesson prove --file test/x.test.mjs --check '["node","--test","test/x.test.mjs"]' --shows "failure text" [--before REF] [--phase ID]   (or --cannot REASON)\n  riff improve record --phase phase-1 --file .riff-data/improvements.json\n  riff improve list [--target project|riff]\n  riff improve decide --id ID --status taken|dismissed [--note REASON]\n  riff finish --review FILE\n  riff finish --check\n  riff state import --from WORKTREE_PATH --phase phase-1 [--dry-run]\n\nLoop stop kinds: credentials-or-access, third-party-verification, destructive-target, validation-failure.\nRIFF never provides a public next command. Selection belongs to wave.\n`);
 }
 
 const [command, ...tokens] = process.argv.slice(2);
@@ -3119,6 +3192,9 @@ else if (command === 'state') {
 }
 else if (command === 'improve') {
   try { cmdImprove(tokens); } catch (error) { fail(error.message); }
+}
+else if (command === 'lesson') {
+  try { cmdLesson(tokens); } catch (error) { fail(error.message); }
 }
 else if (command === 'observations') {
   try {

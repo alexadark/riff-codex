@@ -198,7 +198,7 @@ RIFF records the reason rather than declaring the step complete. Check `/riff:st
 
 ## Keep design and engineering conventions
 
-Production discovery records the project's conventions in `taste.md` and relevant `taste/` topics. Existing Claude taste is preserved. RIFF reads only what the current work needs and saves proven lessons without a separate approval queue.
+Production discovery records the project's conventions in `taste.md` and relevant `taste/` topics. Existing Claude taste is preserved. RIFF reads only what the current work needs and saves proven lessons without a separate approval queue. An error seen twice gets a check that stops it (architecture, types, lint or CI, then a test); RIFF keeps it as a plain lesson only with the reason no check can.
 
 For frontend work, RIFF applies the relevant design skills to layout, typography, colors, components, accessibility and copy, then checks the rendered screen and interactions in the browser. A passing build is not visual acceptance. New screens get a coherent direction based on the product goal; an existing approved design remains authoritative.
 

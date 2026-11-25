@@ -75,6 +75,10 @@ Run these from an initialized application, unless noted otherwise.
 | `riff discovery check` | Verify current dossier and review integrity. |
 | `riff review run --type discovery\|functional\|security\|delivery [--phase ID\|--quick]` | Run the reviewer chain read-only on the current candidate, write the artifact to `.riff-data/reviews/`, and print the command that records it. |
 | `riff observations list` | List technical and security observations with their status. |
+| `riff lesson list` | List the lessons of `taste.md` and `taste/`, how often each was seen and what enforces it. |
+| `riff lesson record --file FILE` | Record an occurrence of an error. The second one needs a check proved to catch it, or the reason none can. See [learning](../riff/references/learning.md#an-error-seen-twice-gets-a-check). |
+| `riff lesson check [--since REF]` | Judge the lessons the staged candidate adds or changes and run their checks. |
+| `riff lesson prove --file FILE --check ARGV --shows TEXT [--before REF]` | Show that a regression check fails before the fix and passes after it, or record why not with `--cannot REASON`. |
 | `riff wave context [phase-id]` | Read phase references, checkpoint and candidate freshness. |
 | `riff wave checkpoint phase-id --summary TEXT --next TEXT` | Persist a phase recovery checkpoint through the CLI. |
 | `riff finish --review FILE` | Record the independent review of whole-version verification. |

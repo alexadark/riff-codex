@@ -14,14 +14,17 @@ Find the smallest supported cause of the reported failure and fix it, without tu
 ## Done when
 
 - The reported failure is reproduced, its cause is explained with evidence, and a minimal fix is in place when the fix is authorized. A bug report or a request to repair authorizes the fix; only a destructive or external action (data deletion, production change, publication, a message to someone) needs its own approval.
-- The failed behavior passes once. A narrow regression check exists only if this case needs one.
+- The failed behavior passes once. A narrow regression check exists only if this case needs one. When there is one, it fails on the code before the fix, shown in the evidence, or the reason it can't be shown is recorded (see Verify).
 - Observations are triaged: confirmed in-scope problems fixed, decisions recorded with `riff observations review` (by the main agent, when RIFF state exists), nothing unverified marked resolved, no technical judgment handed to the user.
 - Inside an active wave, validation and review evidence went through the wave commands.
-- A failure that teaches something reusable left a verified prevention rule in the project taste, merged before final validation.
+- A first occurrence keeps this narrow fix; if it teaches something reusable, it left a verified prevention rule in the project taste, merged before final validation.
+- An error already seen (`riff lesson list`, `INCIDENTS.md`, or the history of the code) got the strongest check that stops it, in this order: architecture, types, lint or CI, test, and a taste lesson alone last. The reason each stronger rung was passed over is recorded with `riff lesson record` (format in `learning.md`). One check for this error, not hardening around it.
 
 ## Verify
 
 Re-run the failing behavior on the fix. For a UI failure, check the rendered screen in a real browser with the relevant design skills from the frontend taste.
+
+For a regression check, stage the fix and the check, then run `riff lesson prove --file FILE --check '["node","--test","FILE"]' --shows "<failure text>"`: RIFF runs it on the code before the fix (`--before REF`, default `HEAD`), where it must fail with that text, and on the candidate, where it must pass. In an active phase the proof goes to the reviewer. When the old code can't be run, `riff lesson prove --file FILE --cannot "<reason>"` records why. A check recorded by `riff lesson record` is proved there already.
 
 Use the strongest evidence available, in this order: the real browser with screenshots; then the DOM, an HTTP response or JSON CLI output; then logs. When the stronger level is impossible (locked screen, no browser, no access), use the next one and name the level and the reason in the report; never present it as a browser check.
 
@@ -44,7 +47,7 @@ When `.riff-cli` or `.riff-data/state.json` is missing, start the reply with one
 
 - Your own checks are the only guardrails: reproduce, fix and re-run the failing behavior as above.
 - Keep evidence in the report, or in a folder the brief names; don't create tracked files for it unless asked.
-- Skip `riff observations review` and `riff incident log`; list in the report what they would have recorded.
+- Skip `riff observations review`, `riff incident log` and `riff lesson`; list in the report what they would have recorded. Run the regression check on the old code by hand (a throwaway worktree at the commit before the fix) and quote its failure.
 - Don't install or repair RIFF and don't touch repository plumbing (Git hooks, `core.hooksPath`, `.git/info/exclude`, `.claude/settings.local.json`, `.codex/hooks.json`). Bringing the project into RIFF is a separate `onboard`, after its prerequisite check.
 
 ## Production incident

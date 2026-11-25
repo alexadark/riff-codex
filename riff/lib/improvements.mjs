@@ -16,7 +16,7 @@ export function ideasFile(frameworkRepo) {
   return process.env.RIFF_IDEAS_FILE ? path.resolve(process.env.RIFF_IDEAS_FILE) : path.join(frameworkRepo, 'ideas', 'inbox.ndjson');
 }
 
-const titleKey = (title) => title.normalize('NFKD').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+export const titleKey = (title) => title.normalize('NFKD').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 export function parseProposals(proposals) {
   if (!Array.isArray(proposals)) throw new Error('improvement file must be a JSON array of proposals (an empty array is valid)');
@@ -82,4 +82,10 @@ export function decideImprovement(state, { id, status, note, at }) {
   item.status = status;
   item.decision = { note: typeof note === 'string' ? note.trim() : '', at };
   return item;
+}
+
+// The last phase of a version closes only with its improvement pass; an empty one is valid.
+export function improvementPassError(state, phase) {
+  const open = state.phases.some((item) => item.id !== phase.id && !['completed', 'skipped'].includes(item.status));
+  return open || phase.improvementPass ? null : `the last phase of a version needs its improvement pass first: riff improve record --phase ${phase.id} --file FILE (zero to three proposals; an empty array is valid)`;
 }

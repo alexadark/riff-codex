@@ -28,7 +28,7 @@ Make one bounded change that leaves the product roadmap unchanged, on its own br
 1. Establish or reconcile the change's scoped branch.
 2. Read the project taste and only the relevant topics and lessons. For UI work, apply the design skills listed in the frontend taste. Read the security reference for a sensitive boundary.
 3. Work as a single writer: inspect the affected boundary, implement, verify, review, commit. Let the Git hooks record the commit; don't call `riff hook` yourself. A blocked tool call or commit comes from a RIFF hook (operating contract, "When a RIFF hook blocks").
-4. Merge a proven reusable lesson into taste, in proportion to the change.
+4. Merge a proven reusable lesson into taste, in proportion to the change. An error seen twice needs a check, recorded with `riff lesson record` (`references/learning.md`).
 5. If the scope grows or a product decision appears, stop and recommend the `add-phase` skill.
 
 Model advice is optional and never switches the primary model; a request for advice alone stops before implementation. Report the outcome, commit, checks and PR URL or local-only status. Merge and deploy only as the delivery policy allows, and never claim a merge or a deployment that didn't happen.
