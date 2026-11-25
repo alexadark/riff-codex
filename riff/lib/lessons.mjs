@@ -147,7 +147,9 @@ function changedLessons(root, base, candidate) {
   const changed = after.flatMap((section) => {
     const was = before.find((item) => place(item) === place(section));
     if (!section.block) return was ? [{ ...section, problem: `its riff-lesson block was removed; the count of a recorded lesson never goes down. Retire it with retired: "<reason>" in its block instead` }] : [];
-    if (!section.block.error && was && data(was) === data(section)) return [];
+    // Unchanged, or renamed and moved unchanged: its proof was judged when it was recorded.
+    if (!section.block.error && before.some((item) => data(item) === data(section))) return [];
+    if (section.block.data?.retired !== undefined && !(was && seenOf(was) === seenOf(section))) return [{ ...section, problem: 'only a recorded lesson can be retired, with its count unchanged' }];
     const lowered = was && seenOf(was) > seenOf(section) ? `seen went from ${seenOf(was)} to ${seenOf(section)}; the count of a recorded lesson never goes down` : null;
     return [{ ...section, problem: section.block.error ?? lowered ?? lessonProblem(section.block.data) ?? missingEvidence(root, candidate, section.block.data) }];
   });
@@ -192,6 +194,10 @@ export function proveCheck(root, { candidate, before = 'HEAD', file, check, show
   try { commit = git('rev-parse', '--verify', '--quiet', '--end-of-options', `${before}^{commit}`); } catch { throw new Error(`the code before the fix is not a commit of this repository: ${before}`); }
   let blob;
   try { blob = execFileSync('git', ['cat-file', 'blob', `${candidate}:${file}`], { cwd: root, stdio: 'pipe', maxBuffer: 64 * 1024 * 1024 }); } catch { throw new Error(`${file} is not in the staged candidate; stage the fix and its check first`); }
+  // Inside a Git hook, GIT_INDEX_FILE and friends point at the commit in progress: a check must never reach them.
+  const checkEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')));
+  // A missing file or import is unrelated to the error only when it names a file the fix added.
+  const added = git('diff', '--name-only', '--diff-filter=A', commit, candidate).split('\n').filter(Boolean);
   const scratch = realpathSync(mkdtempSync(path.join(tmpdir(), 'riff-proof-')));
   const observe = (name, tree) => {
     const directory = path.join(scratch, name);
@@ -199,7 +205,7 @@ export function proveCheck(root, { candidate, before = 'HEAD', file, check, show
     const target = localPath(directory, file);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, blob);
-    const result = spawnSync(check[0], check.slice(1), { cwd: directory, encoding: 'utf8', timeout: timeoutSeconds * 1000, maxBuffer: 8 * 1024 * 1024 });
+    const result = spawnSync(check[0], check.slice(1), { cwd: directory, env: checkEnv, encoding: 'utf8', timeout: timeoutSeconds * 1000, maxBuffer: 8 * 1024 * 1024 });
     const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.replaceAll(directory, '.').replace(SECRET, '[REDACTED]');
     const label = name === 'before' ? `the code before the fix (${commit.slice(0, 12)})` : 'the candidate';
     if (result.error?.code === 'ETIMEDOUT') throw new Error(`the check exceeded ${timeoutSeconds} s on ${label}; raise validation.runTimeoutSeconds or --timeout-seconds`);
@@ -211,7 +217,7 @@ export function proveCheck(root, { candidate, before = 'HEAD', file, check, show
     const old = observe('before', commit);
     if (old.status === 0) throw new Error(`the check passes on the code before the fix (${commit.slice(0, 12)}), so it does not catch the error. Name the commit that holds it (before), or correct the check`);
     if (!old.output.includes(shows)) throw new Error(`the check fails on the code before the fix but does not show "${shows}". Its output:\n${tail(old.output)}`);
-    if (UNRELATED_FAILURE.test(old.output)) throw new Error(`the check fails on the code before the fix only because a file or import it needs is missing there, not because of the error. Make it test the behavior through code that exists before the fix. Its output:\n${tail(old.output)}`);
+    if (UNRELATED_FAILURE.test(old.output) && added.some((name) => old.output.includes(name))) throw new Error(`the check fails on the code before the fix only because a file or import it needs is missing there, not because of the error. Make it test the behavior through code that exists before the fix. Its output:\n${tail(old.output)}`);
     const fixed = observe('candidate', candidate);
     if (fixed.status !== 0) throw new Error(`the check fails on the candidate:\n${tail(fixed.output)}`);
     if (fixed.output.includes(shows)) throw new Error(`"${shows}" also appears in the check's output on the candidate, so it doesn't single out the error; quote the failure itself`);

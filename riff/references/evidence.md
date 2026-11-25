@@ -20,9 +20,9 @@ The CLI executes the argv without a shell and stops it after 60 seconds by defau
 
 ## Regression checks and lessons
 
-A bug fix's regression check must fail on the code before the fix. `riff lesson prove --file FILE --check ARGV --shows TEXT [--before REF]` runs it there and on the staged candidate, in two exported trees set up the same way (they borrow the project's `node_modules`, `.venv` and `vendor`; there is no Git repository inside). It is refused when the check passes before the fix, fails without showing `TEXT` or only because a file or import is missing, doesn't run, fails on the candidate, or still shows `TEXT` there. `--cannot REASON` records why it can't be shown. In an active phase (or with `--phase ID`) the result is kept with the phase and given to its reviewers; otherwise quote it in the report. Choose `TEXT` from the failure the user saw.
+A bug fix's regression check must fail on the code before the fix. `riff lesson prove --file FILE --check ARGV --shows TEXT [--before REF]` runs it there and on the staged candidate, in two exported trees set up the same way (they borrow the project's `node_modules`, `.venv` and `vendor`; there is no Git repository inside). It is refused when the check passes before the fix, fails without showing `TEXT` or only because a file or import the fix added is missing, doesn't run, fails on the candidate, or still shows `TEXT` there. `--cannot REASON` records why it can't be shown. In an active phase (or with `--phase ID`) the result is kept with the phase and given to its reviewers; otherwise quote it in the report. Choose `TEXT` from the failure the user saw.
 
-`wave validate --run` and the pre-commit hook also run the check of every lesson the candidate adds or changes, with the same limits and timeout, before the phase's own command, and lists them in the receipt (`lessons`). See [learning](learning.md#an-error-seen-twice-gets-a-check).
+`wave validate --run` and the pre-commit hook also run the check of every lesson the candidate adds or changes, with the same limits and timeout (two runs per changed lesson, which a commit waits for), before the phase's own command, and lists them in the receipt (`lessons`). See [learning](learning.md#an-error-seen-twice-gets-a-check).
 
 ## Browser evidence
 
