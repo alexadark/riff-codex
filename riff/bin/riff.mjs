@@ -2668,7 +2668,7 @@ function preCommit(root) {
     // A linked worktree without its own state must not gain a stray state folder.
     if (existsSync(pathsFor(root).riff)) event(root, 'git_pre_commit_warning', { hook: finding.kind, severity: finding.severity, summary: finding.summary });
   }
-  try { requireLessons(root, baseline(root), candidateTree(root)); }
+  try { requireLessons(root, baseline(root), candidateTree(root), { run: true, timeoutSeconds: validationTimeoutSeconds(root, {}) }); }
   catch (error) { process.stderr.write(`RIFF pre-commit blocked: ${error.message}\n`); return 1; }
   let state;
   try { state = readState(root); } catch { return 0; }
@@ -2932,21 +2932,28 @@ function cmdLesson(tokens) {
       process.stdout.write(`Lesson recorded in ${plan.topic}, seen ${plan.data.seen}.${proof ? ` Its check fails on ${proof.before.slice(0, 12)} and passes on the candidate.` : ''}\n${plan.existing ? 'The entry text is unchanged; amend it by hand when the rule changed.\n' : `Link ${plan.topic} from taste.md when it is a new topic.\n`}Stage it with the candidate.\n`);
     });
   } else if (action === 'prove') {
+    // Settle where the result goes before the proof runs; a parked phase can still be completed by the owner.
+    const phaseFor = (state) => {
+      const phase = options.phase ? phaseById(state, options.phase) : state.activeWave?.batch?.length > 1 ? null : activePhases(state)[0];
+      if (phase && phase.status !== 'parked') activePhase(state, phase);
+      return phase;
+    };
+    if (tracked) phaseFor(readState(root));
     let entry;
     if (options.cannot !== undefined) {
       const reason = String(options.cannot).trim();
       if (options.cannot === true || reason.length < 10) throw new Error('--cannot must state the reason the check cannot be shown failing before the fix (at least 10 characters)');
       entry = { file: options.file ?? null, cannot: reason };
-      process.stdout.write(`Recorded: the regression check cannot be shown failing before the fix: ${reason}\n`);
+      process.stdout.write(`The regression check cannot be shown failing before the fix: ${reason}\n`);
     } else {
       entry = proveCheck(root, { candidate: candidateTree(root), before: options.before, file: optionRequired(options, 'file'), check: JSON.parse(optionRequired(options, 'check')), shows: optionRequired(options, 'shows'), timeoutSeconds: validationTimeoutSeconds(root, options) });
       process.stdout.write(`${entry.file} fails on ${entry.before.slice(0, 12)} and passes on the candidate ${entry.candidate.slice(0, 12)}.\nOutput before the fix:\n${entry.output}\n`);
     }
+    if (!tracked) process.stdout.write('Not stored: this checkout has no RIFF state. Quote it in the report.\n');
     if (tracked) locked(() => {
       const state = readState(root);
-      const phase = options.phase ? phaseById(state, options.phase) : state.activeWave?.batch?.length > 1 ? null : activePhases(state)[0];
+      const phase = phaseFor(state);
       if (phase) {
-        activePhase(state, phase);
         phase.regressions = [...(phase.regressions ?? []), { ...entry, at: now() }];
         saveState(root, state);
       }

@@ -15,6 +15,8 @@ const NO_HEADING = '(no heading)';
 const DEFAULT_TOPIC = 'taste/lessons.md';
 // Installed dependencies are not in Git: both exported trees of a proof borrow the project's.
 const DEPENDENCY_FOLDERS = ['node_modules', '.venv', 'vendor'];
+// Failures of the check's own setup, which an older tree causes without the error being there.
+const UNRELATED_FAILURE = /ERR_MODULE_NOT_FOUND|Cannot find module|does not provide an export named|ModuleNotFoundError|No module named|ENOENT: no such file/;
 const SECRET = /\b(?:sk-proj-|(?:sk|rk)_live_|gh[pousr]_)[A-Za-z0-9_-]+\b/g;
 
 const isReason = (value) => typeof value === 'string' && value.trim().length >= REASON_LENGTH;
@@ -29,7 +31,9 @@ function parseLessons(text, file) {
   let section = null;
   let fence = null;
   lines.forEach((line, index) => {
-    const marker = line.match(/^ {0,3}(`{3,}|~{3,})\s*(.*)$/);
+    const found = line.match(/^ {0,3}(`{3,}|~{3,})\s*(.*)$/);
+    // CommonMark: a backtick fence's info string holds no backtick, so ```js``` is inline code.
+    const marker = found && !(found[1][0] === '`' && found[2].includes('`')) ? found : null;
     if (fence) {
       if (!marker || marker[1][0] !== fence.mark[0] || marker[1].length < fence.mark.length || marker[2].trim()) return;
       if (fence.lesson) {
@@ -49,7 +53,10 @@ function parseLessons(text, file) {
       return;
     }
     const heading = line.match(/^#{1,6}\s+(.+?)\s*#*\s*$/);
-    if (!heading) return;
+    if (!heading) {
+      if (section && /\*\*(?:When|Rule and reason|Evidence):\*\*/.test(line)) section.written = true;
+      return;
+    }
     if (section) section.end = index;
     section = line.startsWith('# ') ? null : { title: heading[1], file, start: index, end: lines.length, block: null };
     if (section) sections.push(section);
@@ -64,6 +71,8 @@ const seenOf = (section) => (Number.isInteger(section.block?.data?.seen) ? secti
 function lessonProblem(data) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return 'the riff-lesson block must be a mapping with seen and enforced_by';
   if (!Number.isInteger(data.seen) || data.seen < 1) return 'seen must be a whole number, 1 or more';
+  // A lesson that no longer applies keeps its count and says why it was retired.
+  if (data.retired !== undefined) return isReason(data.retired) ? null : `retired must give the reason the lesson no longer applies (at least ${REASON_LENGTH} characters)`;
   const enforced = data.enforced_by;
   if (enforced === undefined || enforced === null) {
     if (data.seen === 1) return null;
@@ -80,6 +89,7 @@ function lessonProblem(data) {
     if (!isArgv(enforced.check)) return 'enforced_by.check must be the command as an argv array, run without a shell';
     const evidence = enforced.evidence;
     const shown = isText(evidence?.before) && isText(evidence?.shows);
+    if ((evidence?.shows ?? evidence?.before) !== undefined && evidence?.cannot !== undefined) return 'evidence is either before and shows, or cannot, not both';
     if (!shown && !isReason(evidence?.cannot)) return `a check needs its evidence: evidence.before (the commit that holds the error) and evidence.shows (the failure text seen there), or evidence.cannot with the reason it can't be shown (at least ${REASON_LENGTH} characters)`;
   }
   if (data.seen === 1) return null;
@@ -116,29 +126,34 @@ export function lessonSummary(section) {
   return { title: section.title, file: section.file, seen: seenOf(section), enforced_by: section.block?.data?.enforced_by ?? null };
 }
 
-// A recorded lesson names a commit, not a moving reference such as HEAD.
-function unresolvedBefore(data) {
-  const before = data.enforced_by?.evidence?.before;
-  return before !== undefined && !/^[0-9a-f]{40,64}$/.test(before) ? 'enforced_by.evidence.before must be a full commit id' : null;
+// Cheap facts a hand-written block can get wrong: the commit it names and the file of its check.
+function missingEvidence(root, candidate, data) {
+  const enforced = data.enforced_by;
+  if (!enforced?.file || data.retired !== undefined) return null;
+  const exists = (object) => spawnSync('git', ['cat-file', '-e', object], { cwd: root }).status === 0;
+  if (!exists(`${candidate}:${enforced.file}`)) return `enforced_by.file ${enforced.file} is not in the candidate`;
+  const before = enforced.evidence?.before;
+  if (before === undefined) return null;
+  return /^[0-9a-f]{40,64}$/.test(before) && exists(`${before}^{commit}`) ? null : 'enforced_by.evidence.before must be the full id of a commit of this repository';
 }
 
 // Lessons the candidate adds or changes since base. Untouched ones are never judged again.
 function changedLessons(root, base, candidate) {
   if (spawnSync('git', ['diff', '--quiet', base, candidate, '--', 'taste.md', 'taste'], { cwd: root }).status === 0) return [];
-  const before = treeLessons(root, base);
+  const before = treeLessons(root, base).filter((section) => section.block && !section.block.error);
   const after = treeLessons(root, candidate);
-  // Same title in two topics: the highest count is the one that must not go down.
-  const alike = (sections, section) => sections.filter((item) => item.block && titleKey(item.title) === titleKey(section.title));
-  const highest = (sections) => Math.max(0, ...sections.map(seenOf));
-  return after.flatMap((section) => {
-    const same = alike(before, section);
-    const was = highest(same);
-    const is = highest(alike(after, section));
-    const lowered = was > is ? `seen went from ${was} to ${is || 'nothing'}; the count of a recorded lesson never goes down` : null;
-    if (!section.block) return lowered ? [{ ...section, problem: lowered }] : [];
-    if (!section.block.error && same.some((item) => JSON.stringify(item.block.data) === JSON.stringify(section.block.data))) return [];
-    return [{ ...section, problem: section.block.error ?? lowered ?? lessonProblem(section.block.data) ?? unresolvedBefore(section.block.data) }];
+  const place = (section) => `${section.file}\0${titleKey(section.title)}`;
+  const data = (section) => JSON.stringify(section.block?.data);
+  const changed = after.flatMap((section) => {
+    const was = before.find((item) => place(item) === place(section));
+    if (!section.block) return was ? [{ ...section, problem: `its riff-lesson block was removed; the count of a recorded lesson never goes down. Retire it with retired: "<reason>" in its block instead` }] : [];
+    if (!section.block.error && was && data(was) === data(section)) return [];
+    const lowered = was && seenOf(was) > seenOf(section) ? `seen went from ${seenOf(was)} to ${seenOf(section)}; the count of a recorded lesson never goes down` : null;
+    return [{ ...section, problem: section.block.error ?? lowered ?? lessonProblem(section.block.data) ?? missingEvidence(root, candidate, section.block.data) }];
   });
+  // A recorded lesson may move or be renamed unchanged; it may not disappear.
+  const gone = before.filter((item) => !after.some((section) => place(section) === place(item) || (section.block && data(section) === data(item))));
+  return [...changed, ...gone.map((item) => ({ ...item, problem: `the recorded lesson (seen ${seenOf(item)}) was removed or renamed with other changes. Rename it unchanged first, or retire it with retired: "<reason>" in its block` }))];
 }
 
 // Refuses changed lessons that skip the ladder; with `run`, also runs their checks before and after the fix.
@@ -149,7 +164,7 @@ export function requireLessons(root, base, candidate, { run = false, timeoutSeco
   return changed.map((section) => {
     const enforced = section.block.data.enforced_by;
     const summary = { title: section.title, file: section.file, seen: section.block.data.seen, enforced_by: enforced ?? null };
-    if (!run || !enforced?.check || enforced.evidence.cannot) return summary;
+    if (!run || !enforced?.check || enforced.evidence.cannot || section.block.data.retired !== undefined) return summary;
     try { return { ...summary, proof: proveCheck(root, { candidate, file: enforced.file, check: enforced.check, before: enforced.evidence.before, shows: enforced.evidence.shows, timeoutSeconds }) }; }
     catch (error) { throw new Error(`lesson "${section.title}" (${section.file}): ${error.message}`); }
   });
@@ -196,8 +211,10 @@ export function proveCheck(root, { candidate, before = 'HEAD', file, check, show
     const old = observe('before', commit);
     if (old.status === 0) throw new Error(`the check passes on the code before the fix (${commit.slice(0, 12)}), so it does not catch the error. Name the commit that holds it (before), or correct the check`);
     if (!old.output.includes(shows)) throw new Error(`the check fails on the code before the fix but does not show "${shows}". Its output:\n${tail(old.output)}`);
+    if (UNRELATED_FAILURE.test(old.output)) throw new Error(`the check fails on the code before the fix only because a file or import it needs is missing there, not because of the error. Make it test the behavior through code that exists before the fix. Its output:\n${tail(old.output)}`);
     const fixed = observe('candidate', candidate);
     if (fixed.status !== 0) throw new Error(`the check fails on the candidate:\n${tail(fixed.output)}`);
+    if (fixed.output.includes(shows)) throw new Error(`"${shows}" also appears in the check's output on the candidate, so it doesn't single out the error; quote the failure itself`);
     return { file, check, before: commit, shows, candidate, output: tail(old.output) };
   } finally { rmSync(scratch, { recursive: true, force: true }); }
 }
@@ -213,7 +230,8 @@ export function planLesson(root, input) {
   for (const field of ['title', 'evidence']) if (!isText(input[field])) throw new Error(`lesson ${field} is required`);
   const key = titleKey(input.title);
   if (!key) throw new Error('lesson title needs letters or digits');
-  const alike = projectLessons(root).filter((section) => titleKey(section.title) === key);
+  // Topic headings such as "Testing" are not lessons: only a recorded block or the lesson bullets make one.
+  const alike = projectLessons(root).filter((section) => titleKey(section.title) === key && (section.block || section.written));
   // Common headings repeat across topics: a recorded lesson wins over a plain heading, then the named topic.
   const recorded = alike.filter((section) => section.block);
   const named = recorded.length ? recorded : alike.filter((section) => !input.topic || section.file === input.topic);
@@ -229,7 +247,7 @@ export function planLesson(root, input) {
   if (!Number.isInteger(seen) || seen < next) throw new Error(`lesson seen must be a whole number, ${next} or more`);
   const data = { seen, ...(input.enforced_by ? { enforced_by: structuredClone(input.enforced_by) } : {}), ...(input.passed_over ? { passed_over: input.passed_over } : {}) };
   const evidence = data.enforced_by?.evidence;
-  if (evidence?.shows && !evidence.before) evidence.before = 'HEAD';
+  if (evidence?.shows && !evidence.before && evidence.cannot === undefined) evidence.before = 'HEAD';
   const problem = lessonProblem(data);
   if (problem) throw new Error(`lesson "${input.title}": ${problem}`);
   return { existing, topic, data, input };
@@ -238,13 +256,16 @@ export function planLesson(root, input) {
 export function writeLesson(root, { existing, topic, data, input }) {
   const target = localPath(root, topic);
   const bullet = (label, text) => `- **${label}:** ${oneLine(text)}`;
+  const text = existsSync(target) ? readFileSync(target, 'utf8') : '';
+  // Keep the file's own line endings.
+  const eol = text.includes('\r\n') ? '\r\n' : '\n';
   if (!existing) {
-    const previous = existsSync(target) ? `${readFileSync(target, 'utf8').trimEnd()}\n` : '# Lessons\n';
+    const previous = text ? `${text.trimEnd()}\n` : '# Lessons\n';
     mkdirSync(path.dirname(target), { recursive: true });
-    writeFileSync(target, `${previous}\n## ${oneLine(input.title)}\n\n${[bullet('When', input.when), bullet('Rule and reason', input.rule), bullet('Evidence', input.evidence)].join('\n')}\n\n${renderBlock(data)}\n`);
+    writeFileSync(target, `${previous}\n## ${oneLine(input.title)}\n\n${[bullet('When', input.when), bullet('Rule and reason', input.rule), bullet('Evidence', input.evidence)].join('\n')}\n\n${renderBlock(data)}\n`.replace(/\r?\n/g, eol));
     return;
   }
-  const lines = readFileSync(target, 'utf8').split(/\r?\n/);
+  const lines = text.split(/\r?\n/);
   const { start, end, block } = existing;
   const body = block ? [...lines.slice(start, block.start), ...lines.slice(block.end + 1, end)] : lines.slice(start, end);
   while (body.length && !body.at(-1).trim()) body.pop();
@@ -252,5 +273,5 @@ export function writeLesson(root, { existing, topic, data, input }) {
   // Join the evidence to the entry's bullets; a block that followed them left one blank line behind.
   const glue = /^\s*[-*] /.test(body.at(-1)) ? [] : [''];
   const updated = [...lines.slice(0, start), ...body, ...glue, bullet(`Seen again (${data.seen})`, input.evidence), '', ...renderBlock(data).split('\n'), ...(rest.some((line) => line.trim()) ? ['', ...rest] : [''])];
-  writeFileSync(target, updated.join('\n'));
+  writeFileSync(target, updated.join(eol));
 }

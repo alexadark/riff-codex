@@ -34,7 +34,7 @@ Without RIFF state:
 
 ## Subagents and workers
 
-A subagent does the code, evidence and artifact drafts of its package and never changes RIFF state. It ends its report with the state commands its package needs (`riff wave sync`, `riff observations review`, `riff incident log`, validation and review records), and the main agent runs them. A skill's "Done when" item that needs such a command is met when the subagent hands it back and the main agent runs it.
+A subagent does the code, evidence and artifact drafts of its package and never changes RIFF state. It ends its report with the state commands its package needs (`riff wave sync`, `riff observations review`, `riff incident log`, `riff lesson record`, `riff lesson prove`, validation and review records), and the main agent runs them. A skill's "Done when" item that needs such a command is met when the subagent hands it back and the main agent runs it.
 
 A writing worker commits its package on its own branch in its own worktree; the main agent merges that branch. A worker never commits to, merges into or pushes the integration or default branch, and returns a patch instead of commits only when its brief says so.
 

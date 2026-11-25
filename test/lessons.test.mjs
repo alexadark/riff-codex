@@ -35,7 +35,7 @@ function refused(root, pattern, ...args) {
 }
 const record = (root, lesson) => { write(root, '.riff-data/lesson.json', lesson); return ['lesson', 'record', '--file', '.riff-data/lesson.json']; };
 
-const LEGACY = '# Taste\n\n## Old rule\n\n- **When:** always.\n- **Rule and reason:** keep it.\n- **Evidence:** `README.md`.\n';
+const LEGACY = '# Taste\n\n## Testing\n\nUse the node test runner.\n\n## Old rule\n\n- **When:** always.\n- **Rule and reason:** keep it.\n- **Evidence:** `README.md`.\n';
 const CHECK = ['node', 'test/total.check.mjs'];
 // The committed code holds the bug; the staged candidate holds the fix and the check.
 function fixture({ init = true, phases = ['a'] } = {}) {
@@ -50,7 +50,9 @@ function fixture({ init = true, phases = ['a'] } = {}) {
   git(root, 'commit', '-qm', 'Baseline with the bug');
   if (init) { ok(root, 'init', '--project-root', root, '--non-interactive'); ok(root, 'wave', 'sync'); }
   write(root, 'src/total.mjs', 'export const total = (items) => items.reduce((sum, item) => sum + item, 0);\n');
-  write(root, 'test/total.check.mjs', "import { total } from '../src/total.mjs';\nif (total([]) !== 0) throw new Error('wrong total');\n");
+  write(root, 'test/total.check.mjs', "import { total } from '../src/total.mjs';\nif (total([]) !== 0) throw new Error('wrong total');\nconsole.log('checked total');\n");
+  write(root, 'src/helper.mjs', 'export const ok = true;\n');
+  write(root, 'test/helper.check.mjs', "import { ok } from '../src/helper.mjs';\nconsole.log('total', ok);\n");
   write(root, 'test/blind.check.mjs', "import { total } from '../src/total.mjs';\nif (total([1]) !== 1) throw new Error('wrong total');\n");
   git(root, 'add', '--', 'src', 'test');
   return root;
@@ -62,6 +64,8 @@ const proven = (extra = {}) => ({ rung: 'test', file: 'test/total.check.mjs', ch
 test('a repeated failure is refused as a plain lesson until a check that catches it, or why none can, is recorded', () => {
   const root = fixture();
   ok(root, ...record(root, LESSON));
+  // A topic heading is not a lesson: its title starts a new one.
+  ok(root, ...record(root, { ...LESSON, title: 'Testing' }));
   const topic = 'taste/lessons.md';
   assert.match(read(root, topic), /## Empty list totals\n[\s\S]*seen: 1\n/);
   const before = read(root, topic);
@@ -75,7 +79,9 @@ test('a repeated failure is refused as a plain lesson until a check that catches
   reject(/passes on the code before the fix/, { enforced_by: proven({ file: 'test/blind.check.mjs', check: ['node', 'test/blind.check.mjs'] }), passed_over: PASSED });
   reject(/did not run/, { enforced_by: proven({ check: ['no-such-command-anywhere'] }), passed_over: PASSED });
   reject(/does not show/, { enforced_by: proven({ evidence: { shows: 'some other error' } }), passed_over: PASSED });
-  reject(/fails on the candidate/, { enforced_by: proven({ check: ['node', 'test/missing.check.mjs'], evidence: { shows: 'Cannot find module' } }), passed_over: PASSED });
+  reject(/only because a file or import/, { enforced_by: proven({ file: 'test/helper.check.mjs', check: ['node', 'test/helper.check.mjs'], evidence: { shows: 'Error' } }), passed_over: PASSED });
+  reject(/also appears.*on the candidate/s, { enforced_by: proven({ evidence: { shows: 'total' } }), passed_over: PASSED });
+  reject(/not both/, { enforced_by: proven({ evidence: { shows: 'Reduce of empty array', cannot: 'the old code needs a retired sandbox' } }), passed_over: PASSED });
   ok(root, ...record(root, { ...again, enforced_by: proven(), passed_over: PASSED }));
   const entry = JSON.parse(ok(root, 'lesson', 'list')).find((item) => item.title === LESSON.title);
   assert.equal(entry.seen, 2);
@@ -109,6 +115,14 @@ test('validation and commits refuse a hand-written lesson that skips the ladder 
   // The count of a recorded lesson cannot be walked back by hand.
   lesson({ seen: 1 });
   refused(root, /seen.*2.*1/s, 'lesson', 'check');
+  write(root, 'taste/lessons.md', '# Lessons\n');
+  git(root, 'add', '--', 'taste');
+  refused(root, /removed or renamed/, 'lesson', 'check');
+  // A committed block cannot name a check that is not there or a commit that does not exist.
+  lesson({ ...blind, enforced_by: proven({ file: 'test/none.check.mjs', evidence: { before: head, shows: 'x' } }) });
+  assert.throws(() => git(root, 'commit', '-qm', 'Invented check'), /not in the candidate/);
+  lesson({ ...blind, enforced_by: proven({ evidence: { before: '0'.repeat(40), shows: 'x' } }) });
+  assert.throws(() => git(root, 'commit', '-qm', 'Invented commit'), /full id of a commit/);
 });
 
 test('a fix records that its regression check fails before it, or why that cannot be shown', () => {

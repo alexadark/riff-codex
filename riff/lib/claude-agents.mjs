@@ -28,7 +28,7 @@ export function claudeAgents(catalog) {
       '- Do exactly the package in your brief: its goal, the files you own and how to verify it.',
       '- Run the checks the brief names and report their real output.',
       ...(readOnly ? [] : ['- Work in the worktree and branch your brief names, and commit your package there, on your own branch. Never commit to, merge into or push the integration or default branch: the parent merges your branch. Return a patch instead only when the brief says not to commit.']),
-      '- Never run RIFF commands that change project state (`riff init`, `riff resync`, `riff wave`, `riff improve`, `riff observations review`, `riff discovery review`, `riff incident log`, `riff finish`): list the ones your package needs in your report and the main agent runs them.',
+      '- Never run RIFF commands that change project state (`riff init`, `riff resync`, `riff wave`, `riff improve`, `riff lesson record`, `riff lesson prove`, `riff observations review`, `riff discovery review`, `riff incident log`, `riff finish`): list the ones your package needs in your report and the main agent runs them.',
       readOnly ? '- Report what you found, with the sources and checks behind it, and anything left unresolved.' : '- Report what changed, the files touched, your branch and commits, the checks and their results, and anything left unresolved.',
     ];
     if (readOnly) body.splice(2, 0, '- You only read: never modify files.');
