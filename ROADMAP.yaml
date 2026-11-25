@@ -1,0 +1,62 @@
+version: 1
+project: riff
+# Phases of the RIFF framework itself.
+phases:
+  - id: P-001
+    title: A repeated error gets a check before a sentence
+    outcome: When an error has been seen twice, RIFF asks for the strongest check that can stop it (architecture, then types, lint or CI, then a test) and writes a taste lesson only as a last resort.
+    demo: In a fixture project, a first failure leaves a lesson; the same failure seen again is refused as a plain lesson until a check that catches it, or a stated reason why none can, is recorded.
+    priority: P1
+    depends_on: []
+    sensitive: false
+    owns: ["riff/skills/debug", "riff/references/learning.md"]
+    risks:
+      - Every bug turns into hardening work, against the goal of the debug skill.
+      - A check is recorded that doesn't catch the old error.
+    done_when:
+      - "The debug skill and learning.md state the ladder: seen twice, then architecture, types, lint or CI, test, and taste last, with the reason each stronger rung was passed over. A first occurrence keeps today's narrow fix."
+      - "A lesson carries how often it was seen and what enforces it (`enforced_by`: a file and a check, or none with a reason). Existing lessons stay valid unchanged."
+      - "A bug fix's regression check fails on the code before the fix, shown in the evidence, or the reason it can't is recorded."
+      - "The CLI, not the prose, refuses the last rung without its reason and a check without its evidence; projects without the new fields keep working."
+      - "The improvement pass on the last phase of a version, described as required, is enforced by `wave complete` or described as optional: the text and the CLI agree."
+    verify:
+      - "npm test, with failing tests first for each refusal."
+      - "A functional review by another agent."
+  - id: P-002
+    title: Each project's own guardrails always run
+    outcome: RIFF learns a project's lint, type and test commands once, and `wave validate` always runs them, whatever command the agent picks.
+    demo: In a fixture project with a lint and a type command, a wave whose chosen command passes is refused because the type check fails.
+    priority: P1
+    depends_on: [P-001]
+    sensitive: false
+    risks:
+      - Existing projects stop building because a check was already red.
+      - A slow or interactive command blocks every validation.
+    done_when:
+      - "Onboard and start detect the commands a project already has (scripts, config, CI) and record them, with none invented; the user's list wins over the detected one."
+      - "`wave validate --run` runs every recorded guardrail as well as the phase's own command, and reports each one apart; a failing guardrail fails the validation."
+      - "A guardrail already red when recorded is marked as such with its findings: only a new finding fails, and it is shown until fixed."
+      - "A missing tool, a time limit and an interactive command each have a clear result. A project without recorded guardrails behaves as today and `riff doctor` says so."
+      - "The riff repository records its own, and a CI workflow runs them."
+    verify:
+      - "npm test, with failing tests first; the fixture above end to end."
+      - "A functional review by another agent."
+  - id: P-003
+    title: Evals that run on this machine
+    outcome: A framework change can be compared with the version before it, on any machine, with one command and a result to read.
+    demo: One small comparison of two framework revisions on the quick fixture, from a fresh clone, with its table.
+    priority: P1
+    depends_on: []
+    sensitive: false
+    owns: ["test/ab"]
+    risks:
+      - A run uses the user's real settings, pushes, or costs more than announced.
+      - One run is read as a proof.
+    done_when:
+      - "run-arm.sh and analyze.mjs hold no machine path: the two arms are Git revisions given as arguments, checked out in scratch folders that are removed after."
+      - "A dry mode runs everything but the model, in npm test. A model run has a number of runs and a spending limit, isolated settings, no push."
+      - "The report gives each run and its spread, and says not enough data below the number of runs needed."
+      - "Documented in the repository: when to run it and how to read it."
+    verify:
+      - "npm test; the dry mode from a fresh clone in another folder."
+      - "One real quick comparison, at most two runs per arm, its cost reported."
