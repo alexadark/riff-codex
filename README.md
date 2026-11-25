@@ -17,7 +17,7 @@ You describe what you want. RIFF helps your coding agent keep a clear plan, buil
 
 RIFF runs in two coding tools, called hosts: Claude Code and Codex. Connecting a project sets it up for both, so you can switch hosts without reinstalling. The slogan comes from the original RIFF framework; here, the agent in your host coordinates the work and brings in extra help when it's useful.
 
-[Visual field manual](https://riff-codex-doc.vercel.app) · [Installation](docs/installation.md) · [Everyday use](docs/usage.md) · [Model advice](docs/model-advice.md) · [How it works](docs/how-it-works.md)
+[Visual field manual](https://riff-codex-doc.vercel.app) · [Installation](docs/installation.md) · [Everyday use](docs/usage.md) · [Model advice](docs/model-advice.md) · [How it works](docs/how-it-works.md) · [Compare two versions](docs/evals.md)
 
 The visual manual is available online at [riff-codex-doc.vercel.app](https://riff-codex-doc.vercel.app).
 
