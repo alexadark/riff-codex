@@ -1,1 +1,1 @@
-{ "name": "tasklist", "version": "1.0.0", "type": "module", "private": true, "scripts": { "test": "node --test test/" } }
+{ "name": "tasklist", "version": "1.0.0", "type": "module", "private": true, "scripts": { "test": "node --test" } }

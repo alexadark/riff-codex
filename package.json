@@ -12,6 +12,7 @@
   },
   "scripts": {
     "riff": "node ./riff/bin/riff.mjs",
+    "eval": "node ./test/ab/compare.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
