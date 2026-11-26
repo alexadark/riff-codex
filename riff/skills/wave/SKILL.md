@@ -17,7 +17,7 @@ Deliver the selected phase as a complete outcome a user can demonstrate, then co
 - `riff wave validate --run` passed on the staged candidate, and `riff wave review` recorded a passing functional review on that same candidate, plus security for a sensitive phase.
 - The reviewed tree is committed, `riff wave complete <phase> --commit HEAD` succeeded and a short `EXPLAIN-POST.simple.md` is written.
 
-On the last phase of the version, before completing it, record one improvement pass with `riff improve record`: zero to three proposals for the project or RIFF, drawn from the whole version. After the last phase, the connected journeys of the whole version are verified, a delivery review from `riff review run --type delivery` is recorded with `riff finish --review FILE`, and `riff finish --check` passes. Fix in-scope defects through an explicit correction phase.
+On the last phase of the version, before completing it, record one improvement pass with `riff improve record`: zero to three proposals for the project or RIFF, drawn from the whole version; `wave complete` refuses the last phase without it. After the last phase, the connected journeys of the whole version are verified, a delivery review from `riff review run --type delivery` is recorded with `riff finish --review FILE`, and `riff finish --check` passes. Fix in-scope defects through an explicit correction phase.
 
 ## Verify
 
@@ -35,7 +35,7 @@ On the last phase of the version, before completing it, record one improvement p
 2. Establish the evolution's integration branch before building.
 3. Read only what the phase needs: its stories, criteria and contracts linked from `PROJECT.md`, the project taste and relevant topics, applicable lessons, and the security reference for a sensitive phase. Finish missing planning or design before building.
 4. Build the whole vertical outcome. Reuse existing components and services and keep behavior outside the phase intact. Delegate where it pays, per `references/model-routing.md`: explore separate modules in parallel on read-only subagents, settle shared contracts yourself, then hand each independent, sizeable package to its own subagent, all launched in one message so they run at once. Keep dependent steps and small changes yourself. Concurrent writers use separate worktrees and commit on their own branches; you merge them, own RIFF state and verify the assembled result. Subagents hand state commands back to you (see the operating contract).
-5. Before freezing the candidate, merge proven lessons into taste and fix pending HIGH or CRITICAL observations; they block completion. Lower ones stay listed in the dashboard.
+5. Before freezing the candidate, merge proven lessons into taste (an error seen twice needs a check, `learning.md`) and fix pending HIGH or CRITICAL observations; they block completion. Lower ones stay listed in the dashboard.
 6. Validate, review, commit, complete, and write the short `EXPLAIN-POST.simple.md`. Run `riff wave checkpoint <phase> --summary ... --next ...` only when you stop before completion.
 7. Open or update the draft PR only when publication is authorized; otherwise continue locally. Merge and deployment follow the project's delivery policy (`riff delivery`, described in `references/git-delivery.md`): with `merge: standing`, once final gates and required GitHub checks pass, merge into the target base and report the deployment it triggers; a separate production deployment step follows `deploy`.
 
